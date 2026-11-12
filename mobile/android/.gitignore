@@ -1,3 +1,8 @@
 
 # Per-machine SDK paths, written by Flutter
 local.properties
+
+# Release signing (written by CI from secrets; never commit)
+key.properties
+*.jks
+*.keystore

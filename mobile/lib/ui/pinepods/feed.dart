@@ -24,6 +24,7 @@ import 'package:pinepods_mobile/services/global_services.dart';
 import 'package:pinepods_mobile/services/offline/offline_action_queue.dart';
 import 'package:provider/provider.dart';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
 import 'package:sliver_tools/sliver_tools.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
@@ -59,20 +60,38 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
   bool _favoritesOnly = false;
   Set<int> _favoritePodcastIds = {};
 
+  // Hide episodes already played. Independent of the favorites filter, and
+  // remembered between launches.
+  static const _hidePlayedKey = 'feed_hide_played';
+  bool _hidePlayed = false;
+
   /// Original indices into [_episodes] that are currently visible given the
-  /// favorites filter. Used so index-based handlers still address [_episodes].
+  /// favorites and played filters. Used so index-based handlers still address
+  /// [_episodes].
   List<int> get _visibleIndices {
-    if (!_favoritesOnly) {
-      return List<int>.generate(_episodes.length, (i) => i);
-    }
     final indices = <int>[];
     for (var i = 0; i < _episodes.length; i++) {
-      final pid = _episodes[i].podcastId;
-      if (pid != null && _favoritePodcastIds.contains(pid)) {
-        indices.add(i);
+      final episode = _episodes[i];
+      if (_hidePlayed && episode.completed) continue;
+      if (_favoritesOnly) {
+        final pid = episode.podcastId;
+        if (pid == null || !_favoritePodcastIds.contains(pid)) continue;
       }
+      indices.add(i);
     }
     return indices;
+  }
+
+  Future<void> _loadHidePlayed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hide = prefs.getBool(_hidePlayedKey) ?? false;
+    if (mounted && hide != _hidePlayed) setState(() => _hidePlayed = hide);
+  }
+
+  Future<void> _toggleHidePlayed() async {
+    setState(() => _hidePlayed = !_hidePlayed);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hidePlayedKey, _hidePlayed);
   }
 
   @override
@@ -84,6 +103,7 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
       final updated = PositionUtils.applyUpdate(_episodes, update);
       if (!identical(updated, _episodes)) setState(() => _episodes = updated);
     });
+    _loadHidePlayed();
     _loadRecentEpisodes();
   }
 
@@ -927,6 +947,12 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
                 selected: _favoritesOnly,
                 onTap: _toggleFavoritesFilter,
               ),
+              ToolbarFilter(
+                label: L.of(context)!.hide_played,
+                icon: _hidePlayed ? PhosphorIconsFill.eyeSlash : PhosphorIconsRegular.eyeSlash,
+                selected: _hidePlayed,
+                onTap: _toggleHidePlayed,
+              ),
             ],
           ),
         ),
@@ -940,6 +966,8 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
     final visibleIndices = _visibleIndices;
     final showEmptyFavorites =
         _favoritesOnly && visibleIndices.isEmpty && !showFooter;
+    final showEmptyUnplayed =
+        !_favoritesOnly && _hidePlayed && _episodes.isNotEmpty && visibleIndices.isEmpty && !showFooter;
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
@@ -948,6 +976,12 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
               icon: PhosphorIconsRegular.star,
               title: L.of(context)!.no_favorite_episodes,
               body: L.of(context)!.favorites_empty_body,
+            );
+          }
+          if (showEmptyUnplayed && index == 0) {
+            return SoftEmptyState(
+              icon: PhosphorIconsRegular.checkCircle,
+              title: L.of(context)!.no_episodes_match_filter,
             );
           }
 
@@ -983,7 +1017,7 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
           );
         },
         // Visible episodes, + optional footer or empty message
-        childCount: (showEmptyFavorites ? 1 : visibleIndices.length) +
+        childCount: (showEmptyFavorites || showEmptyUnplayed ? 1 : visibleIndices.length) +
             (showFooter ? 1 : 0),
       ),
     );

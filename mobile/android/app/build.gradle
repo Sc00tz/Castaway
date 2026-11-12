@@ -78,7 +78,10 @@ android {
         }
 
         release {
-            signingConfig signingConfigs.release
+            // Signed with the release key when android/key.properties exists (CI writes it from
+            // secrets). Without one, fall back to the debug key so the build still produces an
+            // installable APK; such builds can't update an app signed with the release key.
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

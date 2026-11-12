@@ -2363,5 +2363,9 @@
     }
   },
   "collection_empty_body": "Long-press an episode and choose Add to Collection, or select several on a podcast's page.",
-  "new_collection_chip": "New"
+  "new_collection_chip": "New",
+  "hide_played": "Hide played",
+  "@hide_played": {
+    "description": "Toggle on episode lists that hides episodes already played"
+  }
 }

@@ -1110,19 +1110,12 @@ class TitleWidget extends StatelessWidget {
               padding: const EdgeInsets.only(left: 2.0),
               child: Row(
                 children: <Widget>[
+                  Image.asset('assets/images/pinepods-logo.png', width: 26, height: 26),
+                  const SizedBox(width: 8),
                   const Text(
-                    'Pine', // i18n-ignore
+                    'Castaway', // i18n-ignore
                     style: TextStyle(
-                      color: Color(0xFF539e8a),
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'MontserratRegular',
-                      fontSize: 18,
-                    ),
-                  ),
-                  Text(
-                    'Pods', // i18n-ignore
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white,
+                      color: Color(0xFF169DCA), // Castaway blue
                       fontWeight: FontWeight.bold,
                       fontFamily: 'MontserratRegular',
                       fontSize: 18,

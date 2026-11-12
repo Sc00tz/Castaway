@@ -372,10 +372,6 @@ pub fn search_bar() -> Html {
         let s = select_src.clone();
         Callback::from(move |_: MouseEvent| s("itunes"))
     };
-    let select_youtube = {
-        let s = select_src.clone();
-        Callback::from(move |_: MouseEvent| s("youtube"))
-    };
 
     // Mobile takeover callbacks
     let on_expand = {
@@ -420,14 +416,6 @@ pub fn search_bar() -> Html {
         })
     };
 
-    let select_youtube_mobile = {
-        let search_index = search_index.clone();
-        let src_menu_open = src_menu_open.clone();
-        Callback::from(move |_: MouseEvent| {
-            search_index.set("youtube".to_string());
-            src_menu_open.set(false);
-        })
-    };
 
     let on_keydown_takeover = {
         let expanded = expanded.clone();
@@ -571,11 +559,6 @@ pub fn search_bar() -> Html {
                                         onclick={select_itunes.clone()}>
                                         {"iTunes"}
                                     </button>
-                                    <button type="button"
-                                        class={classes!("src-dropdown-item", (*search_index == "youtube").then_some("is-active"))}
-                                        onclick={select_youtube.clone()}>
-                                        {"YouTube"}
-                                    </button>
                                 </div>
                             }
                         </div>
@@ -654,13 +637,6 @@ pub fn search_bar() -> Html {
                                             aria-current={(*search_index == "itunes").then_some("true")}>
                                         <i class="ph ph-apple-logo"></i>
                                         <span>{"iTunes"}</span>
-                                    </button>
-                                    <button type="button"
-                                            class={classes!("src-menu-item", (*search_index == "youtube").then_some("is-active"))}
-                                            onclick={select_youtube_mobile.clone()}
-                                            aria-current={(*search_index == "youtube").then_some("true")}>
-                                        <i class="ph ph-youtube-logo"></i>
-                                        <span>{"YouTube"}</span>
                                     </button>
                                 </div>
                             }

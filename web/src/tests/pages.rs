@@ -160,6 +160,26 @@ async fn shown_when_signed_in(page: Page, routes: Value) -> String {
     shown
 }
 
+/// Like [`shown_when_signed_in`], but waits (up to 5 seconds) for `wait_for` to appear
+/// instead of reading the page after a fixed delay. For pages that load data before showing it:
+/// on a slow CI runner the fixed delay can catch them still on their loading message.
+async fn shown_when_signed_in_once_it_shows(page: Page, routes: Value, wait_for: &str) -> String {
+    answer_api_with(routes);
+    sign_in();
+    let (root, app) = render(page).await;
+    let mut shown = text(&root);
+    for _ in 0..50 {
+        if shown.contains(wait_for) {
+            break;
+        }
+        TimeoutFuture::new(100).await;
+        shown = text(&root);
+    }
+    close(root, app);
+    sign_out();
+    shown
+}
+
 fn assert_shows(shown: &str, expected: &str) {
     assert!(shown.contains(expected), "expected {expected:?} on the page, got: {shown}");
 }
@@ -257,7 +277,7 @@ async fn queued_episodes_are_listed() {
 
 #[wasm_bindgen_test]
 async fn the_stats_page_shows_the_servers_numbers() {
-    let shown = shown_when_signed_in(
+    let shown = shown_when_signed_in_once_it_shows(
         Page::Stats,
         json!({ "/api/data/get_stats": {
             "UserCreated": "2026-01-02T03:04:05",
@@ -269,6 +289,7 @@ async fn the_stats_page_shows_the_servers_numbers() {
             "GpodderUrl": "",
             "Pod_Sync_Type": "None",
         } }),
+        "321",
     )
     .await;
     assert_shows(&shown, "321");
