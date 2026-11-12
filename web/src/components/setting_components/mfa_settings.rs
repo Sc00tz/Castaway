@@ -1,6 +1,5 @@
 use crate::components::context::{AppState, NotificationState};
 use crate::components::gen_funcs::format_error_message;
-use crate::components::safehtml::SafeHtml;
 use crate::requests::setting_reqs::{
     call_disable_mfa, call_generate_mfa_secret, call_mfa_settings, call_verify_temp_mfa,
 };
@@ -308,7 +307,16 @@ pub fn mfa_options() -> Html {
                         {&i18n_scan_qr_or_enter_code}
                     </p>
                     <div style="align-self:center;background:#fff;border-radius:8px;overflow:hidden;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,.2);">
-                        <SafeHtml html={qr_code_svg} />
+                        // Shown as an image so the server's SVG never becomes part of the page's
+                        // HTML (SafeHtml would sanitize it away, and it doesn't need scripting).
+                        <img
+                            alt="MFA QR code"
+                            style="display:block;width:200px;height:200px;"
+                            src={format!("data:image/svg+xml;base64,{}", {
+                                use base64::Engine;
+                                base64::engine::general_purpose::STANDARD.encode(qr_code_svg.as_bytes())
+                            })}
+                        />
                     </div>
                     <div class="mfa-code-box" style="padding:10px 14px;border-radius:6px;overflow-x:auto;white-space:nowrap;max-width:100%;font-size:13px;">
                         {(*mfa_secret).clone()}

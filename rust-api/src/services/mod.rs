@@ -9,6 +9,7 @@ pub mod feed_health;
 pub mod feed_metadata;
 pub mod feed_transcripts;
 pub mod feeds;
+pub mod html;
 pub mod http;
 pub mod oidc;
 pub mod people;

@@ -71,6 +71,9 @@ pub fn oauth_callback() -> Html {
     let i18n_authentication_failed = i18n.t("oauth_callback.authentication_failed").to_string();
     let i18n_invalid_provider = i18n.t("oauth_callback.invalid_provider").to_string();
     let i18n_no_access = i18n.t("oauth_callback.no_access").to_string();
+    let i18n_email_not_verified = i18n.t("oauth_callback.email_not_verified").to_string();
+    let i18n_registration_disabled = i18n.t("oauth_callback.registration_disabled").to_string();
+    let i18n_account_linked_elsewhere = i18n.t("oauth_callback.account_linked_elsewhere").to_string();
     let i18n_unexpected_error = i18n.t("oauth_callback.unexpected_error").to_string();
     let i18n_no_auth_info = i18n
         .t("oauth_callback.no_authentication_information")
@@ -231,6 +234,9 @@ pub fn oauth_callback() -> Html {
         let i18n_authentication_failed_effect = i18n_authentication_failed.clone();
         let i18n_invalid_provider_effect = i18n_invalid_provider.clone();
         let i18n_no_access_effect = i18n_no_access.clone();
+        let i18n_email_not_verified_effect = i18n_email_not_verified.clone();
+        let i18n_registration_disabled_effect = i18n_registration_disabled.clone();
+        let i18n_account_linked_elsewhere_effect = i18n_account_linked_elsewhere.clone();
         let i18n_unexpected_error_effect = i18n_unexpected_error.clone();
         let i18n_no_auth_info_effect = i18n_no_auth_info.clone();
 
@@ -244,6 +250,9 @@ pub fn oauth_callback() -> Html {
             let i18n_authentication_failed = i18n_authentication_failed_effect.clone();
             let i18n_invalid_provider = i18n_invalid_provider_effect.clone();
             let i18n_no_access = i18n_no_access_effect.clone();
+            let i18n_email_not_verified = i18n_email_not_verified_effect.clone();
+            let i18n_registration_disabled = i18n_registration_disabled_effect.clone();
+            let i18n_account_linked_elsewhere = i18n_account_linked_elsewhere_effect.clone();
             let i18n_unexpected_error = i18n_unexpected_error_effect.clone();
             let i18n_no_auth_info = i18n_no_auth_info_effect.clone();
 
@@ -410,6 +419,9 @@ pub fn oauth_callback() -> Html {
                         "authentication_failed" => i18n_authentication_failed.clone(),
                         "invalid_provider" => i18n_invalid_provider.clone(),
                         "no_access" => i18n_no_access.clone(),
+                        "email_not_verified" => i18n_email_not_verified.clone(),
+                        "registration_disabled" => i18n_registration_disabled.clone(),
+                        "account_linked_elsewhere" => i18n_account_linked_elsewhere.clone(),
                         _ => i18n_unexpected_error.clone(),
                     };
                     page_state.set(PageState::Error(error_message));

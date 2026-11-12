@@ -129,6 +129,8 @@ impl TestApp {
                 roles_claim: None,
                 user_role: None,
                 admin_role: None,
+                auto_create_users: None,
+                trust_unverified_email: false,
             },
             api: ApiConfig {
                 search_api_url: fixtures.url("search-api/api/search"),

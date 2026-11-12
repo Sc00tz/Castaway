@@ -103,23 +103,14 @@ async fn download_episode_and_wait(
             .await
             .map_err(|reason| crate::error::AppError::Internal(format!("Refusing to download episode URL: {}", reason)))?;
 
-        // Download the file. Redirects are re-validated by the same guard so a
-        // public URL cannot 30x-redirect into the internal network.
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::custom(|attempt| {
-                match crate::services::url_guard::ensure_safe_public_url(attempt.url().as_str()) {
-                    Ok(()) => attempt.follow(),
-                    Err(_) => attempt.stop(),
-                }
-            }))
-            .build()
-            .map_err(|e| crate::error::AppError::Internal(format!("Failed to build HTTP client: {}", e)))?;
-        let mut response = client.get(&episode_url)
+        // Download the file. The guarded client re-checks every redirect and DNS answer, so a
+        // public URL cannot 30x-redirect (or rebind) into the internal network.
+        let mut response = crate::services::http::download_client().get(&episode_url)
             .header("Accept", "*/*")
             .header("User-Agent", "PinePods/1.0")
             .send()
             .await
-            .map_err(|e| crate::error::AppError::Internal(format!("Failed to start download: {}", e)))?;
+            .map_err(|e| crate::error::AppError::Internal(format!("Failed to start download: {}", crate::services::http::describe_error(&e))))?;
     
         if !response.status().is_success() {
             return Err(crate::error::AppError::Internal(format!("Server returned error: {}", response.status())));
@@ -494,9 +485,16 @@ impl TaskSpawner {
                 let (downloaded, mut fingerprint) = if let Some((size, fp)) = reused.clone() {
                     (size, fp)
                 } else {
+                    // SSRF guard: episode_url is the feed's <enclosure url>, which the feed's
+                    // author controls. Refuse internal destinations before any request, and
+                    // use the guarded client so redirects and DNS answers are checked too.
+                    crate::services::url_guard::ensure_safe_public_url_async(&episode_url)
+                        .await
+                        .map_err(|reason| crate::error::AppError::bad_request(format!("Refusing to download episode URL: {}", reason)))?;
+
                     // Download the file. Send a podcast-client User-Agent first; some hosts
                     // (e.g. Buzzsprout) reject requests without one with 403 Forbidden.
-                    let client = reqwest::Client::new();
+                    let client = crate::services::http::download_client();
                     let build_request = |client: &reqwest::Client, user_agent: &str| {
                         let mut request = client
                             .get(&episode_url)
@@ -513,7 +511,7 @@ impl TaskSpawner {
                     let mut response = build_request(&client, "PinePods/1.0")
                         .send()
                         .await
-                        .map_err(|e| crate::error::AppError::internal(&format!("Failed to start download: {}", e)))?;
+                        .map_err(|e| crate::error::AppError::internal(&format!("Failed to start download: {}", crate::services::http::describe_error(&e))))?;
 
                     // If we get a 403, the host may be blocking podcast-client User-Agents.
                     // Retry with a browser User-Agent as a fallback (mirrors feed-refresh fetch).
@@ -522,7 +520,7 @@ impl TaskSpawner {
                         let browser_response = build_request(&client, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                             .send()
                             .await
-                            .map_err(|e| crate::error::AppError::internal(&format!("Failed to start download: {}", e)))?;
+                            .map_err(|e| crate::error::AppError::internal(&format!("Failed to start download: {}", crate::services::http::describe_error(&e))))?;
                         if browser_response.status().is_success() {
                             response = browser_response;
                         }

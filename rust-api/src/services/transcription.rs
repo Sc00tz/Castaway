@@ -226,16 +226,7 @@ async fn fetch_episode_audio_temp(db_pool: &DatabasePool, episode_id: i32) -> Re
         .map_err(|e| format!("failed to create temp dir: {}", e))?;
     let tmp_path = format!("{}/{}.mp3", crate::paths::transcribe_tmp_dir(), episode_id);
 
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            match crate::services::url_guard::ensure_safe_public_url(attempt.url().as_str()) {
-                Ok(()) => attempt.follow(),
-                Err(_) => attempt.stop(),
-            }
-        }))
-        .build()
-        .map_err(|e| e.to_string())?;
-    let mut req = client
+    let mut req = crate::services::http::download_client()
         .get(&url)
         .header("User-Agent", "PinePods/1.0")
         .header("Accept", "*/*");

@@ -61,7 +61,7 @@ impl DatabasePool {
         let channel_id = channel_info.get("channel_id").ok_or_else(|| AppError::bad_request("Channel ID is required"))?;
         let empty_string = String::new();
         let name = channel_info.get("name").unwrap_or(&empty_string);
-        let description = channel_info.get("description").unwrap_or(&empty_string);
+        let description = &crate::services::html::sanitize_feed_html(channel_info.get("description").unwrap_or(&empty_string));
         let thumbnail_url = channel_info.get("thumbnail_url").unwrap_or(&empty_string);
         let feed_url = format!("https://www.youtube.com/channel/{}", channel_id);
         
@@ -357,7 +357,9 @@ impl DatabasePool {
         let mut inserted = Vec::with_capacity(videos.len());
         for video in videos {
             let title = self.clean_and_normalize_title(&video.title);
-            let description = self.decode_html_entities(&video.description);
+            // Sanitize after decoding: decoding turns escaped text like "&lt;img onerror…&gt;" back
+            // into real markup, and the channel owner writes these descriptions.
+            let description = crate::services::html::sanitize_feed_html(&self.decode_html_entities(&video.description));
             let url = format!("https://www.youtube.com/watch?v={}", video.id);
             let published = video.published.naive_utc();
             let video_id: i32 = dialect_match!(self, {

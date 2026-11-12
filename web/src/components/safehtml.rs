@@ -1,5 +1,6 @@
 use crate::components::audio::AudioPlayerProps;
 use crate::components::context::{AppState, NotificationState, UIState};
+use crate::components::gen_funcs::sanitize_html_with_blank_target;
 use crate::requests::episode::Episode;
 use i18nrs::yew::use_translation;
 use regex::Regex;
@@ -788,17 +789,25 @@ pub struct RawHtmlProps {
 
 #[function_component(RawHtml)]
 pub fn raw_html(props: &RawHtmlProps) -> Html {
+    // Always sanitized: this HTML usually comes from a feed, which anyone can write. Memoized so
+    // re-renders with the same content don't sanitize again.
+    let clean = use_memo(props.html.clone(), |html| sanitize_html_with_blank_target(html));
     let div = match gloo_utils::document().create_element("div") {
         Ok(el) => el,
         Err(_) => gloo_utils::document().create_element("span").unwrap(),
     };
-    div.set_inner_html(&props.html);
+    div.set_inner_html(&clean);
     Html::VRef(div.into())
 }
 
-// Also update the SafeHtml component to add logging
+/// Renders HTML from a feed (descriptions, show notes) with clickable timecodes.
+///
+/// The input is always sanitized first, whatever the caller did: feed HTML is written by
+/// whoever controls the feed, and inserting it unsanitized would let it run scripts with the
+/// viewer's login. For markup this app generates itself (e.g. the MFA QR code), don't use this.
 #[function_component(SafeHtml)]
 pub fn safe_html(props: &Props) -> Html {
+    let clean_html = use_memo(props.html.clone(), |html| sanitize_html_with_blank_target(html));
     let (i18n, _) = use_translation();
     let (state, _dispatch) = use_store::<AppState>();
     let api_key = state.auth_details.as_ref().map(|ud| ud.api_key.clone());
@@ -819,7 +828,7 @@ pub fn safe_html(props: &Props) -> Html {
     // Only get the audio_dispatch when timecode processing is enabled
     let processed_html = if props.process_timecodes && server_name.is_some() && api_key.is_some() && user_id.is_some() {
         process_timecodes(
-            &props.html,
+            &clean_html,
             audio_dispatch,
             props,
             server_name.unwrap(),
@@ -831,8 +840,8 @@ pub fn safe_html(props: &Props) -> Html {
             starting_episode_for_timecode_msg,
         )
     } else {
-        log_debug("Timecode processing disabled, returning original HTML");
-        props.html.clone()
+        log_debug("Timecode processing disabled, returning sanitized HTML");
+        (*clean_html).clone()
     };
 
     // Create the div just like the original implementation

@@ -119,24 +119,25 @@ pub fn truncate_description(description: String, max_length: usize) -> (String, 
     (truncated_html, is_truncated)
 }
 
-/// Sets 'target=_blank' for all <a> elements in html text
-pub fn sanitize_html_with_blank_target(html: &str) -> String {
-    // Create the inner HashMap for attribute "target" with value "_blank"
+/// Ammonia's safe defaults (no scripts, event handlers, `javascript:` URLs, styles or forms),
+/// with every link opening in a new tab. Ammonia also adds `rel="noopener noreferrer"`.
+fn feed_html_builder() -> Builder<'static> {
     let mut attribute_values = HashMap::new();
     attribute_values.insert("target", "_blank");
-
-    // Create the outer HashMap for tag "a"
     let mut tag_attribute_values = HashMap::new();
     tag_attribute_values.insert("a", attribute_values);
 
-    // Configure the builder with the correct attribute values
     let mut builder = Builder::default();
-    builder.add_tags(&["a"]); // ensure <a> tags are allowed
-    builder.add_tag_attributes("a", &["href", "target"]); // allow href and target attributes on <a> tags
-    builder.set_tag_attribute_values(tag_attribute_values); // set target="_blank" on all <a> tags
+    builder.add_tags(&["a"]);
+    builder.add_tag_attributes("a", &["href", "target"]);
+    builder.set_tag_attribute_values(tag_attribute_values);
+    builder
+}
 
-    // Clean the input HTML with the specified builder
-    builder.clean(html).to_string()
+/// Sanitizes HTML from a feed (or any other untrusted source) for display, and sets
+/// `target="_blank"` on every link. Anything shown with `set_inner_html` must go through this.
+pub fn sanitize_html_with_blank_target(html: &str) -> String {
+    feed_html_builder().clean(html).to_string()
 }
 
 pub fn encode_password(password: &str) -> Result<String, argon2::password_hash::Error> {
@@ -291,26 +292,14 @@ pub fn convert_time_to_seconds(time: &str) -> Result<u32, Box<dyn std::error::Er
     }
 }
 
-/// Removes all <img> tags from html
+/// Sanitizes `html` (like [`sanitize_html_with_blank_target`]) and drops every <img>.
+///
+/// Done entirely by the sanitizer: the HTML is never parsed into a live DOM element, where an
+/// unsanitized `<img onerror=…>` would run even though the element is never shown.
 pub fn strip_images_from_html(html: &str) -> String {
-    let document = web_sys::window().unwrap().document().unwrap();
-
-    // Create a temporary div to parse the HTML
-    let temp_div = document.create_element("div").unwrap();
-    temp_div.set_inner_html(html);
-
-    // Remove all img elements
-    if let Ok(images) = temp_div.query_selector_all("img") {
-        for i in 0..images.length() {
-            if let Some(img) = images.item(i) {
-                if let Some(parent) = img.parent_node() {
-                    let _ = parent.remove_child(&img);
-                }
-            }
-        }
-    }
-
-    temp_div.inner_html()
+    let mut builder = feed_html_builder();
+    builder.rm_tags(&["img"]);
+    builder.clean(html).to_string()
 }
 
 #[hook]

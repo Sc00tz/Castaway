@@ -44,6 +44,17 @@ services:
       TZ: "America/New_York"
       # Language Configuration
       DEFAULT_LANGUAGE: "en"
+      # Feeds and downloads hosted on your own network (a NAS, Audiobookshelf, a Tailscale
+      # peer) are blocked by default, so a feed can't make the server probe your LAN. List the
+      # hosts or networks to allow, comma-separated IPs or CIDRs:
+      # ALLOWED_PRIVATE_NETWORKS: "192.168.1.20,100.64.0.0/10"
+      # Single sign-on: by default, a first SSO login only creates an account when the provider
+      # restricts who can log in (OIDC_ROLES_CLAIM + OIDC_USER_ROLE). Set to true to let anyone
+      # who can sign in at your provider get an account, or false to never create accounts.
+      # OIDC_AUTO_CREATE_USERS: "false"
+      # SSO logins only link to an existing account by email when the provider marks the email
+      # verified. Only for a provider you control that never sends email_verified:
+      # OIDC_TRUST_UNVERIFIED_EMAIL: "true"
       # Optional AI features (#726 transcripts, #790 ad detection). Uncomment + run the
       # pinepods-ai service below to enable; leave unset to keep AI features disabled.
       # PINEPODS_AI_URL: "http://pinepods-ai:8100"

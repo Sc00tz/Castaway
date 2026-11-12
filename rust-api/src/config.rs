@@ -25,6 +25,11 @@ pub fn env_value(name: &str) -> Option<String> {
     env::var(name).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
 }
 
+/// Whether an environment value means "on": true, 1 or yes, in any case.
+pub fn env_flag(value: &str) -> bool {
+    matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes")
+}
+
 /// VALKEY_<suffix>, else REDIS_<suffix>.
 fn valkey_env(suffix: &str) -> Option<String> {
     env_value(&format!("VALKEY_{suffix}")).or_else(|| env_value(&format!("REDIS_{suffix}")))
@@ -106,6 +111,15 @@ pub struct OIDCConfig {
     pub roles_claim: Option<String>,
     pub user_role: Option<String>,
     pub admin_role: Option<String>,
+    /// OIDC_AUTO_CREATE_USERS: whether a first SSO login may create a new account. Unset means
+    /// "only when a provider restricts logins with a roles claim and user role"; without that
+    /// restriction, anyone who can sign in at the provider (e.g. any GitHub user) would get one.
+    pub auto_create_users: Option<bool>,
+    /// OIDC_TRUST_UNVERIFIED_EMAIL: link an SSO login to an existing account by email even when
+    /// the provider doesn't say the address is verified. Off by default: someone who registers
+    /// the admin's address at a lax provider would otherwise sign in as the admin. Turn on only
+    /// for a provider you control that never sends `email_verified`.
+    pub trust_unverified_email: bool,
 }
 
 impl OIDCConfig {
@@ -288,6 +302,8 @@ impl Config {
             roles_claim: oidc_env("OIDC_ROLES_CLAIM"),
             user_role: oidc_env("OIDC_USER_ROLE"),
             admin_role: oidc_env("OIDC_ADMIN_ROLE"),
+            auto_create_users: oidc_env("OIDC_AUTO_CREATE_USERS").map(|v| env_flag(&v)),
+            trust_unverified_email: oidc_env("OIDC_TRUST_UNVERIFIED_EMAIL").is_some_and(|v| env_flag(&v)),
         };
 
         let api = ApiConfig {

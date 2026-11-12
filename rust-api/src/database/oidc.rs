@@ -750,4 +750,79 @@ impl DatabasePool {
             },
         })
     }
+
+    /// The account linked to `subject` (the provider's permanent user id, its `sub` claim) at
+    /// `provider_id`, with its username. This, not the email address, is what identifies a
+    /// returning SSO user: emails can change hands or be unverified, `sub` can't.
+    pub async fn get_user_by_oidc_subject(&self, provider_id: i32, subject: &str) -> AppResult<Option<(i32, Option<String>)>> {
+        Ok(dialect_match!(self, {
+            pg(pool) => {
+                q::query(r#"SELECT userid, username FROM "Users" WHERE oidc_provider_id = $1 AND oidc_subject = $2 ORDER BY userid LIMIT 1"#)
+                    .bind(provider_id)
+                    .bind(subject)
+                    .fetch_optional(pool)
+                    .await?
+                    .map(|row| -> AppResult<_> { Ok((row.try_get("userid")?, row.try_get("username")?)) })
+                    .transpose()?
+            },
+            mysql(pool) => {
+                sqlx::query("SELECT UserID, Username FROM Users WHERE oidc_provider_id = ? AND oidc_subject = ? ORDER BY UserID LIMIT 1")
+                    .bind(provider_id)
+                    .bind(subject)
+                    .fetch_optional(pool)
+                    .await?
+                    .map(|row| -> AppResult<_> { Ok((row.try_get("UserID")?, row.try_get("Username")?)) })
+                    .transpose()?
+            },
+        }))
+    }
+
+    /// The SSO identity (provider id, subject) an account is linked to, if any.
+    pub async fn get_user_oidc_identity(&self, user_id: i32) -> AppResult<(Option<i32>, Option<String>)> {
+        Ok(dialect_match!(self, {
+            pg(pool) => {
+                match q::query(r#"SELECT oidc_provider_id, oidc_subject FROM "Users" WHERE userid = $1"#)
+                    .bind(user_id)
+                    .fetch_optional(pool)
+                    .await?
+                {
+                    Some(row) => (row.try_get("oidc_provider_id")?, row.try_get("oidc_subject")?),
+                    None => (None, None),
+                }
+            },
+            mysql(pool) => {
+                match sqlx::query("SELECT oidc_provider_id, oidc_subject FROM Users WHERE UserID = ?")
+                    .bind(user_id)
+                    .fetch_optional(pool)
+                    .await?
+                {
+                    Some(row) => (row.try_get("oidc_provider_id")?, row.try_get("oidc_subject")?),
+                    None => (None, None),
+                }
+            },
+        }))
+    }
+
+    /// Link an account to an SSO identity, so later logins find it by `sub` instead of email.
+    pub async fn set_user_oidc_identity(&self, user_id: i32, provider_id: i32, subject: &str) -> AppResult<()> {
+        dialect_match!(self, {
+            pg(pool) => {
+                q::query(r#"UPDATE "Users" SET oidc_provider_id = $1, oidc_subject = $2 WHERE userid = $3"#)
+                    .bind(provider_id)
+                    .bind(subject)
+                    .bind(user_id)
+                    .execute(pool)
+                    .await?;
+            },
+            mysql(pool) => {
+                sqlx::query("UPDATE Users SET oidc_provider_id = ?, oidc_subject = ? WHERE UserID = ?")
+                    .bind(provider_id)
+                    .bind(subject)
+                    .bind(user_id)
+                    .execute(pool)
+                    .await?;
+            },
+        });
+        Ok(())
+    }
 }

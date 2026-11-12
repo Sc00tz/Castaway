@@ -291,14 +291,14 @@ impl DatabasePool {
         }
     }
 
-    // Comprehensive description parsing with HTML cleaning
+    // The episode's description: content:encoded, else content, else summary. Feed HTML is
+    // sanitized here, before it's stored, so no client ever receives markup that can run script.
     pub(super) fn parse_description_comprehensive(&self, data: &HashMap<String, String>) -> String {
-        // EXACT Python replication: entry.get('content', [{}])[0].get('value') or entry.get('summary') or "No description available"
         data.get("content:encoded")
-            .or_else(|| data.get("content"))  
+            .or_else(|| data.get("content"))
             .or_else(|| data.get("summary"))
             .filter(|s| !s.trim().is_empty())
-            .cloned()
+            .map(|s| crate::services::html::sanitize_feed_html(s))
             .unwrap_or_else(|| "No description available".to_string())
     }
 
@@ -742,10 +742,9 @@ impl DatabasePool {
         }
 
         // Build HTTP client with proper configuration
-        let client = reqwest::Client::builder()
+        let client = crate::services::url_guard::guarded_client_builder()
             .user_agent("PinePods/1.0")
             .timeout(std::time::Duration::from_secs(30))
-            .redirect(crate::services::url_guard::guarded_redirect_policy())
             .build()
             .map_err(|e| AppError::external_error(&format!("Failed to build HTTP client: {}", e)))?;
         
@@ -890,7 +889,7 @@ impl DatabasePool {
             // Create episode JSON object matching frontend Episode structure
             let episode_json = serde_json::json!({
                 "title": entry.title.as_ref().map(|t| t.content.clone()),
-                "description": entry.summary.as_ref().map(|s| s.content.clone()),
+                "description": entry.summary.as_ref().map(|s| crate::services::html::sanitize_feed_html(&s.content)),
                 "pub_date": pub_date,
                 "enclosure_url": if audio_url.is_empty() { None } else { Some(audio_url) },
                 "enclosure_length": if enclosure_length.is_empty() { None } else { Some(enclosure_length) },

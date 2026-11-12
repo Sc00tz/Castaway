@@ -60,7 +60,9 @@ pub fn parse(body: &str) -> Option<FeedMetadata> {
         .or_else(|| feed.icon.as_ref().map(|i| i.uri.clone()));
     Some(FeedMetadata {
         name: non_empty(feed.title.map(|t| t.content)),
-        description: non_empty(feed.description.map(|d| d.content)),
+        // Sanitized like episode descriptions. Rows stored before this are cleaned on the next
+        // refresh, since the sanitized text no longer matches them.
+        description: non_empty(feed.description.map(|d| crate::services::html::sanitize_feed_html(&d.content))),
         // feed-rs names an Atom author without a <name> "unknown".
         author: non_empty(feed.authors.first().map(|a| a.name.clone()).filter(|n| n != "unknown")),
         artwork: non_empty(artwork),

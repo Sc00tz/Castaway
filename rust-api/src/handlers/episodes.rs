@@ -444,9 +444,16 @@ pub async fn download_episode_file(
 
     let (episode_url, episode_title, podcast_name, pub_date, author, episode_artwork, artwork_url, description, feed_username, feed_password, feed_url, episode_guid, episode_duration) = episode_info;
 
+    // SSRF guard: episode_url is the feed's <enclosure url>, which the feed's author controls,
+    // and this handler returns whatever it fetches. Refuse internal destinations up front; the
+    // guarded client also checks every redirect and DNS answer.
+    crate::services::url_guard::ensure_safe_public_url_async(&episode_url)
+        .await
+        .map_err(|reason| AppError::bad_request(format!("Refusing to download episode URL: {}", reason)))?;
+
     // Download the episode file. Send a podcast-client User-Agent first; some hosts
     // (e.g. Buzzsprout) reject requests without one with 403 Forbidden.
-    let client = reqwest::Client::new();
+    let client = crate::services::http::download_client();
     let build_request = |user_agent: &str| {
         let mut request = client
             .get(&episode_url)
@@ -463,14 +470,14 @@ pub async fn download_episode_file(
     let mut response = build_request("PinePods/1.0")
         .send()
         .await
-        .map_err(|e| AppError::internal(&format!("Failed to download episode: {}", e)))?;
+        .map_err(|e| AppError::internal(&format!("Failed to download episode: {}", crate::services::http::describe_error(&e))))?;
 
     // If we get a 403, retry with a browser User-Agent as a fallback.
     if response.status() == reqwest::StatusCode::FORBIDDEN {
         let browser_response = build_request("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .map_err(|e| AppError::internal(&format!("Failed to download episode: {}", e)))?;
+            .map_err(|e| AppError::internal(&format!("Failed to download episode: {}", crate::services::http::describe_error(&e))))?;
         if browser_response.status().is_success() {
             response = browser_response;
         }
@@ -480,21 +487,40 @@ pub async fn download_episode_file(
         return Err(AppError::internal(&format!("Server returned error: {}", response.status())));
     }
 
-    let audio_bytes = response.bytes()
-        .await
-        .map_err(|e| AppError::internal(&format!("Failed to download audio content: {}", e)))?;
-    
-    // Create a temporary file for metadata processing
-    let temp_dir = std::env::temp_dir();
-    let temp_filename = format!("episode_{}_{}_{}.mp3", episode_id, user_id, chrono::Utc::now().timestamp());
-    let temp_path = temp_dir.join(&temp_filename);
-    
-    // Write audio content to temp file
-    std::fs::write(&temp_path, &audio_bytes)
-        .map_err(|e| AppError::internal(&format!("Failed to write temp file: {}", e)))?;
-    
-    // Add metadata using the same shared tagging as server downloads. The client
-    // download streams a single mp3 with no folder, so sidecars do not apply here.
+    let (content_type, extension) = media_type_for(
+        response.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()),
+        &episode_url,
+    );
+
+    // Stream the download into a temp file chunk by chunk, so even a multi-gigabyte video never
+    // sits in memory. The name is random so concurrent downloads can't collide or be predicted.
+    use tokio::io::AsyncWriteExt;
+    let temp_path = std::env::temp_dir().join(format!("episode_{}.{}", uuid::Uuid::new_v4(), extension));
+    let write_result: Result<(), AppError> = async {
+        let mut file = tokio::fs::File::create(&temp_path)
+            .await
+            .map_err(|e| AppError::internal(&format!("Failed to create temp file: {}", e)))?;
+        while let Some(chunk) = response.chunk()
+            .await
+            .map_err(|e| AppError::internal(&format!("Failed to download audio content: {}", e)))?
+        {
+            file.write_all(&chunk)
+                .await
+                .map_err(|e| AppError::internal(&format!("Failed to write temp file: {}", e)))?;
+        }
+        file.flush()
+            .await
+            .map_err(|e| AppError::internal(&format!("Failed to write temp file: {}", e)))
+    }
+    .await;
+    if let Err(e) = write_result {
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        return Err(e);
+    }
+
+    // Add metadata using the same shared tagging as server downloads. ID3 tags only belong on
+    // MP3s (writing them into an M4A or video file can corrupt it), and the client download is a
+    // single file with no folder, so sidecars do not apply here.
     let episode_meta = crate::services::download_metadata::EpisodeMetadata {
         title: episode_title.clone(),
         artist: author.clone().unwrap_or_else(|| "Unknown".to_string()),
@@ -508,20 +534,26 @@ pub async fn download_episode_file(
         episode_artwork: episode_artwork.clone(),
         podcast_artwork: artwork_url.clone(),
     };
-    if let Err(e) = crate::services::download_metadata::add_podcast_metadata(
-        &temp_path,
-        &episode_meta,
-    ).await {
-        tracing::warn!("Failed to add metadata to downloaded episode: {}", e);
+    if extension == "mp3" {
+        if let Err(e) = crate::services::download_metadata::add_podcast_metadata(
+            &temp_path,
+            &episode_meta,
+        ).await {
+            tracing::warn!("Failed to add metadata to downloaded episode: {}", e);
+        }
     }
-    
-    // Read the file with metadata back
-    let final_bytes = std::fs::read(&temp_path)
-        .map_err(|e| AppError::internal(&format!("Failed to read processed file: {}", e)))?;
-    
-    // Clean up temp file
-    let _ = std::fs::remove_file(&temp_path);
-    
+
+    // Open the finished file, then unlink it right away: the open handle keeps the data readable
+    // while it streams, and the temp file disappears even if the client disconnects midway.
+    let file = tokio::fs::File::open(&temp_path).await;
+    let _ = tokio::fs::remove_file(&temp_path).await;
+    let file = file.map_err(|e| AppError::internal(&format!("Failed to read processed file: {}", e)))?;
+    let file_len = file
+        .metadata()
+        .await
+        .map_err(|e| AppError::internal(&format!("Failed to read processed file: {}", e)))?
+        .len();
+
     // Create safe filename for download
     let safe_episode_title = episode_title.chars()
         .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
@@ -541,17 +573,65 @@ pub async fn download_episode_file(
         chrono::Utc::now().format("%Y-%m-%d").to_string()
     };
     
-    let filename = format!("{}_{}_-_{}.mp3", pub_date_str, safe_podcast_name, safe_episode_title);
-    
-    // Return the file with appropriate headers
+    let filename = format!("{}_{}_-_{}.{}", pub_date_str, safe_podcast_name, safe_episode_title, extension);
+
+    // Stream the file back rather than loading it into memory.
     let response = Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "audio/mpeg")
+        .header(header::CONTENT_TYPE, content_type)
         .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}\"", filename))
-        .header(header::CONTENT_LENGTH, final_bytes.len())
-        .body(axum::body::Body::from(final_bytes))
+        .header(header::CONTENT_LENGTH, file_len)
+        .body(axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(file)))
         .map_err(|e| AppError::internal(&format!("Failed to create response: {}", e)))?;
-    
+
     Ok(response)
+}
+
+/// Content type and file extension for a downloaded episode, from the host's Content-Type, or
+/// the URL's extension when the host sends a generic type. Falls back to MP3.
+fn media_type_for(content_type: Option<&str>, url: &str) -> (&'static str, &'static str) {
+    const KNOWN: &[(&str, &str, &str)] = &[
+        // (content type, extension, other content types that mean the same)
+        ("audio/mpeg", "mp3", "audio/mp3"),
+        ("audio/mp4", "m4a", "audio/x-m4a audio/aac-mp4"),
+        ("audio/aac", "aac", "audio/x-aac"),
+        ("audio/ogg", "ogg", "application/ogg"),
+        ("audio/opus", "opus", ""),
+        ("audio/flac", "flac", "audio/x-flac"),
+        ("audio/wav", "wav", "audio/x-wav audio/wave"),
+        ("video/mp4", "mp4", "video/x-m4v"),
+        ("video/webm", "webm", "audio/webm"),
+    ];
+    let declared = content_type
+        .map(|ct| ct.split(';').next().unwrap_or("").trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    for &(ct, ext, aliases) in KNOWN {
+        if declared == ct || aliases.split_whitespace().any(|a| a == declared) {
+            return (ct, ext);
+        }
+    }
+    let url_ext = url::Url::parse(url)
+        .ok()
+        .and_then(|u| u.path().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase()));
+    if let Some(url_ext) = url_ext {
+        if let Some(&(ct, ext, _)) = KNOWN.iter().find(|(_, ext, _)| *ext == url_ext) {
+            return (ct, ext);
+        }
+    }
+    ("audio/mpeg", "mp3")
+}
+
+#[cfg(test)]
+mod media_type_tests {
+    use super::media_type_for;
+
+    #[test]
+    fn picks_type_from_header_then_url_then_mp3() {
+        assert_eq!(media_type_for(Some("audio/mpeg"), "https://x/a"), ("audio/mpeg", "mp3"));
+        assert_eq!(media_type_for(Some("audio/x-m4a; charset=binary"), "https://x/a"), ("audio/mp4", "m4a"));
+        assert_eq!(media_type_for(Some("video/mp4"), "https://x/a.mp3"), ("video/mp4", "mp4"));
+        assert_eq!(media_type_for(Some("application/octet-stream"), "https://x/ep.M4A?t=1"), ("audio/mp4", "m4a"));
+        assert_eq!(media_type_for(None, "https://x/ep"), ("audio/mpeg", "mp3"));
+    }
 }
 

@@ -164,24 +164,35 @@ pub async fn add_podcast_metadata(
     Ok(())
 }
 
+const MAX_ARTWORK_BYTES: usize = 5 * 1024 * 1024;
+
 /// Fetch artwork bytes (5MB cap). Shared by tagging and sidecar writers.
+///
+/// The URL comes from a feed, so it goes through the SSRF guard, and the cap is enforced while
+/// reading rather than after buffering the whole body.
 pub async fn download_artwork(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::new();
-    let response = client
+    crate::services::url_guard::ensure_safe_public_url_async(url).await?;
+    let mut response = crate::services::http::download_client()
         .get(url)
         .header("User-Agent", "PinePods/1.0")
+        .timeout(std::time::Duration::from_secs(30))
         .send()
         .await?;
 
-    if response.status().is_success() {
-        let bytes = response.bytes().await?;
-        if bytes.len() > 5 * 1024 * 1024 {
+    if !response.status().is_success() {
+        return Err(format!("Failed to download artwork: HTTP {}", response.status()).into());
+    }
+    if response.content_length().is_some_and(|len| len > MAX_ARTWORK_BYTES as u64) {
+        return Err("Artwork too large".into());
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        if bytes.len() + chunk.len() > MAX_ARTWORK_BYTES {
             return Err("Artwork too large".into());
         }
-        Ok(bytes.to_vec())
-    } else {
-        Err(format!("Failed to download artwork: HTTP {}", response.status()).into())
+        bytes.extend_from_slice(&chunk);
     }
+    Ok(bytes)
 }
 
 fn sniff_image_mime(data: &[u8]) -> &'static str {

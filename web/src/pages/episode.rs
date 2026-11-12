@@ -331,7 +331,7 @@ pub fn transcript_inline(props: &TranscriptInlineProps) -> Html {
                                                             .unwrap()
                                                             .create_element("div")
                                                             .unwrap();
-                                                        div.set_inner_html(content);
+                                                        div.set_inner_html(&sanitize_html_with_blank_target(content));
                                                         div.text_content().unwrap_or_default()
                                                     }
                                                     // Keep raw SRT/VTT so the render can parse
@@ -384,7 +384,7 @@ pub fn transcript_inline(props: &TranscriptInlineProps) -> Html {
             if let Some(content) = content.as_ref() {
                 if content.contains('<') && content.contains('>') {
                     if let Some(element) = content_ref.cast::<web_sys::HtmlElement>() {
-                        element.set_inner_html(content);
+                        element.set_inner_html(&sanitize_html_with_blank_target(content));
                     }
                 }
             }
@@ -689,7 +689,7 @@ pub fn transcript_modal(props: &TranscriptModalProps) -> Html {
                                                                     .unwrap()
                                                                     .create_element("div")
                                                                     .unwrap();
-                                                                div.set_inner_html(content);
+                                                                div.set_inner_html(&sanitize_html_with_blank_target(content));
                                                                 div.text_content()
                                                                     .unwrap_or_default()
                                                             }
@@ -784,7 +784,7 @@ pub fn transcript_modal(props: &TranscriptModalProps) -> Html {
             if let Some(content) = content.as_ref() {
                 if content.contains('<') && content.contains('>') {
                     if let Some(element) = content_ref.cast::<web_sys::HtmlElement>() {
-                        element.set_inner_html(content);
+                        element.set_inner_html(&sanitize_html_with_blank_target(content));
                     }
                 }
             }

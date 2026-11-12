@@ -1173,6 +1173,133 @@ fn oidc_frontend_base(origin_url: &str, allowed_hosts: &[String]) -> Option<Stri
     allowed_hosts.contains(&host).then(|| url.origin().ascii_serialization())
 }
 
+/// The provider's permanent id for the user: the standard `sub` claim, or GitHub's numeric
+/// `id` (its userinfo API isn't OIDC and has no `sub`).
+fn oidc_subject(userinfo: &serde_json::Value) -> Option<String> {
+    let value = userinfo.get("sub").or_else(|| userinfo.get("id"))?;
+    let subject = match value {
+        serde_json::Value::String(s) => s.trim().to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        _ => return None,
+    };
+    (!subject.is_empty()).then_some(subject)
+}
+
+/// Whether a claim is true. Some providers send booleans as strings ("true").
+fn claim_is_true(value: Option<&serde_json::Value>) -> bool {
+    match value {
+        Some(serde_json::Value::Bool(b)) => *b,
+        Some(serde_json::Value::String(s)) => s.eq_ignore_ascii_case("true"),
+        _ => false,
+    }
+}
+
+/// Which account an SSO login belongs to.
+#[derive(Debug, PartialEq)]
+enum OidcAccount {
+    /// Already linked to this provider identity: (user id, username).
+    Existing(i32, Option<String>),
+    /// An account with the same, provider-verified email, to be linked now.
+    LinkByEmail(i32, Option<String>),
+    /// No account yet; create one.
+    Create,
+    /// Refuse, with the error code sent back to the app.
+    Refuse(&'static str),
+}
+
+/// Decide which account an SSO login belongs to.
+///
+/// * `by_subject`: the account already linked to (`provider_id`, `subject`), if any.
+/// * `by_email`: otherwise, the account with the login's email: (user id, username, and the
+///   identity it's linked to).
+///
+/// An email match is only trusted when the provider verified the address
+/// (`email_trusted`), and never when the account already belongs to a different identity
+/// at the same provider. Otherwise anyone able to register the admin's address at the
+/// provider could sign in as the admin.
+fn decide_oidc_account(
+    by_subject: Option<(i32, Option<String>)>,
+    by_email: Option<(i32, Option<String>, (Option<i32>, Option<String>))>,
+    provider_id: i32,
+    subject: &str,
+    email_trusted: bool,
+    may_create: bool,
+) -> OidcAccount {
+    if let Some((user_id, username)) = by_subject {
+        return OidcAccount::Existing(user_id, username);
+    }
+    match by_email {
+        Some((user_id, username, (linked_provider, linked_subject))) => {
+            if linked_provider == Some(provider_id) && linked_subject.as_deref().is_some_and(|s| s != subject) {
+                OidcAccount::Refuse("account_linked_elsewhere")
+            } else if !email_trusted {
+                OidcAccount::Refuse("email_not_verified")
+            } else {
+                OidcAccount::LinkByEmail(user_id, username)
+            }
+        }
+        None if may_create => OidcAccount::Create,
+        None => OidcAccount::Refuse("registration_disabled"),
+    }
+}
+
+#[cfg(test)]
+mod oidc_account_tests {
+    use super::*;
+    use serde_json::json;
+
+    const PROVIDER: i32 = 3;
+
+    fn email_match(linked: (Option<i32>, Option<&str>)) -> Option<(i32, Option<String>, (Option<i32>, Option<String>))> {
+        Some((7, Some("admin".into()), (linked.0, linked.1.map(String::from))))
+    }
+
+    #[test]
+    fn returning_user_is_found_by_subject_regardless_of_email() {
+        let account = decide_oidc_account(Some((7, Some("admin".into()))), None, PROVIDER, "sub-1", false, false);
+        assert_eq!(account, OidcAccount::Existing(7, Some("admin".into())));
+    }
+
+    #[test]
+    fn unverified_email_never_takes_over_an_account() {
+        let account = decide_oidc_account(None, email_match((None, None)), PROVIDER, "attacker", false, true);
+        assert_eq!(account, OidcAccount::Refuse("email_not_verified"));
+    }
+
+    #[test]
+    fn verified_email_links_an_unlinked_account() {
+        let account = decide_oidc_account(None, email_match((None, None)), PROVIDER, "sub-1", true, false);
+        assert_eq!(account, OidcAccount::LinkByEmail(7, Some("admin".into())));
+    }
+
+    #[test]
+    fn account_linked_to_another_identity_is_refused_even_with_verified_email() {
+        let account = decide_oidc_account(None, email_match((Some(PROVIDER), Some("sub-1"))), PROVIDER, "sub-2", true, true);
+        assert_eq!(account, OidcAccount::Refuse("account_linked_elsewhere"));
+        // A link to a different provider doesn't block linking this one.
+        let account = decide_oidc_account(None, email_match((Some(9), Some("sub-1"))), PROVIDER, "sub-2", true, true);
+        assert_eq!(account, OidcAccount::LinkByEmail(7, Some("admin".into())));
+    }
+
+    #[test]
+    fn new_accounts_only_when_allowed() {
+        assert_eq!(decide_oidc_account(None, None, PROVIDER, "s", true, true), OidcAccount::Create);
+        assert_eq!(decide_oidc_account(None, None, PROVIDER, "s", true, false), OidcAccount::Refuse("registration_disabled"));
+    }
+
+    #[test]
+    fn subject_and_verified_claims_are_read_leniently() {
+        assert_eq!(oidc_subject(&json!({"sub": " abc "})), Some("abc".into()));
+        assert_eq!(oidc_subject(&json!({"id": 12345})), Some("12345".into()), "GitHub's numeric id");
+        assert_eq!(oidc_subject(&json!({"sub": ""})), None);
+        assert_eq!(oidc_subject(&json!({"email": "a@b"})), None);
+        assert!(claim_is_true(Some(&json!(true))));
+        assert!(claim_is_true(Some(&json!("TRUE"))));
+        assert!(!claim_is_true(Some(&json!(false))));
+        assert!(!claim_is_true(None));
+    }
+}
+
 // Helper function to create proper redirect URLs for both web and mobile
 fn create_oidc_redirect_url(frontend_base: &str, params: &str) -> String {
     let redirect_url = if frontend_base.starts_with("pinepods://") {
@@ -1350,7 +1477,7 @@ pub async fn oidc_callback(
     };
 
     // Unpack provider details - EXACT match to Python unpacking
-    let (_provider_id, _client_id, client_secret, token_url, userinfo_url, name_claim, email_claim, username_claim, roles_claim, user_role, admin_role) = provider_tuple;
+    let (provider_id, _client_id, client_secret, token_url, userinfo_url, name_claim, email_claim, username_claim, roles_claim, user_role, admin_role) = provider_tuple;
 
     // Exchange authorization code for access token - EXACT match to Python
     let client = reqwest::Client::new();
@@ -1432,9 +1559,14 @@ pub async fn oidc_callback(
     tracing::debug!("OIDC Debug - email_claim: {:?}, email_field: {}, userinfo_response: {:?}", email_claim, email_field, userinfo_response);
     
     let mut email = userinfo_response.get(email_field).and_then(|v| v.as_str()).map(|s| s.to_string());
-    
+    let is_github = userinfo_url.contains("api.github.com");
+    // Whether the provider vouches for the address. GitHub has no email_verified claim, but only
+    // lets users publish a verified address, and the /user/emails fallback below picks verified
+    // ones only.
+    let email_verified = is_github || claim_is_true(userinfo_response.get("email_verified"));
+
     // GitHub email handling - EXACT match to Python
-    if email.is_none() && userinfo_url.contains("api.github.com") {
+    if email.is_none() && is_github {
         if let Ok(emails_response) = client.get("https://api.github.com/user/emails")
             .header("Authorization", format!("Bearer {}", access_token))
             .header("User-Agent", "PinePods/1.0")
@@ -1487,9 +1619,49 @@ pub async fn oidc_callback(
         }
     }
 
-    // Check if user exists - EXACT match to Python
-    let existing_user = state.db_pool.get_user_by_email(&email).await?;
-    
+    // The provider's permanent id for this person. Accounts are matched on it, never on the email
+    // alone (see decide_oidc_account).
+    let Some(subject) = oidc_subject(&userinfo_response) else {
+        tracing::error!("OIDC: userinfo response has no 'sub' (or GitHub 'id') claim");
+        return Ok(create_oidc_response(&frontend_base, "error=userinfo_failed&details=missing_subject"));
+    };
+
+    let by_subject = state.db_pool.get_user_by_oidc_subject(provider_id, &subject).await?;
+    let by_email = if by_subject.is_some() {
+        None
+    } else {
+        match state.db_pool.get_user_by_email(&email).await? {
+            Some((user_id, _email, username, _fullname, _is_admin)) => {
+                Some((user_id, username, state.db_pool.get_user_oidc_identity(user_id).await?))
+            }
+            None => None,
+        }
+    };
+    let restricted_by_role = roles_claim.as_deref().is_some_and(|s| !s.is_empty())
+        && user_role.as_deref().is_some_and(|s| !s.is_empty());
+    let may_create = state.config.oidc.auto_create_users.unwrap_or(restricted_by_role);
+    let account = decide_oidc_account(
+        by_subject,
+        by_email,
+        provider_id,
+        &subject,
+        email_verified || state.config.oidc.trust_unverified_email,
+        may_create,
+    );
+    let existing_user = match account {
+        OidcAccount::Existing(user_id, username) => Some((user_id, username)),
+        OidcAccount::LinkByEmail(user_id, username) => {
+            tracing::info!("OIDC: linking existing user {} to provider {} by verified email", user_id, provider_id);
+            state.db_pool.set_user_oidc_identity(user_id, provider_id, &subject).await?;
+            Some((user_id, username))
+        }
+        OidcAccount::Create => None,
+        OidcAccount::Refuse(reason) => {
+            tracing::warn!("OIDC: refusing login for provider {}: {}", provider_id, reason);
+            return Ok(create_oidc_response(&frontend_base, &format!("error={}", reason)));
+        }
+    };
+
     let name_field = name_claim
         .as_deref()
         .filter(|s| !s.is_empty())
@@ -1551,7 +1723,7 @@ pub async fn oidc_callback(
             .map(|s| s.to_string())
     });
 
-    let user_id = if let Some((user_id, _email, current_username, _fullname, _is_admin)) = existing_user {
+    let user_id = if let Some((user_id, current_username)) = existing_user {
         // Existing user - EXACT match to Python
         let api_key = match state.db_pool.get_user_api_key(user_id).await? {
             Some(key) => key,
@@ -1621,6 +1793,7 @@ pub async fn oidc_callback(
         // Create user - EXACT match to Python
         match state.db_pool.create_oidc_user(&email, &fullname, &final_username).await {
             Ok(user_id) => {
+                state.db_pool.set_user_oidc_identity(user_id, provider_id, &subject).await?;
                 let _api_key = state.db_pool.create_api_key(user_id).await?;
                 
                 // Set admin role for new user - EXACT match to Python

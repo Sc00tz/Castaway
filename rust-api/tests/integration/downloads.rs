@@ -246,6 +246,50 @@ async fn a_web_page_is_not_saved_as_an_episode() {
     assert_eq!(location(&app, &user, episode).await, None);
 }
 
+/// A feed's episode links can't make the server fetch from the internal network, whether they
+/// point there directly or a public link redirects there. (Outbound traffic in tests goes to a
+/// dead proxy anyway, so these assert the guard's own refusals, not just a failed fetch.)
+#[tokio::test(flavor = "multi_thread")]
+async fn episode_links_cannot_reach_the_internal_network() {
+    let app = TestApp::new().await;
+    let user = app.user("prober").await;
+    let bounce = app.fixtures().serve(
+        "bounce.mp3",
+        Fixture::new("text/plain", "").status(302).header("location", "http://169.254.169.254/latest/meta-data/"),
+    );
+    let feed = Feed::new(&format!("Probe Show {}", app.tag))
+        .episode(Episode::new(1).enclosure("http://10.0.0.5/router-admin.mp3"))
+        .episode(Episode::new(2).enclosure(&bounce));
+    let pod = app.subscribe(&user, &app.feed("probe.xml", &feed), 2).await;
+    let direct = app.episode_id(&user, pod, "Episode 1").await;
+    let redirected = app.episode_id(&user, pod, "Episode 2").await;
+
+    // Download to the device: refused before any request for a direct internal link...
+    let resp = app.get(&format!("/api/episodes/{direct}/download")).key(&user).send().await;
+    assert_eq!(resp.status.as_u16(), 400, "{}", resp.text());
+    assert!(resp.text().contains("private/reserved"), "{}", resp.text());
+    // ...and the redirect is refused by the guarded client, not followed.
+    let resp = app.get(&format!("/api/episodes/{redirected}/download")).key(&user).send().await;
+    assert!(!resp.status.is_success(), "{}", resp.text());
+    assert!(resp.text().contains("private/reserved"), "{}", resp.text());
+    assert_eq!(app.fixtures().hits("bounce.mp3").len(), 1, "the public link itself was fetched");
+
+    // Server downloads end without saving anything.
+    for episode in [direct, redirected] {
+        start_download(&app, &user, episode).await;
+    }
+    eventually("both download tasks failed", || async {
+        let tasks = app.get(&format!("/api/tasks/user/{}", user.id)).key(&user).send().await.ok_json();
+        let failed = tasks.as_array().map_or(0, |all| {
+            all.iter().filter(|t| t["status"].as_str().is_some_and(|s| s.eq_ignore_ascii_case("failed"))).count()
+        });
+        (failed >= 2).then_some(())
+    })
+    .await;
+    assert_eq!(location(&app, &user, direct).await, None);
+    assert_eq!(location(&app, &user, redirected).await, None);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn an_admin_can_turn_server_downloads_off() {
     let s = show().await;

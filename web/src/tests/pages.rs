@@ -354,3 +354,36 @@ fn images_can_be_stripped_from_descriptions() {
     let clean = strip_images_from_html(r#"<p>Before<img src="x.png">After</p>"#);
     assert_eq!(clean, "<p>BeforeAfter</p>");
 }
+
+/// Feed HTML is written by whoever controls the feed. None of these may survive sanitizing.
+#[wasm_bindgen_test]
+fn feed_html_cannot_run_scripts() {
+    use crate::components::gen_funcs::{sanitize_html_with_blank_target, strip_images_from_html};
+    let attacks = [
+        r#"<img src=x onerror="alert(1)">"#,
+        r#"<script>alert(1)</script>"#,
+        r#"<a href="javascript:alert(1)">x</a>"#,
+        r#"<svg onload="alert(1)"></svg>"#,
+        r#"<iframe src="https://evil.test"></iframe>"#,
+        r#"<p style="background:url(javascript:alert(1))" onclick="alert(1)">x</p>"#,
+        r#"<form action="https://evil.test"><input name=k></form>"#,
+    ];
+    for html in attacks {
+        for clean in [sanitize_html_with_blank_target(html), strip_images_from_html(html)] {
+            let lower = clean.to_lowercase();
+            for bad in ["<script", "onerror", "onload", "onclick", "javascript:", "<iframe", "<svg", "<form", "style="] {
+                assert!(!lower.contains(bad), "{:?} survived in {:?} (from {:?})", bad, clean, html);
+            }
+        }
+    }
+}
+
+#[wasm_bindgen_test]
+fn feed_html_keeps_formatting_and_opens_links_in_new_tab() {
+    use crate::components::gen_funcs::sanitize_html_with_blank_target;
+    let clean = sanitize_html_with_blank_target(r#"<p>Show <b>notes</b> <a href="https://a.test/">link</a></p>"#);
+    assert!(clean.contains("<b>notes</b>"));
+    assert!(clean.contains(r#"href="https://a.test/""#));
+    assert!(clean.contains(r#"target="_blank""#));
+    assert!(clean.contains("noopener"));
+}

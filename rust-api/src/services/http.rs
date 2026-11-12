@@ -21,10 +21,9 @@ static BROWSER_FEED_CLIENT: LazyLock<reqwest::Client> =
     LazyLock::new(|| feed_builder(BROWSER_USER_AGENT).build().expect("browser feed HTTP client"));
 
 static PROBE_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
+    crate::services::url_guard::guarded_client_builder()
         .user_agent(BROWSER_USER_AGENT)
         .timeout(PROBE_TIMEOUT)
-        .redirect(crate::services::url_guard::guarded_redirect_policy())
         // HEAD probes read Content-Length, which reqwest drops when it decodes a compressed body.
         .no_gzip()
         .no_brotli()
@@ -45,13 +44,29 @@ static SERVICE_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 fn feed_builder(user_agent: &str) -> reqwest::ClientBuilder {
     // gzip/brotli/deflate/zstd are enabled crate-wide, so Accept-Encoding is sent and bodies are
     // decoded transparently.
-    reqwest::Client::builder()
+    crate::services::url_guard::guarded_client_builder()
         .user_agent(user_agent)
         .timeout(FEED_TIMEOUT)
-        .redirect(crate::services::url_guard::guarded_redirect_policy())
 }
 
-/// RSS feed fetches: PinePods UA, 30s timeout, redirects re-checked by the SSRF guard.
+/// Episode and artwork downloads: SSRF-guarded like the feed clients. Only the connection has a
+/// timeout, because a large episode on a slow host can legitimately take longer than any total
+/// limit; a stalled transfer is caught by the read timeout instead.
+static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    crate::services::url_guard::guarded_client_builder()
+        .connect_timeout(Duration::from_secs(20))
+        .read_timeout(Duration::from_secs(60))
+        .build()
+        .expect("download HTTP client")
+});
+
+/// Client for downloading enclosures and artwork named in feeds. Callers set the user agent per
+/// request (some hosts need a browser UA) and must run `ensure_safe_public_url_async` first.
+pub fn download_client() -> &'static reqwest::Client {
+    &DOWNLOAD_CLIENT
+}
+
+/// RSS feed fetches: PinePods UA, 30s timeout, SSRF guard on every DNS answer and redirect.
 pub fn feed_client() -> &'static reqwest::Client {
     &FEED_CLIENT
 }
@@ -78,6 +93,22 @@ pub fn sync_client_builder() -> reqwest::ClientBuilder {
         .user_agent(PINEPODS_USER_AGENT)
         .timeout(FEED_TIMEOUT)
         .cookie_store(true)
+}
+
+/// An error with its whole cause chain ("a: b: c"). reqwest's own message leaves out the cause,
+/// e.g. why a redirect was refused or a connection failed.
+pub fn describe_error(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        let cause_text = cause.to_string();
+        if !text.contains(&cause_text) {
+            text.push_str(": ");
+            text.push_str(&cause_text);
+        }
+        source = cause.source();
+    }
+    text
 }
 
 /// Longest `Retry-After` we honour; anything beyond is clamped.

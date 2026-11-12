@@ -4,7 +4,7 @@ use crate::components::gen_components::{on_shownotes_click, EpisodeModal, Fallba
 
 use crate::components::context_menu_button::{ContextMenuButton, PageType};
 use crate::components::gen_funcs::{
-    format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target, use_long_press,
+    format_datetime, match_date_format, parse_date, use_long_press,
 };
 use crate::components::gen_funcs::{format_time, strip_images_from_html};
 use crate::components::safehtml::RawHtml;
@@ -274,7 +274,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     // description.
     let episode_description = use_memo(
         props.episode.episodedescription.clone(),
-        |desc| strip_images_from_html(&sanitize_html_with_blank_target(desc)),
+        |desc| strip_images_from_html(desc),
     );
 
     let (_listen_duration_str, listen_duration_percentage) = {

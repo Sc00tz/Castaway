@@ -441,3 +441,19 @@ async fn paging_through_tied_episodes_shows_each_one_once() {
         }
     }
 }
+
+/// Feed HTML is written by whoever controls the feed. It's sanitized before it's stored, so no
+/// client is ever handed show notes that can run script.
+#[tokio::test(flavor = "multi_thread")]
+async fn show_notes_are_sanitized_before_they_are_stored() {
+    let app = TestApp::new().await;
+    let user = app.user("reader").await;
+    let notes = r#"<p>Notes <b>here</b></p><img src=x onerror="alert(1)"><script>alert(2)</script><a href="javascript:alert(3)">x</a>"#;
+    let feed = Feed::new(&format!("Html Show {}", app.tag)).episode(Episode::new(1).description(notes));
+    let pod = app.subscribe(&user, &app.feed("html.xml", &feed), 1).await;
+    let episode = app.episodes(&user, pod).await.remove(0).to_string().to_lowercase();
+    assert!(episode.contains("<b>here</b>"), "formatting survives: {episode}");
+    for bad in ["onerror", "<script", "javascript:"] {
+        assert!(!episode.contains(bad), "{bad} was stored: {episode}");
+    }
+}

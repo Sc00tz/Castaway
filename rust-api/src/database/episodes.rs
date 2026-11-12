@@ -1380,9 +1380,8 @@ impl DatabasePool {
             warn!("Refusing to fetch chapters from unsafe URL {}: {}", chapters_url, reason);
             return Err(AppError::bad_request(format!("Refused to fetch chapters URL: {}", reason)));
         }
-        let client = reqwest::Client::builder()
+        let client = crate::services::url_guard::guarded_client_builder()
             .timeout(std::time::Duration::from_secs(5))
-            .redirect(crate::services::url_guard::guarded_redirect_policy())
             .build()?;
         
         let mut request = client.get(chapters_url)
