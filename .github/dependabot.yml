@@ -1,16 +1,20 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
+# Weekly dependency update pull requests.
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
 updates:
-  - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/web" # Location of package manifests
+  - package-ecosystem: "cargo"
+    directory: "/web"
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "pip" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "pip"
+    directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # faster-whisper 1.2.1 calls av.open(..., metadata_errors=...), which PyAV 19 removed, so
+      # every AI transcription would fail. Hold PyAV at 18.x until faster-whisper supports 19
+      # (see pinepods-ai/requirements.txt).
+      - dependency-name: "av"
+        versions: [">=19"]
