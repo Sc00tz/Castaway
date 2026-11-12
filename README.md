@@ -47,58 +47,20 @@ Castaway is based on [PinePods](https://github.com/madeofpendletonwool/PinePods)
 Castaway needs a database (PostgreSQL) and a Valkey or Redis server. The easiest way to run
 it is Docker Compose.
 
-**1. Get the image.** GitHub builds it on every push to `main` and publishes it as
-`ghcr.io/sc00tz/castaway` for x86_64 and ARM64. Docker pulls it automatically in step 3, or
-build it yourself with `docker build -t castaway .` from a clone of this repo.
+The repo root has a ready-made [`docker-compose.yml`](docker-compose.yml) that pulls the
+published image (`ghcr.io/sc00tz/castaway`, built by GitHub for x86_64 and ARM64) and
+runs it with PostgreSQL and Valkey. On your Docker host:
 
-**2. Create a `docker-compose.yml`:**
-
-```yaml
-services:
-  db:
-    image: postgres:18
-    environment:
-      POSTGRES_DB: pinepods_database
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: change-me
-      PGDATA: /var/lib/pgdata/pgdata
-    volumes:
-      - /home/user/castaway/pgdata:/var/lib/pgdata
-    restart: always
-
-  valkey:
-    image: valkey/valkey:8-alpine
-    restart: always
-
-  castaway:
-    image: ghcr.io/sc00tz/castaway:latest
-    ports:
-      - "8040:8040"
-    environment:
-      HOSTNAME: "http://localhost:8040"
-      DB_TYPE: postgresql
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: change-me
-      DB_NAME: pinepods_database
-      VALKEY_HOST: valkey
-      VALKEY_PORT: 6379
-      # Run as your host user so downloads stay accessible (optional)
-      PUID: ${UID:-911}
-      PGID: ${GID:-911}
-      TZ: "America/New_York"
-    volumes:
-      - /home/user/castaway/downloads:/opt/pinepods/downloads
-      - /home/user/castaway/backups:/opt/pinepods/backups
-    restart: always
-    depends_on:
-      - db
-      - valkey
+```bash
+mkdir castaway && cd castaway
+curl -fsSLO https://raw.githubusercontent.com/Sc00tz/Castaway/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/Sc00tz/Castaway/main/.env.example -o .env
+# edit .env: set CASTAWAY_URL, DB_PASSWORD (openssl rand -base64 24) and DATA_DIR
+docker compose up -d
 ```
 
-**3. Start it** with `docker compose up -d`, open `http://localhost:8040`, and create your
-first admin account.
+Then open your `CASTAWAY_URL` and create your first admin account. To update later:
+`docker compose pull && docker compose up -d`.
 
 More complete examples, including SQLite, the optional AI sidecar, single sign-on settings
 and allowing feeds hosted on your own network, are in

@@ -1,0 +1,61 @@
+# Castaway server: PostgreSQL + Valkey + Castaway.
+#
+# 1. Put this file in a folder on your Docker host, next to a `.env` file
+#    (copy .env.example and fill it in).
+# 2. docker compose up -d
+# 3. Open CASTAWAY_URL in a browser and create your admin account.
+#
+# Update later with: docker compose pull && docker compose up -d
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pinepods_database
+      POSTGRES_USER: castaway
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      PGDATA: /var/lib/pgdata/pgdata
+    volumes:
+      - ${DATA_DIR:-./data}/pgdata:/var/lib/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U castaway -d pinepods_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+
+  castaway:
+    image: ghcr.io/sc00tz/castaway:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_started
+    ports:
+      - "${CASTAWAY_PORT:-8040}:8040"
+    environment:
+      # The address people use to reach Castaway. RSS feeds and single sign-on build links from it.
+      HOSTNAME: ${CASTAWAY_URL:?set CASTAWAY_URL in .env}
+      DB_TYPE: postgresql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: castaway
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: pinepods_database
+      VALKEY_HOST: valkey
+      VALKEY_PORT: 6379
+      # Files are written as this host user, so you can read and manage downloads.
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-UTC}
+      # Feeds hosted on your own network (a NAS, Audiobookshelf, a Tailscale peer) are blocked
+      # unless listed here: comma-separated IPs or CIDRs, e.g. 192.168.1.20,100.64.0.0/10
+      ALLOWED_PRIVATE_NETWORKS: ${ALLOWED_PRIVATE_NETWORKS:-}
+    volumes:
+      - ${DATA_DIR:-./data}/downloads:/opt/pinepods/downloads
+      - ${DATA_DIR:-./data}/backups:/opt/pinepods/backups
