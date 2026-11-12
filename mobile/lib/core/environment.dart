@@ -30,8 +30,8 @@ const feedbackUrl = String.fromEnvironment('FEEDBACK_URL', defaultValue: '');
 /// using dart-define.
 class Environment {
   static const _applicationName = 'Castaway'; // i18n-ignore
-  static const _projectVersion = '0.9.2';
-  static const _build = '20252816';
+  static const _projectVersion = '0.10.0';
+  static const _build = '20261112';
 
   static var _agentString = userAgentAppString;
 

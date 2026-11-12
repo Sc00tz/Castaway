@@ -7,7 +7,7 @@
   },
   "identifier": "com.sc00tz.castaway",
   "productName": "Castaway",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "app": {
     "trayIcon": {
       "iconPath": "icons/icon.png",
