@@ -2133,103 +2133,85 @@ impl DatabasePool {
         })
     }
 
-    // Record listen duration - matches Python record_listen_duration function exactly
-    pub async fn record_listen_duration(&self, episode_id: i32, user_id: i32, listen_duration: f64, origin: crate::services::sync::SyncOrigin) -> AppResult<()> {
+    /// When a reported position was taken: the client's `recorded_at`, never later than now
+    /// (a fast clock mustn't let one device win every future comparison), or now if the client
+    /// didn't say.
+    pub fn position_time(recorded_at: Option<DateTime<Utc>>) -> chrono::NaiveDateTime {
+        let now = Utc::now();
+        recorded_at.map_or(now, |at| at.min(now)).naive_utc()
+    }
+
+    /// Save where the user is in an episode.
+    ///
+    /// The most recently *recorded* position wins, so rewinding, skipping back and restarting
+    /// all stick, while a stale report (an offline device catching up, or an upload retried
+    /// late) can't overwrite a newer one. `recorded_at` is when the player took the position;
+    /// `UserEpisodeHistory.ListenDate` holds that time for the stored position, the same rule
+    /// gpodder sync applies (see `services::sync::db::set_listen_position`).
+    pub async fn record_listen_duration(
+        &self,
+        episode_id: i32,
+        user_id: i32,
+        listen_duration: f64,
+        recorded_at: Option<DateTime<Utc>>,
+        origin: crate::services::sync::SyncOrigin,
+    ) -> AppResult<()> {
         use crate::services::sync::events::{self, EpisodeEvent};
-        debug!("Recording listen duration: episode_id={}, user_id={}, duration={}", episode_id, user_id, listen_duration);
-        
-        if listen_duration < 0.0 {
+        if !listen_duration.is_finite() || listen_duration < 0.0 {
             warn!("Skipped updating listen duration for user {} and episode {} due to invalid duration: {}", user_id, episode_id, listen_duration);
             return Ok(());
         }
-        
-        let listen_duration_int = listen_duration as i32;
+        let position = listen_duration as i32;
+        let at = Self::position_time(recorded_at);
         let log = events::should_log(self, user_id, origin).await;
-        
+
         dialect_match!(self, {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
-                // Check if record exists and get existing duration
-                let existing_row = q::query(r#"SELECT listenduration FROM "UserEpisodeHistory" WHERE userid = $1 AND episodeid = $2"#)
-                    .bind(user_id)
-                    .bind(episode_id)
-                    .fetch_optional(&mut *tx)
-                    .await?;
-                
-                let changed = if let Some(row) = existing_row {
-                    let existing_duration: Option<i32> = row.try_get("listenduration")?;
-                    let existing_duration = existing_duration.unwrap_or(0);
-                    
-                    // Update only if new duration is greater than existing
-                    if listen_duration_int > existing_duration {
-                        q::query(r#"UPDATE "UserEpisodeHistory" SET listenduration = $1, listendate = NOW() WHERE userid = $2 AND episodeid = $3"#)
-                            .bind(listen_duration_int)
-                            .bind(user_id)
-                            .bind(episode_id)
-                            .execute(&mut *tx)
-                            .await?;
-                        debug!("Updated listen duration for user {} episode {} from {} to {}", user_id, episode_id, existing_duration, listen_duration_int);
-                        true
-                    } else {
-                        debug!("No update required for user {} and episode {} as existing duration {} is greater than or equal to new duration {}", user_id, episode_id, existing_duration, listen_duration_int);
-                        false
-                    }
-                } else {
-                    // Insert new record
-                    q::query(r#"INSERT INTO "UserEpisodeHistory" (userid, episodeid, listendate, listenduration) VALUES ($1, $2, NOW(), $3)"#)
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .bind(listen_duration_int)
-                        .execute(&mut *tx)
-                        .await?;
-                    debug!("Inserted new listen duration record for user {} episode {} with duration {}", user_id, episode_id, listen_duration_int);
-                    true
-                };
+                let changed = q::query(
+                    r#"INSERT INTO "UserEpisodeHistory" (userid, episodeid, listendate, listenduration)
+                       VALUES ($1, $2, $3, $4)
+                       ON CONFLICT (userid, episodeid) DO UPDATE
+                       SET listenduration = EXCLUDED.listenduration, listendate = EXCLUDED.listendate
+                       WHERE "UserEpisodeHistory".listendate IS NULL
+                          OR "UserEpisodeHistory".listendate <= EXCLUDED.listendate"#,
+                )
+                .bind(user_id)
+                .bind(episode_id)
+                .bind(at)
+                .bind(position)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected()
+                    > 0;
                 if changed && log {
-                    q::pick(events::episode_pg, events::episode_lite)(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(listen_duration_int)).await;
+                    q::pick(events::episode_pg, events::episode_lite)(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(position)).await;
                 }
                 tx.commit().await?;
+                if !changed {
+                    debug!("Ignored a stale position for user {} episode {}: a newer one is stored", user_id, episode_id);
+                }
             },
             mysql(pool) => {
-                let mut tx = crate::services::sync::events::begin_mysql(pool, user_id, log).await?;
-                // Check if record exists and get existing duration
-                let existing_row = sqlx::query("SELECT ListenDuration FROM UserEpisodeHistory WHERE UserID = ? AND EpisodeID = ?")
-                    .bind(user_id)
-                    .bind(episode_id)
-                    .fetch_optional(&mut *tx)
-                    .await?;
-                
-                let changed = if let Some(row) = existing_row {
-                    let existing_duration: Option<i32> = row.try_get("ListenDuration")?;
-                    let existing_duration = existing_duration.unwrap_or(0);
-                    
-                    // Update only if new duration is greater than existing
-                    if listen_duration_int > existing_duration {
-                        sqlx::query("UPDATE UserEpisodeHistory SET ListenDuration = ?, ListenDate = NOW() WHERE UserID = ? AND EpisodeID = ?")
-                            .bind(listen_duration_int)
-                            .bind(user_id)
-                            .bind(episode_id)
-                            .execute(&mut *tx)
-                            .await?;
-                        debug!("Updated listen duration for user {} episode {} from {} to {}", user_id, episode_id, existing_duration, listen_duration_int);
-                        true
-                    } else {
-                        debug!("No update required for user {} and episode {} as existing duration {} is greater than or equal to new duration {}", user_id, episode_id, existing_duration, listen_duration_int);
-                        false
-                    }
-                } else {
-                    // Insert new record
-                    sqlx::query("INSERT INTO UserEpisodeHistory (UserID, EpisodeID, ListenDate, ListenDuration) VALUES (?, ?, NOW(), ?)")
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .bind(listen_duration_int)
-                        .execute(&mut *tx)
-                        .await?;
-                    debug!("Inserted new listen duration record for user {} episode {} with duration {}", user_id, episode_id, listen_duration_int);
-                    true
-                };
+                let mut tx = events::begin_mysql(pool, user_id, log).await?;
+                // ListenDuration is assigned first, so its condition still sees the old ListenDate.
+                let changed = sqlx::query(
+                    "INSERT INTO UserEpisodeHistory (UserID, EpisodeID, ListenDate, ListenDuration)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                         ListenDuration = IF(ListenDate IS NULL OR ListenDate <= VALUES(ListenDate), VALUES(ListenDuration), ListenDuration),
+                         ListenDate = IF(ListenDate IS NULL OR ListenDate <= VALUES(ListenDate), VALUES(ListenDate), ListenDate)",
+                )
+                .bind(user_id)
+                .bind(episode_id)
+                .bind(at)
+                .bind(position)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected()
+                    > 0;
                 if changed && log {
-                    events::episode_mysql(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(listen_duration_int)).await;
+                    events::episode_mysql(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(position)).await;
                 }
                 tx.commit().await?;
             },
@@ -2237,87 +2219,53 @@ impl DatabasePool {
         Ok(())
     }
 
-    // Record YouTube listen duration - matches Python record_youtube_listen_duration function exactly  
-    pub async fn record_youtube_listen_duration(&self, video_id: i32, user_id: i32, listen_duration: f64) -> AppResult<()> {
-        debug!("Recording YouTube listen duration: video_id={}, user_id={}, duration={}", video_id, user_id, listen_duration);
-        
-        if listen_duration < 0.0 {
+    /// [`record_listen_duration`](Self::record_listen_duration) for YouTube videos: the most
+    /// recently recorded position wins.
+    pub async fn record_youtube_listen_duration(
+        &self,
+        video_id: i32,
+        user_id: i32,
+        listen_duration: f64,
+        recorded_at: Option<DateTime<Utc>>,
+    ) -> AppResult<()> {
+        if !listen_duration.is_finite() || listen_duration < 0.0 {
             warn!("Skipped updating listen duration for user {} and video {} due to invalid duration: {}", user_id, video_id, listen_duration);
             return Ok(());
         }
-        
-        let listen_duration_int = listen_duration as i32;
-        
+        let position = listen_duration as i32;
+        let at = Self::position_time(recorded_at);
+
         dialect_match!(self, {
             pg(pool) => {
-                // Check if record exists and get existing duration
-                let existing_row = q::query(r#"SELECT listenduration FROM "UserVideoHistory" WHERE userid = $1 AND videoid = $2"#)
-                    .bind(user_id)
-                    .bind(video_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = existing_row {
-                    let existing_duration: Option<i32> = row.try_get("listenduration")?;
-                    let existing_duration = existing_duration.unwrap_or(0);
-                    
-                    // Update only if new duration is greater than existing
-                    if listen_duration_int > existing_duration {
-                        q::query(r#"UPDATE "UserVideoHistory" SET listenduration = $1, listendate = NOW() WHERE userid = $2 AND videoid = $3"#)
-                            .bind(listen_duration_int)
-                            .bind(user_id)
-                            .bind(video_id)
-                            .execute(pool)
-                            .await?;
-                        debug!("Updated YouTube listen duration for user {} video {} from {} to {}", user_id, video_id, existing_duration, listen_duration_int);
-                    } else {
-                        debug!("No update required for user {} and video {} as existing duration {} is greater than or equal to new duration {}", user_id, video_id, existing_duration, listen_duration_int);
-                    }
-                } else {
-                    // Insert new record
-                    q::query(r#"INSERT INTO "UserVideoHistory" (userid, videoid, listendate, listenduration) VALUES ($1, $2, NOW(), $3)"#)
-                        .bind(user_id)
-                        .bind(video_id)
-                        .bind(listen_duration_int)
-                        .execute(pool)
-                        .await?;
-                    debug!("Inserted new YouTube listen duration record for user {} video {} with duration {}", user_id, video_id, listen_duration_int);
-                }
+                q::query(
+                    r#"INSERT INTO "UserVideoHistory" (userid, videoid, listendate, listenduration)
+                       VALUES ($1, $2, $3, $4)
+                       ON CONFLICT (userid, videoid) DO UPDATE
+                       SET listenduration = EXCLUDED.listenduration, listendate = EXCLUDED.listendate
+                       WHERE "UserVideoHistory".listendate IS NULL
+                          OR "UserVideoHistory".listendate <= EXCLUDED.listendate"#,
+                )
+                .bind(user_id)
+                .bind(video_id)
+                .bind(at)
+                .bind(position)
+                .execute(pool)
+                .await?;
             },
             mysql(pool) => {
-                // Check if record exists and get existing duration
-                let existing_row = sqlx::query("SELECT ListenDuration FROM UserVideoHistory WHERE UserID = ? AND VideoID = ?")
-                    .bind(user_id)
-                    .bind(video_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = existing_row {
-                    let existing_duration: Option<i32> = row.try_get("ListenDuration")?;
-                    let existing_duration = existing_duration.unwrap_or(0);
-                    
-                    // Update only if new duration is greater than existing
-                    if listen_duration_int > existing_duration {
-                        sqlx::query("UPDATE UserVideoHistory SET ListenDuration = ?, ListenDate = NOW() WHERE UserID = ? AND VideoID = ?")
-                            .bind(listen_duration_int)
-                            .bind(user_id)
-                            .bind(video_id)
-                            .execute(pool)
-                            .await?;
-                        debug!("Updated YouTube listen duration for user {} video {} from {} to {}", user_id, video_id, existing_duration, listen_duration_int);
-                    } else {
-                        debug!("No update required for user {} and video {} as existing duration {} is greater than or equal to new duration {}", user_id, video_id, existing_duration, listen_duration_int);
-                    }
-                } else {
-                    // Insert new record
-                    sqlx::query("INSERT INTO UserVideoHistory (UserID, VideoID, ListenDate, ListenDuration) VALUES (?, ?, NOW(), ?)")
-                        .bind(user_id)
-                        .bind(video_id)
-                        .bind(listen_duration_int)
-                        .execute(pool)
-                        .await?;
-                    debug!("Inserted new YouTube listen duration record for user {} video {} with duration {}", user_id, video_id, listen_duration_int);
-                }
+                sqlx::query(
+                    "INSERT INTO UserVideoHistory (UserID, VideoID, ListenDate, ListenDuration)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                         ListenDuration = IF(ListenDate IS NULL OR ListenDate <= VALUES(ListenDate), VALUES(ListenDuration), ListenDuration),
+                         ListenDate = IF(ListenDate IS NULL OR ListenDate <= VALUES(ListenDate), VALUES(ListenDate), ListenDate)",
+                )
+                .bind(user_id)
+                .bind(video_id)
+                .bind(at)
+                .bind(position)
+                .execute(pool)
+                .await?;
             },
         });
         Ok(())

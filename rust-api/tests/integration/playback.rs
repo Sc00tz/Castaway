@@ -46,6 +46,47 @@ async fn listen_progress_is_saved_and_shows_everywhere() {
     assert!(in_progress.iter().any(|e| e["episodeid"] == ep), "home in-progress: {home}");
 }
 
+/// The most recently recorded position wins: skipping back or restarting sticks, and an
+/// upload that arrives late (an offline phone catching up) can't undo newer progress. Home
+/// and the podcast's episode list always agree.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_latest_position_wins_even_when_it_is_earlier_in_the_episode() {
+    let app = TestApp::new().await;
+    let (user, pod, ep) = setup(&app).await;
+    let record_at = |secs: f64, at: Option<chrono::DateTime<chrono::Utc>>| {
+        let mut body = json!({ "episode_id": ep, "user_id": user.id, "listen_duration": secs });
+        if let Some(at) = at {
+            body["recorded_at"] = json!(at.to_rfc3339());
+        }
+        app.post("/api/data/record_listen_duration").key(&user).json(&body)
+    };
+    let home_position = || async {
+        let home = app.get("/api/data/home_overview").key(&user).query("user_id", user.id).send().await.ok_json();
+        home["in_progress_episodes"]
+            .as_array()
+            .and_then(|eps| eps.iter().find(|e| e["episodeid"] == ep))
+            .map(|e| e["listenduration"].clone())
+    };
+
+    record(&app, &user, ep, 1200.0).await;
+    record(&app, &user, ep, 600.0).await; // skipped back ten minutes
+    assert_eq!(episode(&app, &user, pod, ep).await["Listenduration"], 600);
+    assert_eq!(home_position().await, Some(json!(600)), "home matches the episode list");
+
+    // A position recorded an hour ago arrives now: older than what's stored, so ignored.
+    let an_hour_ago = chrono::Utc::now() - chrono::Duration::hours(1);
+    record_at(1500.0, Some(an_hour_ago)).send().await.assert_ok();
+    assert_eq!(episode(&app, &user, pod, ep).await["Listenduration"], 600);
+
+    // A position from a device whose clock runs ahead is treated as recorded now, so it can't
+    // block every later update.
+    let tomorrow = chrono::Utc::now() + chrono::Duration::days(1);
+    record_at(700.0, Some(tomorrow)).send().await.assert_ok();
+    record(&app, &user, ep, 710.0).await;
+    assert_eq!(episode(&app, &user, pod, ep).await["Listenduration"], 710);
+    assert_eq!(home_position().await, Some(json!(710)));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn history_records_positions_in_seconds() {
     let app = TestApp::new().await;

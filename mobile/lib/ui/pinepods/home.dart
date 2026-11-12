@@ -11,6 +11,7 @@ import 'package:pinepods_mobile/ui/utils/local_download_utils.dart';
 import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
 import 'package:pinepods_mobile/services/pinepods/pinepods_audio_service.dart';
 import 'package:pinepods_mobile/services/global_services.dart';
+import 'package:pinepods_mobile/services/offline/offline_action_queue.dart';
 import 'package:pinepods_mobile/entities/home_data.dart';
 import 'package:pinepods_mobile/entities/pinepods_episode.dart';
 import 'package:pinepods_mobile/entities/episode.dart';
@@ -48,7 +49,7 @@ class PinepodsHome extends StatefulWidget {
   State<PinepodsHome> createState() => _PinepodsHomeState();
 }
 
-class _PinepodsHomeState extends State<PinepodsHome> {
+class _PinepodsHomeState extends State<PinepodsHome> with WidgetsBindingObserver {
   bool _isLoading = true;
   String _errorMessage = '';
   HomeOverview? _homeData;
@@ -67,9 +68,15 @@ class _PinepodsHomeState extends State<PinepodsHome> {
   StreamSubscription<Episode?>? _nowPlayingSub;
   String? _lastNowPlayingGuid;
 
+  // Positions this device records while Home is open, so the progress shown
+  // follows playback instead of waiting for the next reload.
+  StreamSubscription<PositionUpdate>? _positionSub;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _positionSub = GlobalServices.offlineActionQueue?.positionUpdates.listen(_onPositionRecorded);
     _loadHomeContent();
     // Recover automatically when the server becomes reachable again after an
     // offline launch, so the user doesn't have to manually retry (#935).
@@ -105,9 +112,37 @@ class _PinepodsHomeState extends State<PinepodsHome> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _positionSub?.cancel();
     _nowPlayingSub?.cancel();
     ConnectivityService.instance.removeListener(_onConnectivityChanged);
     super.dispose();
+  }
+
+  /// Coming back to the app: positions may have moved on another device.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && _homeData != null) {
+      _refreshHomeContentSilently();
+    }
+  }
+
+  void _onPositionRecorded(PositionUpdate update) {
+    final data = _homeData;
+    if (data == null || !mounted) return;
+    final updated = data.withPositions(
+      (id, isYoutube) => id == update.episodeId && isYoutube == update.isYoutube ? update.seconds : null,
+    );
+    if (!identical(updated, data)) setState(() => _homeData = updated);
+  }
+
+  /// [data] with progress this device hasn't synced yet overlaid on the
+  /// server's positions: the same rule every episode list uses (see
+  /// PositionUtils), so Home and the Feed always agree.
+  Future<HomeOverview> _withPendingPositions(HomeOverview data) async {
+    final pending = await GlobalServices.offlineActionQueue?.pendingPositions() ?? const <String, double>{};
+    if (pending.isEmpty) return data;
+    return data.withPositions((id, isYoutube) => pending[PositionUpdate.keyFor(id, isYoutube)]);
   }
 
   /// Re-fetches home data in the background, without showing the full-page
@@ -137,9 +172,10 @@ class _PinepodsHomeState extends State<PinepodsHome> {
         _pinepodsService.getPlaylists(settings.pinepodsUserId!),
       ]);
 
+      final homeData = await _withPendingPositions(futures[0] as HomeOverview);
       if (!mounted) return;
       setState(() {
-        _homeData = futures[0] as HomeOverview;
+        _homeData = homeData;
         _playlistData = futures[1] as PlaylistResponse;
       });
     } catch (e) {
@@ -216,8 +252,10 @@ class _PinepodsHomeState extends State<PinepodsHome> {
             builder: (context) => PinepodsEpisodeDetails(initialEpisode: _tmp[int.parse(const String.fromEnvironment('SHOT_EP'))].toPinepodsEpisode()))));
       }
       // END-TEMP-SCREENSHOT-HOOK
+      final homeData = await _withPendingPositions(futures[0] as HomeOverview);
+      if (!mounted) return;
       setState(() {
-        _homeData = futures[0] as HomeOverview;
+        _homeData = homeData;
         _playlistData = futures[1] as PlaylistResponse;
         _isLoading = false;
       });

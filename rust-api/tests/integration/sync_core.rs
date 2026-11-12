@@ -280,12 +280,12 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
     assert_eq!(first.len(), 1);
     exec(&app, &format!(r#"UPDATE "GpodderSyncEpisodeActions" SET ServerTs = 1, Timestamp = 1 WHERE ActionID = {}"#, first[0].id)).await;
     record(&app, &user, ep, 250.0).await;
-    record(&app, &user, ep, 200.0).await; // not stored (progress only moves forward locally), so not logged
+    record(&app, &user, ep, 200.0).await; // skipped back: the newest position wins, same row
     let log = action_log(&app, &user).await;
     assert_eq!(log.len(), 1, "{log:#?}");
     let row = &log[0];
     assert_eq!((row.action.as_str(), row.origin.as_str()), ("play", "pinepods"));
-    assert_eq!((row.position, row.total), (Some(250), Some(1801)));
+    assert_eq!((row.position, row.total), (Some(200), Some(1801)));
     assert_eq!((row.episode_id, row.guid.as_deref(), row.device.as_deref()), (Some(ep as i64), Some("guid-1"), Some("pinepods")));
     assert!(row.server_ts > 1 && row.timestamp > 1, "coalescing bumps ServerTs/Timestamp: {row:?}");
 
@@ -301,7 +301,7 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
     .await;
     record(&app, &user, ep, 400.0).await;
     let log = action_log(&app, &user).await;
-    assert_eq!(log.iter().map(|r| r.position).collect::<Vec<_>>(), vec![Some(250), Some(400)]);
+    assert_eq!(log.iter().map(|r| r.position).collect::<Vec<_>>(), vec![Some(200), Some(400)]);
 
     // Completing updates the unpushed row to position = total = duration.
     mark(&app, &user, ep, "/api/data/mark_episode_completed").await;

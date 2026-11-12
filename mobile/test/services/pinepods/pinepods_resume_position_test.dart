@@ -1,8 +1,9 @@
-// Regression tests for where playback resumes. The episode data a screen hands
-// to playPinepodsEpisode can be stale (loaded before the last listen), and the
-// server can be behind when progress made offline is still in the outbox.
-// Resume must take the furthest known position, and the play-start record must
-// not replace newer unsynced progress in the outbox.
+// Regression tests for where playback resumes. The newest known position wins,
+// not the furthest: this device's unsynced progress in the outbox, else the
+// server's position, else the (possibly stale) data the screen handed over.
+// That makes skipping back or restarting on another device stick. A start
+// position that came only from stale screen data must not be recorded, or it
+// would overwrite newer progress made elsewhere.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -109,7 +110,39 @@ void main() {
 
     expect(playedEpisode().position, 900000);
     expect(await queue.pendingPosition(101, false), 900);
-    verifyNever(() => api.getEpisodeMetadata(any(), any(), isYoutube: any(named: 'isYoutube')));
+  });
+
+  test('a downloaded episode asks the server where to resume', () async {
+    when(() => audio.findDownloadedEpisode(any())).thenAnswer(
+      (_) async => buildEpisode()..filepath = '/tmp',
+    );
+    serverPosition(300);
+
+    await service.playPinepodsEpisode(pinepodsEpisode: buildPinepodsEpisode(listenDuration: 100));
+
+    expect(playedEpisode().position, 300000);
+  });
+
+  test('skipping back on another device sticks: the newer, earlier position wins', () async {
+    // The screen loaded 10:00, then another device rewound to 2:00.
+    serverPosition(120);
+
+    await service.playPinepodsEpisode(pinepodsEpisode: buildPinepodsEpisode(listenDuration: 600));
+
+    expect(playedEpisode().position, 120000);
+    expect(await queue.pendingPosition(101, false), 120);
+  });
+
+  test('a start from stale screen data is played but not recorded', () async {
+    // Server unreachable: only the screen's data is known, and it may be old.
+    when(() => api.getEpisodeMetadata(any(), any(), isYoutube: any(named: 'isYoutube')))
+        .thenThrow(Exception('offline'));
+
+    await service.playPinepodsEpisode(pinepodsEpisode: buildPinepodsEpisode(listenDuration: 400));
+
+    expect(playedEpisode().position, 400000);
+    expect(await queue.pendingPosition(101, false), isNull,
+        reason: 'recording it would overwrite newer progress made on another device');
   });
 
   test('completed episodes still start from the beginning', () async {

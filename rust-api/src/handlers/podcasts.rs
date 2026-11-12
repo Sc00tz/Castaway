@@ -2852,9 +2852,15 @@ pub struct RecordListenDurationRequest {
     /// gave none (new episodes beyond the newest few are inserted with duration 0).
     #[serde(default)]
     pub episode_duration: Option<f64>,
+    /// When the player took this position (RFC 3339). The most recently recorded position
+    /// wins, so an upload that arrives late (an offline device catching up, a retry) can't
+    /// overwrite a newer one. Omitted means "now".
+    #[serde(default)]
+    pub recorded_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-// Record listen duration - matches Python api record_listen_duration function exactly
+/// Save where the user is in an episode. The most recently recorded position wins, so
+/// skipping back or restarting sticks (see `DatabasePool::record_listen_duration`).
 #[utoipa::path(
     post,
     path = "/record_listen_duration",
@@ -2890,9 +2896,9 @@ pub async fn record_listen_duration(
     require_episode_owner(&state, data.user_id, data.episode_id, data.is_youtube).await?;
 
     if data.is_youtube {
-        state.db_pool.record_youtube_listen_duration(data.episode_id, data.user_id, data.listen_duration).await?;
+        state.db_pool.record_youtube_listen_duration(data.episode_id, data.user_id, data.listen_duration, data.recorded_at).await?;
     } else {
-        state.db_pool.record_listen_duration(data.episode_id, data.user_id, data.listen_duration, crate::services::sync::SyncOrigin::Pinepods).await?;
+        state.db_pool.record_listen_duration(data.episode_id, data.user_id, data.listen_duration, data.recorded_at, crate::services::sync::SyncOrigin::Pinepods).await?;
         if let Some(d) = data.episode_duration.filter(|d| d.is_finite() && *d >= 1.0) {
             state.db_pool.set_episode_duration_if_missing(data.episode_id, d.round() as i32).await?;
         }

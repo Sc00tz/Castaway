@@ -1145,12 +1145,19 @@ class PinepodsService {
       null;
 
   // Record listen duration for episode
+  /// Save where the user is in an episode. [recordedAt] is when the player
+  /// took the position: the server keeps the most recently recorded position,
+  /// so an upload that arrives late (offline, retried) can't undo newer
+  /// progress. Omitted means now.
+  ///
+  /// Returns false when the server couldn't be reached or refused the update.
   Future<bool> recordListenDuration(
     int episodeId,
     int userId,
     double listenDuration,
-    bool isYoutube,
-  ) async {
+    bool isYoutube, {
+    DateTime? recordedAt,
+  }) async {
     if (_server == null || _apiKey == null) {
       throw Exception('Not authenticated');
     }
@@ -1164,6 +1171,7 @@ class PinepodsService {
         'user_id': userId,
         'listen_duration': listenDuration,
         'is_youtube': isYoutube,
+        'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
       });
 
       final response = await _post(

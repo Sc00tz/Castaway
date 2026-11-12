@@ -131,17 +131,35 @@ class PinepodsAudioService {
     }
   }
 
-  /// Where to resume [episode], in seconds: the furthest of the position its
-  /// (possibly stale) list data carries, any position still waiting in the
-  /// offline outbox, and [serverPosition] when one was fetched.
-  Future<double> _resolveResumePosition(PinepodsEpisode episode, {double? serverPosition}) async {
-    if (episode.completed) return 0;
-    var best = (episode.listenDuration ?? 0).toDouble();
+  /// Where to resume [episode], in seconds. The newest known position wins,
+  /// not the furthest, so skipping back or restarting (here or on another
+  /// device) sticks:
+  /// 1. a position still waiting in the offline outbox: this device's own
+  ///    latest progress, newer than anything the server has;
+  /// 2. else [serverPosition], when one was fetched;
+  /// 3. else the position the screen's (possibly stale) list data carries.
+  ///
+  /// `fresh` is false only in case 3, when the position may be out of date and
+  /// so must not be recorded as the newest one.
+  Future<({double seconds, bool fresh})> _resolveResumePosition(
+    PinepodsEpisode episode, {
+    double? serverPosition,
+  }) async {
+    if (episode.completed) return (seconds: 0.0, fresh: true);
     final pending = await _actionQueue?.pendingPosition(episode.episodeId, episode.isYoutube);
-    for (final p in [pending, serverPosition]) {
-      if (p != null && p > best) best = p;
-    }
-    return best;
+    if (pending != null) return (seconds: pending, fresh: true);
+    if (serverPosition != null) return (seconds: serverPosition, fresh: true);
+    return (seconds: (episode.listenDuration ?? 0).toDouble(), fresh: false);
+  }
+
+  /// The server's position for [episode], or null when it doesn't answer
+  /// within [startWait] (or at all, e.g. offline).
+  Future<double?> _serverPositionWithin(PinepodsEpisode episode, int userId) {
+    return getServerPositionForEpisode(episode.episodeId, userId, episode.isYoutube)
+        .timeout(startWait, onTimeout: () {
+      log.info('Server position slow for episode ${episode.episodeId}; starting from the known position');
+      return null;
+    });
   }
 
   /// How long a streamed start waits for the server's resume position and
@@ -235,7 +253,18 @@ class PinepodsAudioService {
         localEpisode.transcriptId = localDownload.transcriptId;
         log.info('Playing local download for episode $episodeId (offline fast path)');
 
-        final initialPosition = startAt ?? (resume ? await _resolveResumePosition(pinepodsEpisode) : 0.0);
+        // Even a downloaded episode asks the server where to resume (briefly;
+        // offline fails at once): the screen's data may predate listening
+        // somewhere else.
+        final resolved = startAt != null
+            ? (seconds: startAt, fresh: true)
+            : resume
+                ? await _resolveResumePosition(
+                    pinepodsEpisode,
+                    serverPosition: await _serverPositionWithin(pinepodsEpisode, userId),
+                  )
+                : (seconds: 0.0, fresh: true);
+        final initialPosition = resolved.seconds;
         if (resume || startAt != null) localEpisode.position = (initialPosition * 1000).round();
 
         await _audioPlayerService.playEpisode(episode: localEpisode, resume: resume || startAt != null, playbackSpeed: null);
@@ -246,6 +275,7 @@ class PinepodsAudioService {
           resume: resume,
           skipQueue: skipQueue,
           initialPosition: initialPosition,
+          recordStart: resolved.fresh,
           playDetails: null,
           lateDetails: null,
           podcast2Data: null,
@@ -263,19 +293,17 @@ class PinepodsAudioService {
       });
       final playDetailsFetch = _fetchPlayDetails(pinepodsEpisode, userId);
       final startData = await Future.wait<dynamic>([
-        (resume && startAt == null
-                ? getServerPositionForEpisode(episodeId, userId, pinepodsEpisode.isYoutube)
-                : Future<double?>.value(null))
-            .timeout(startWait, onTimeout: () {
-          log.info('Server position slow for episode $episodeId; starting from the known position');
-          return null;
-        }),
+        resume && startAt == null
+            ? _serverPositionWithin(pinepodsEpisode, userId)
+            : Future<double?>.value(null),
         playDetailsFetch.timeout(startWait, onTimeout: () => null),
       ]);
-      final initialPosition = startAt ??
-          (resume
+      final resolved = startAt != null
+          ? (seconds: startAt, fresh: true)
+          : resume
               ? await _resolveResumePosition(pinepodsEpisode, serverPosition: startData[0] as double?)
-              : 0.0);
+              : (seconds: 0.0, fresh: true);
+      final initialPosition = resolved.seconds;
       final playDetails = startData[1] as PlayEpisodeDetails?;
 
       // Convert PinepodsEpisode to Episode for the audio player
@@ -306,6 +334,7 @@ class PinepodsAudioService {
         resume: resume,
         skipQueue: skipQueue,
         initialPosition: initialPosition,
+        recordStart: resolved.fresh,
         playDetails: playDetails,
         lateDetails: playDetails == null ? playDetailsFetch : null,
         podcast2Data: podcast2Data,
@@ -357,13 +386,18 @@ class PinepodsAudioService {
     required PlayEpisodeDetails? playDetails,
     required Future<PlayEpisodeDetails?>? lateDetails,
     required Future<Map<String, dynamic>?>? podcast2Data,
+    bool recordStart = true,
   }) async {
     final episodeId = pinepodsEpisode.episodeId;
 
     // Add to history via the offline outbox (buffered locally when offline).
-    // Records the resolved position: the outbox keeps one position per
-    // episode, so a stale value here would replace newer unsynced progress.
-    await _recordPosition(episodeId, userId, initialPosition);
+    // The newest recorded position wins, so this is skipped when the start
+    // position may be stale (only the screen's list data was available):
+    // recording it now would overwrite newer progress from another device.
+    // The first periodic update records the real position instead.
+    if (recordStart) {
+      await _recordPosition(episodeId, userId, initialPosition);
+    }
     _lastRecordedPosition = initialPosition;
 
     _startPeriodicUpdates();

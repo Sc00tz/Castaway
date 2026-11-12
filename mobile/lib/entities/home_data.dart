@@ -126,6 +126,25 @@ class HomeEpisode {
     );
   }
 
+  /// A copy at a different position (seconds).
+  HomeEpisode withListenDuration(int? seconds) => HomeEpisode(
+        episodeId: episodeId,
+        podcastId: podcastId,
+        episodeTitle: episodeTitle,
+        episodeDescription: episodeDescription,
+        episodeUrl: episodeUrl,
+        episodeArtwork: episodeArtwork,
+        episodePubDate: episodePubDate,
+        episodeDuration: episodeDuration,
+        completed: completed,
+        podcastName: podcastName,
+        isYoutube: isYoutube,
+        listenDuration: seconds,
+        saved: saved,
+        queued: queued,
+        downloaded: downloaded,
+      );
+
   PinepodsEpisode toPinepodsEpisode() => PinepodsEpisode(
         podcastName: podcastName,
         episodeTitle: episodeTitle,
@@ -228,6 +247,33 @@ class HomeOverview {
     required this.queueCount,
     required this.weeklyStats,
   });
+
+  /// A copy whose episodes take their position from [positionOf] where it has
+  /// one (seconds; e.g. progress this device hasn't synced yet). Returns this
+  /// same object when nothing changes, so callers can skip a rebuild.
+  HomeOverview withPositions(double? Function(int episodeId, bool isYoutube) positionOf) {
+    var changed = false;
+    List<HomeEpisode> apply(List<HomeEpisode> episodes) => episodes.map((e) {
+          final seconds = positionOf(e.episodeId, e.isYoutube)?.round();
+          if (seconds == null || seconds == e.listenDuration) return e;
+          changed = true;
+          return e.withListenDuration(seconds);
+        }).toList();
+    final recent = apply(recentEpisodes);
+    final inProgress = apply(inProgressEpisodes);
+    final queue = apply(queuePreview);
+    if (!changed) return this;
+    return HomeOverview(
+      recentEpisodes: recent,
+      inProgressEpisodes: inProgress,
+      queuePreview: queue,
+      topPodcasts: topPodcasts,
+      savedCount: savedCount,
+      downloadedCount: downloadedCount,
+      queueCount: queueCount,
+      weeklyStats: weeklyStats,
+    );
+  }
 
   factory HomeOverview.fromJson(Map<String, dynamic> json) {
     return HomeOverview(

@@ -1,4 +1,5 @@
 // lib/ui/pinepods/feed.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
 import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
@@ -20,6 +21,7 @@ import 'package:pinepods_mobile/ui/utils/position_utils.dart';
 import 'package:pinepods_mobile/ui/widgets/server_error_page.dart';
 import 'package:pinepods_mobile/services/error_handling_service.dart';
 import 'package:pinepods_mobile/services/global_services.dart';
+import 'package:pinepods_mobile/services/offline/offline_action_queue.dart';
 import 'package:provider/provider.dart';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
@@ -34,7 +36,11 @@ class PinepodsFeed extends StatefulWidget {
   State<PinepodsFeed> createState() => _PinepodsFeedState();
 }
 
-class _PinepodsFeedState extends State<PinepodsFeed> {
+class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver {
+  // Positions this device records while the feed is open, so the progress
+  // shown follows playback instead of waiting for the next reload.
+  StreamSubscription<PositionUpdate>? _positionSub;
+
   bool _isLoading = false;
   String _errorMessage = '';
   List<PinepodsEpisode> _episodes = [];
@@ -72,7 +78,42 @@ class _PinepodsFeedState extends State<PinepodsFeed> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _positionSub = GlobalServices.offlineActionQueue?.positionUpdates.listen((update) {
+      if (!mounted) return;
+      final updated = PositionUtils.applyUpdate(_episodes, update);
+      if (!identical(updated, _episodes)) setState(() => _episodes = updated);
+    });
     _loadRecentEpisodes();
+  }
+
+  /// Coming back to the app: positions may have moved on another device.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && !_isLoading && _episodes.isNotEmpty) {
+      _refreshPositionsSilently();
+    }
+  }
+
+  /// Re-fetch the episodes already loaded and take their current positions,
+  /// keeping the list (and scroll position) in place. Best effort.
+  Future<void> _refreshPositionsSilently() async {
+    final settings = Provider.of<SettingsBloc>(context, listen: false).currentSettings;
+    final userId = settings.pinepodsUserId;
+    if (userId == null) return;
+    try {
+      final page = await _pinepodsService.getRecentEpisodes(userId, limit: _episodes.length, offset: 0);
+      final fresh = await PositionUtils.withPendingPositions(page.episodes);
+      final positions = {
+        for (final e in fresh)
+          if (e.listenDuration != null) PositionUpdate.keyFor(e.episodeId, e.isYoutube): e.listenDuration!.toDouble(),
+      };
+      if (!mounted) return;
+      final updated = PositionUtils.overlay(_episodes, positions);
+      if (!identical(updated, _episodes)) setState(() => _episodes = updated);
+    } catch (_) {
+      // Keep what's shown; the next pull-to-refresh will catch up.
+    }
   }
 
   PinepodsAudioService? get _audioService {
@@ -116,7 +157,7 @@ class _PinepodsFeedState extends State<PinepodsFeed> {
 
       final page = await _pinepodsService.getRecentEpisodes(userId, limit: 50, offset: 0);
 
-      // Enrich episodes with best available positions (local vs server)
+      // Overlay this device's unsynced progress on the server's positions
       final enrichedEpisodes = await PositionUtils.enrichEpisodesWithBestPositions(
         context,
         _pinepodsService,
@@ -813,6 +854,8 @@ class _PinepodsFeedState extends State<PinepodsFeed> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _positionSub?.cancel();
     // Don't dispose global audio service - it should persist across pages
     super.dispose();
   }

@@ -24,12 +24,20 @@ class OfflineActionQueue {
   final PinepodsService pinepodsService;
   final SettingsService settingsService;
 
-  /// Stop draining after this many consecutive failures for a single item so we
-  /// don't spin; the item is retried on the next flush trigger.
+  /// Drop an item after the server has refused it this many times. Only
+  /// refusals count: while the server can't be reached at all (offline, server
+  /// down) items wait indefinitely, so offline listening is never lost.
   static const int _maxRetries = 8;
 
   bool _flushing = false;
+  bool _flushRequested = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+
+  final StreamController<PositionUpdate> _positionUpdates = StreamController<PositionUpdate>.broadcast();
+
+  /// Every position this device records, as it's recorded. Episode lists listen
+  /// so the progress they show follows playback without reloading.
+  Stream<PositionUpdate> get positionUpdates => _positionUpdates.stream;
 
   OfflineActionQueue({
     required this.repository,
@@ -54,6 +62,7 @@ class OfflineActionQueue {
   void dispose() {
     _connectivitySub?.cancel();
     _connectivitySub = null;
+    _positionUpdates.close();
   }
 
   /// Persist an interaction and immediately attempt to flush it.
@@ -68,6 +77,7 @@ class OfflineActionQueue {
         for (final a in existing) {
           if (a.type == PendingActionType.recordPosition &&
               a.episodeId == action.episodeId &&
+              a.isYoutube == action.isYoutube &&
               a.id != null) {
             await repository.deletePendingAction(a.id!);
           }
@@ -75,6 +85,10 @@ class OfflineActionQueue {
       }
 
       await repository.savePendingAction(action);
+      final position = action.position;
+      if (action.type == PendingActionType.recordPosition && position != null && !_positionUpdates.isClosed) {
+        _positionUpdates.add(PositionUpdate(action.episodeId, action.isYoutube, position));
+      }
     } catch (e) {
       log.warning('Failed to enqueue offline action: $e');
       return;
@@ -129,10 +143,42 @@ class OfflineActionQueue {
     }
   }
 
-  /// Attempt to send all pending actions to the server in order. Stops at the
-  /// first failure (likely offline) so the remaining items are retried later.
+  /// The newest unsent position (seconds) of every episode that has one, keyed
+  /// by [PositionUpdate.keyFor]. Lists overlay these on the server's values:
+  /// they're this device's latest progress, newer than what the server has.
+  Future<Map<String, double>> pendingPositions() async {
+    try {
+      final positions = <String, double>{};
+      // Oldest first, so later entries overwrite earlier ones.
+      for (final a in await repository.getPendingActions()) {
+        final p = a.position;
+        if (a.type == PendingActionType.recordPosition && p != null) {
+          positions[PositionUpdate.keyFor(a.episodeId, a.isYoutube)] = p;
+        }
+      }
+      return positions;
+    } catch (e) {
+      log.warning('Failed to read pending positions: $e');
+      return {};
+    }
+  }
+
+  /// Send all pending actions to the server in order.
+  ///
+  /// When an item fails, a quick reachability check decides what that means:
+  /// - server unreachable (offline, down): stop; everything waits for the next
+  ///   trigger, and no retries are used up;
+  /// - server reachable: it refused this item, which counts toward
+  ///   [_maxRetries]; the rest of the queue carries on.
+  ///
+  /// A flush requested while one is running (e.g. a new position saved
+  /// mid-flush) runs again straight after, so the newest item isn't left
+  /// waiting for the next trigger.
   Future<void> flush() async {
-    if (_flushing) return;
+    if (_flushing) {
+      _flushRequested = true;
+      return;
+    }
 
     final server = settingsService.pinepodsServer;
     final apiKey = settingsService.pinepodsApiKey;
@@ -144,57 +190,89 @@ class OfflineActionQueue {
     _flushing = true;
     try {
       pinepodsService.setCredentials(server, apiKey);
-
-      final actions = await repository.getPendingActions();
-      for (final action in actions) {
-        try {
-          await _dispatch(action);
-          if (action.id != null) {
-            await repository.deletePendingAction(action.id!);
-          }
-        } catch (e) {
-          log.warning('Failed to sync pending action (${action.type.name}): $e');
-          action.retryCount++;
-          if (action.id != null && action.retryCount < _maxRetries) {
-            await repository.savePendingAction(action);
-          } else if (action.id != null) {
-            // Give up on a persistently-failing item rather than blocking the
-            // rest of the queue forever.
-            log.warning('Dropping pending action after $_maxRetries attempts: ${action.type.name}');
-            await repository.deletePendingAction(action.id!);
-          }
-          // Stop draining; likely offline. Remaining items retry next trigger.
-          break;
-        }
-      }
+      do {
+        _flushRequested = false;
+        if (!await _drain(server)) break; // unreachable: wait for the next trigger
+      } while (_flushRequested);
     } finally {
       _flushing = false;
     }
   }
 
+  /// One pass over the queue. Returns false if it stopped because the server
+  /// couldn't be reached.
+  Future<bool> _drain(String server) async {
+    for (final action in await repository.getPendingActions()) {
+      try {
+        await _dispatch(action);
+        if (action.id != null) {
+          await repository.deletePendingAction(action.id!);
+        }
+      } catch (e) {
+        if (!await pinepodsService.verifyPinepodsInstance(server)) {
+          log.fine('Server unreachable - keeping ${action.type.name} queued: $e');
+          return false;
+        }
+        log.warning('Server refused pending action (${action.type.name}): $e');
+        action.retryCount++;
+        if (action.id == null) continue;
+        if (action.retryCount < _maxRetries) {
+          await repository.savePendingAction(action);
+        } else {
+          log.warning('Dropping pending action after $_maxRetries refusals: ${action.type.name}');
+          await repository.deletePendingAction(action.id!);
+        }
+      }
+    }
+    return true;
+  }
+
+  /// Send one action. Throws if it didn't go through: the service methods
+  /// report failure by returning false, and treating that as success is how
+  /// progress used to be silently lost.
   Future<void> _dispatch(PendingAction a) async {
+    final bool sent;
     switch (a.type) {
       case PendingActionType.recordPosition:
-        await pinepodsService.recordListenDuration(a.episodeId, a.userId, a.position ?? 0, a.isYoutube);
-        break;
+        // Sent with the time the position was taken, so a late upload can't
+        // overwrite newer progress made since (on any device).
+        sent = await pinepodsService.recordListenDuration(
+          a.episodeId,
+          a.userId,
+          a.position ?? 0,
+          a.isYoutube,
+          recordedAt: a.createdAt,
+        );
       case PendingActionType.addHistory:
-        await pinepodsService.addHistory(a.episodeId, a.position ?? 0, a.userId, a.isYoutube);
-        break;
+        sent = await pinepodsService.addHistory(a.episodeId, a.position ?? 0, a.userId, a.isYoutube);
       case PendingActionType.markCompleted:
-        await pinepodsService.markEpisodeCompleted(a.episodeId, a.userId, a.isYoutube);
-        break;
+        sent = await pinepodsService.markEpisodeCompleted(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.markUncompleted:
-        await pinepodsService.markEpisodeUncompleted(a.episodeId, a.userId, a.isYoutube);
-        break;
+        sent = await pinepodsService.markEpisodeUncompleted(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.saveEpisode:
-        await pinepodsService.saveEpisode(a.episodeId, a.userId, a.isYoutube);
-        break;
+        sent = await pinepodsService.saveEpisode(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.removeSaved:
-        await pinepodsService.removeSavedEpisode(a.episodeId, a.userId, a.isYoutube);
-        break;
+        sent = await pinepodsService.removeSavedEpisode(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.queue:
-        await pinepodsService.queueEpisode(a.episodeId, a.userId, a.isYoutube);
-        break;
+        sent = await pinepodsService.queueEpisode(a.episodeId, a.userId, a.isYoutube);
+    }
+    if (!sent) {
+      throw StateError('${a.type.name} for episode ${a.episodeId} was not accepted');
     }
   }
+}
+
+/// A position this device recorded for an episode.
+class PositionUpdate {
+  final int episodeId;
+  final bool isYoutube;
+  final double seconds;
+
+  const PositionUpdate(this.episodeId, this.isYoutube, this.seconds);
+
+  /// Map key for an episode's position; podcast episodes and YouTube videos
+  /// have separate id spaces.
+  static String keyFor(int episodeId, bool isYoutube) => '${isYoutube ? 'yt' : 'ep'}:$episodeId';
+
+  String get key => keyFor(episodeId, isYoutube);
 }
