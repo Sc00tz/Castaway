@@ -28,7 +28,9 @@ permissions:
 
 concurrency:
   group: android-${{ github.ref }}
-  cancel-in-progress: true
+  # On main, let every build finish (a cancelled run counts as a failure in GitHub's emails);
+  # newer pushes queue behind it instead.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   apk:
