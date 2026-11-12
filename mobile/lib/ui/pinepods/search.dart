@@ -597,7 +597,8 @@ class _PinepodsSearchState extends State<PinepodsSearch> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                   children: [
-                    for (final provider in SearchProvider.values)
+                    // YouTube search is dropped: it never worked reliably. Only podcast directories.
+                    for (final provider in SearchProvider.values.where((p) => p != SearchProvider.youtube))
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterPill(
