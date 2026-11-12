@@ -18,7 +18,7 @@ void optionalShowNowPlaying(BuildContext context, AppSettings settings) {
   }
 }
 
-/// Helper function to play a PinePods episode and automatically show the full screen player if enabled
+/// Helper function to play a Castaway episode and automatically show the full screen player if enabled
 Future<void> playPinepodsEpisodeWithOptionalFullScreen(
   BuildContext context,
   PinepodsAudioService audioService,

@@ -1,12 +1,12 @@
 # SQLite: one container, no database server or Valkey to run. Suits a single household; for
 # many users or a busy instance, use the PostgreSQL compose file instead.
 services:
-  pinepods:
-    image: madeofpendletonwool/pinepods:latest
+  castaway:
+    image: castaway:latest  # build it from the repo root: docker build -t castaway .
     ports:
       - "8040:8040"
     environment:
-      # The URL you reach Pinepods at, used in RSS feed links. Optional: without it, links use
+      # The URL you reach Castaway at, used in RSS feed links. Optional: without it, links use
       # the address each request came in on.
       HOSTNAME: "http://localhost:8040"
       # The database is one file in the data volume below. Without DB_HOST, SQLite is the
@@ -22,10 +22,10 @@ services:
       DEFAULT_LANGUAGE: "en"
     volumes:
       # The database. Without this mount it's lost when the container is recreated.
-      - /home/user/pinepods/data:/opt/pinepods/data
+      - /home/user/castaway/data:/opt/pinepods/data
       # Mount the download and backup locations on the server
-      - /home/user/pinepods/downloads:/opt/pinepods/downloads
-      - /home/user/pinepods/backups:/opt/pinepods/backups
+      - /home/user/castaway/downloads:/opt/pinepods/downloads
+      - /home/user/castaway/backups:/opt/pinepods/backups
       # Mount local media files to use the Add Local Podcast feature (optional)
-      - /home/user/pinepods/local-media:/opt/pinepods/local-media
+      - /home/user/castaway/local-media:/opt/pinepods/local-media
     restart: always

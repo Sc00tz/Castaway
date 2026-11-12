@@ -1,5 +1,5 @@
 pkgbase = pinepods
-	pkgdesc = Pinepods is a complete podcast management system and allows you to play, download, and keep track of podcasts you enjoy. All self hosted and enjoyed on your own server!
+	pkgdesc = Castaway is a complete podcast management system and allows you to play, download, and keep track of podcasts you enjoy. All self hosted and enjoyed on your own server!
 	pkgver = 0.7.0
 	pkgrel = 1
 	url = https://github.com/madeofpendletonwool/PinePods

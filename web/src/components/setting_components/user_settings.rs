@@ -338,11 +338,11 @@ pub fn user_settings() -> Html {
                         </div>
                         <div>
                             <label for="fullname" style="display:block;font-size:13px;font-weight:500;color:var(--text-color);margin-bottom:6px;">{i18n.t("settings.full_name")}</label>
-                            <input oninput={on_fullname_change.clone()} placeholder="Pinepods User" type="text" id="fullname" name="fullname" class="input" required=true />
+                            <input oninput={on_fullname_change.clone()} placeholder="Castaway User" type="text" id="fullname" name="fullname" class="input" required=true />
                         </div>
                         <div>
                             <label for="email" style="display:block;font-size:13px;font-weight:500;color:var(--text-color);margin-bottom:6px;">{i18n.t("settings.email")}</label>
-                            <input oninput={on_email_change.clone()} placeholder="user@pinepods.online" type="email" id="email" name="email" class="input" required=true />
+                            <input oninput={on_email_change.clone()} placeholder="user@example.com" type="email" id="email" name="email" class="input" required=true />
                             {
                                 match *email_error {
                                     email_error_notice::Hidden => html! {},
@@ -957,11 +957,11 @@ pub fn user_settings() -> Html {
                         </div>
                         <div>
                             <label for="fullname" style="display:block;font-size:13px;font-weight:500;color:var(--text-color);margin-bottom:6px;">{i18n.t("settings.full_name")}</label>
-                            <input oninput={on_fullname_change} value={fullname.to_string()} placeholder="Pinepods User" type="text" id="fullname" name="fullname" class="input" required=true />
+                            <input oninput={on_fullname_change} value={fullname.to_string()} placeholder="Castaway User" type="text" id="fullname" name="fullname" class="input" required=true />
                         </div>
                         <div>
                             <label for="email" style="display:block;font-size:13px;font-weight:500;color:var(--text-color);margin-bottom:6px;">{i18n.t("settings.email")}</label>
-                            <input oninput={on_email_change} value={email.to_string()} placeholder="user@pinepods.online" type="email" id="email" name="email" class="input" required=true />
+                            <input oninput={on_email_change} value={email.to_string()} placeholder="user@example.com" type="email" id="email" name="email" class="input" required=true />
                             {
                                 match *email_error {
                                     email_error_notice::Hidden => html! {},

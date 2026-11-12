@@ -49,7 +49,7 @@
 		<string>zh-Hant</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Pinepods</string>
+	<string>Castaway</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -57,7 +57,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>pinepods</string>
+	<string>Castaway</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -70,20 +70,20 @@
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLName</key>
-			<string>com.gooseberrydevelopment.pinepods</string>
+			<string>com.sc00tz.castaway</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>pinepods-subscribe</string>
+				<string>castaway-subscribe</string>
 			</array>
 		</dict>
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLName</key>
-			<string>com.gooseberrydevelopment.pinepods.auth</string>
+			<string>com.sc00tz.castaway.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>pinepods</string>
+				<string>castaway</string>
 			</array>
 		</dict>
 	</array>
@@ -110,9 +110,9 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>File access is required to facilitate locating and importing OPML files</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Camera access is not used by Pinepods; this entry is required because a bundled library references the camera API.</string>
+	<string>Camera access is not used by Castaway; this entry is required because a bundled library references the camera API.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location access is not used by Pinepods; this entry is required because a bundled library references the location API.</string>
+	<string>Location access is not used by Castaway; this entry is required because a bundled library references the location API.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

@@ -1,6 +1,6 @@
 # pinepods-ai.yml — OPTIONAL AI (transcription) sidecar (#726).
 #
-# Apply this ONLY if you want AI features (transcript generation). Without it, PinePods
+# Apply this ONLY if you want AI features (transcript generation). Without it, Castaway
 # simply hides/disables those features. To enable, also uncomment PINEPODS_AI_URL in
 # env-configmap.yml so the main app knows where to reach this service.
 #

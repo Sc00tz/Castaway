@@ -1,4 +1,4 @@
-// People credited on podcasts and episodes, as served by the PinePods server's
+// People credited on podcasts and episodes, as served by the Castaway server's
 // /api/data/people/* endpoints. These are distinct from [Person] (person.dart),
 // which is the Podcasting 2.0 tag attached to a playing episode.
 
@@ -24,7 +24,7 @@ String roleLabel(String role) {
 
 /// A person as shown on a podcast or episode page.
 class CreditedPerson {
-  /// PinePods person id; 0 when the server is too old to provide one (then the
+  /// Castaway person id; 0 when the server is too old to provide one (then the
   /// person can't be opened or followed).
   final int id;
   final int? podpeopleId;

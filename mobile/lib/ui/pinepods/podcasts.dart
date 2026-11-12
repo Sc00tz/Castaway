@@ -31,7 +31,7 @@ enum PodcastSortDirection {
   oldestSubscribed,
 }
 
-/// This class displays the list of podcasts the user is subscribed to on the PinePods server.
+/// This class displays the list of podcasts the user is subscribed to on the Castaway server.
 class PinepodsPodcasts extends StatefulWidget {
   const PinepodsPodcasts({
     super.key,

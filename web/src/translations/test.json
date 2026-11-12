@@ -683,14 +683,11 @@
     "welcome_hero_subtitle": "",
     "welcome_intro": "",
     "welcome_get_started": "",
-    "welcome_docs_button": "",
     "welcome_tips_heading": "",
     "welcome_tip_search_title": "",
     "welcome_tip_search_desc": "",
     "welcome_tip_feed_title": "",
     "welcome_tip_feed_desc": "",
-    "welcome_tip_docs_title": "",
-    "welcome_tip_docs_desc": "",
     "welcome_open_podcasts": ""
   },
   "host_component": {
@@ -1666,8 +1663,6 @@
     "user_self_service_settings": "ZZTEST-USER-SELF-SERVICE-SETTINGS-ZZTEST"
   },
   "user_stats": {
-    "about_text": "ZZTEST-ABOUT-TEXT-ZZTEST",
-    "buy_me_coffee": "ZZTEST-BUY-ME-COFFEE-ZZTEST",
     "current_version": "ZZTEST-CURRENT-VERSION-ZZTEST",
     "episodes_downloaded": "ZZTEST-EPISODES-DOWNLOADED-ZZTEST",
     "episodes_saved": "ZZTEST-EPISODES-SAVED-ZZTEST",
@@ -1677,8 +1672,6 @@
     "loading_user_stats": "ZZTEST-LOADING-USER-STATS-ZZTEST",
     "nextcloud": "ZZTEST-NEXTCLOUD-ZZTEST",
     "not_syncing": "ZZTEST-NOT-SYNCING-ZZTEST",
-    "pinepods_documentation": "ZZTEST-PINEPODS-DOCUMENTATION-ZZTEST",
-    "pinepods_github_repo": "ZZTEST-PINEPODS-GITHUB-REPO-ZZTEST",
     "podcast_sync_status": "ZZTEST-PODCAST-SYNC-STATUS-ZZTEST",
     "podcasts_added": "ZZTEST-PODCASTS-ADDED-ZZTEST",
     "podcasts_played": "ZZTEST-PODCASTS-PLAYED-ZZTEST",

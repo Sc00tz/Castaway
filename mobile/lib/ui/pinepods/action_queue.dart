@@ -11,7 +11,7 @@ import 'package:pinepods_mobile/l10n/L.dart';
 
 /// Shows the offline "outbox" — episode interactions (progress, completion,
 /// saved, queue) that were recorded while offline and are waiting to sync to
-/// the PinePods server. Lets the user trigger a manual sync.
+/// the Castaway server. Lets the user trigger a manual sync.
 class ActionQueue extends StatefulWidget {
   const ActionQueue({super.key});
 

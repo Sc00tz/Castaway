@@ -1,7 +1,7 @@
-"""PinePods AI sidecar — optional, stateless AI service.
+"""Castaway AI sidecar — optional, stateless AI service.
 
 Modeled on Immich's machine-learning container: a separate, optional service the
-main PinePods API talks to over HTTP. If it isn't running (or PINEPODS_AI_URL is
+main Castaway API talks to over HTTP. If it isn't running (or PINEPODS_AI_URL is
 unset), the API simply disables AI-based features. It holds no database access.
 
 Capabilities:
@@ -13,7 +13,7 @@ Capabilities:
     endpoint labels the ad spans, which map back to audio time ranges.
   - Model management: list installed models and pull new ones.
 
-The active models are chosen by the PinePods API (stored in its DB) and passed on each
+The active models are chosen by the Castaway API (stored in its DB) and passed on each
 request, so this service stays stateless and caches whatever models it's asked for.
 
 Endpoints:
@@ -66,7 +66,7 @@ KNOWN_WHISPER_MODELS = [
     "medium", "medium.en", "large-v1", "large-v2", "large-v3", "distil-large-v3",
 ]
 
-app = FastAPI(title="PinePods AI", version="0.2.0")
+app = FastAPI(title="Castaway AI", version="0.2.0")
 
 # Models are loaded lazily on first use and cached process-wide, keyed by name so the
 # service can hold multiple whisper sizes / GGUFs at once. Loading pulls weights and can

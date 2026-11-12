@@ -107,7 +107,7 @@ async fn download_episode_and_wait(
         // public URL cannot 30x-redirect (or rebind) into the internal network.
         let mut response = crate::services::http::download_client().get(&episode_url)
             .header("Accept", "*/*")
-            .header("User-Agent", "PinePods/1.0")
+            .header("User-Agent", "Castaway/1.0")
             .send()
             .await
             .map_err(|e| crate::error::AppError::Internal(format!("Failed to start download: {}", crate::services::http::describe_error(&e))))?;
@@ -508,7 +508,7 @@ impl TaskSpawner {
                         request
                     };
 
-                    let mut response = build_request(&client, "PinePods/1.0")
+                    let mut response = build_request(&client, "Castaway/1.0")
                         .send()
                         .await
                         .map_err(|e| crate::error::AppError::internal(&format!("Failed to start download: {}", crate::services::http::describe_error(&e))))?;

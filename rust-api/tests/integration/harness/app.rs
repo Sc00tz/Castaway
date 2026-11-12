@@ -1,4 +1,4 @@
-//! `TestApp`: one fully isolated PinePods server per test.
+//! `TestApp`: one fully isolated Castaway server per test.
 //!
 //! Each test gets its own database cloned from the migrated template, a real `AppState`
 //! (real `DatabasePool`, real Valkey), and the exact production router from

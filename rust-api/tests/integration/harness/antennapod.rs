@@ -2,7 +2,7 @@
 //!
 //! Ported from `AntennaPod/net/sync` (`ResponseMapper`, `EpisodeAction.readFromJsonObject`,
 //! `GpodnetUploadChangesResponse`, `GpodnetService.readDeviceFromJsonObject`). AntennaPod is
-//! the client most Pinepods users sync, and it fails quietly: a `play` action it can't read
+//! the client most Castaway users sync, and it fails quietly: a `play` action it can't read
 //! still applies, with position −1 s, which puts the episode back to the start (#636).
 //! Each `check_*` returns the list of rule violations; the `assert_*` wrappers panic on any.
 

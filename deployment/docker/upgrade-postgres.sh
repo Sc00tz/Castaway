@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# upgrade-postgres.sh — Upgrade a Pinepods PostgreSQL data directory to a new
+# upgrade-postgres.sh — Upgrade a Castaway PostgreSQL data directory to a new
 # major version (e.g. 17 -> 18) using the drop-in pgautoupgrade image.
 #
 # A major PostgreSQL version uses an incompatible on-disk format, so postgres:18
@@ -14,7 +14,7 @@
 #
 set -euo pipefail
 
-# ---- Defaults (match the shipped Pinepods compose files) --------------------
+# ---- Defaults (match the shipped Castaway compose files) --------------------
 VOLUME=""                                   # host path OR docker named volume holding pgdata
 DB_NAME="pinepods_database"
 DB_USER="postgres"
@@ -29,7 +29,7 @@ ASSUME_YES="no"
 
 usage() {
     cat <<EOF
-Upgrade a Pinepods PostgreSQL data directory to a new major version.
+Upgrade a Castaway PostgreSQL data directory to a new major version.
 
 Usage: $0 --volume <pgdata-volume> [options]
 
@@ -225,5 +225,5 @@ Next steps:
            -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;"
 
 Safety backup kept at: $BACKUP_FILE
-Delete it only after you've confirmed Pinepods works on the new version.
+Delete it only after you've confirmed Castaway works on the new version.
 EOF

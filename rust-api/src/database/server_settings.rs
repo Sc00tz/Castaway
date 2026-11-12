@@ -3,7 +3,7 @@
 use super::*;
 
 impl DatabasePool {
-    // Get PinePods version - matches Python get_pinepods_version function
+    // Get Castaway version - matches Python get_pinepods_version function
     pub async fn get_pinepods_version(&self) -> AppResult<String> {
         match std::fs::read_to_string("/pinepods/current_version") {
             Ok(version) => {

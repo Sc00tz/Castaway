@@ -743,7 +743,7 @@ impl DatabasePool {
 
         // Build HTTP client with proper configuration
         let client = crate::services::url_guard::guarded_client_builder()
-            .user_agent("PinePods/1.0")
+            .user_agent("Castaway/1.0")
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| AppError::external_error(&format!("Failed to build HTTP client: {}", e)))?;

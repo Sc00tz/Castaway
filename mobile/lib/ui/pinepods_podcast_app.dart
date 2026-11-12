@@ -90,7 +90,7 @@ import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 
 var theme = Themes.lightTheme().themeData;
 
-/// PinePods is a Podcast player. You can search and subscribe to podcasts,
+/// Castaway is a Podcast player. You can search and subscribe to podcasts,
 /// download and stream episodes and view the latest podcast charts.
 // ignore: must_be_immutable
 class PinepodsPodcastApp extends StatefulWidget {
@@ -327,7 +327,7 @@ class PinepodsPodcastAppState extends State<PinepodsPodcastApp> {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         showSemanticsDebugger: false,
-        title: 'Pinepods Podcast Client', // i18n-ignore
+        title: 'Castaway Podcast Client', // i18n-ignore
         navigatorObservers: [NavigationRouteObserver()],
         localizationsDelegates: const <LocalizationsDelegate<Object>>[
           AppLocalizations.delegate,
@@ -344,7 +344,7 @@ class PinepodsPodcastAppState extends State<PinepodsPodcastApp> {
           // Wrap with AccessibilityTools(child: ...) to enable the accessibility checker.
           return child!;
         },
-        home: const AuthWrapper(child: PinepodsHomePage(title: 'PinePods Podcast Player')), // i18n-ignore
+        home: const AuthWrapper(child: PinepodsHomePage(title: 'Castaway Podcast Player')), // i18n-ignore
       ),
     );
   }
@@ -414,7 +414,7 @@ class _PinepodsHomePageState extends State<PinepodsHomePage> with WidgetsBinding
   }
 
   /// We listen to external links from outside the app. For example, someone may navigate
-  /// to a web page that supports 'Open with Pinepods'.
+  /// to a web page that supports 'Open with Castaway'.
   void _setupLinkListener() async {
     print('Deep Link: Setting up link listener...');
     final appLinks = AppLinks(); // AppLinks is singleton
@@ -455,21 +455,21 @@ class _PinepodsHomePageState extends State<PinepodsHomePage> with WidgetsBinding
     print('Deep Link: Scheme: ${uri.scheme}, Host: ${uri.host}, Path: ${uri.path}');
 
     // Handle OIDC authentication callback - be more flexible with path matching
-    if (uri.scheme == 'pinepods' && uri.host == 'auth') {
+    if (uri.scheme == 'castaway' && uri.host == 'auth') {
       print('Deep Link: OIDC callback detected (flexible match)');
       await _handleOidcCallback(uri);
       return;
     }
 
     // Handle OIDC authentication callback - strict match
-    if (uri.scheme == 'pinepods' && uri.host == 'auth' && uri.path == '/callback') {
+    if (uri.scheme == 'castaway' && uri.host == 'auth' && uri.path == '/callback') {
       print('Deep Link: OIDC callback detected (strict match)');
       await _handleOidcCallback(uri);
       return;
     }
 
     // Handle podcast subscription links
-    if ((uri.scheme == 'pinepods-subscribe' || uri.scheme == 'https') &&
+    if ((uri.scheme == 'castaway-subscribe' || uri.scheme == 'https') &&
         (uri.query.startsWith('uri=') || uri.query.startsWith('url='))) {
       var path = uri.query.substring(4);
       var loadPodcastBloc = Provider.of<PodcastBloc>(context, listen: false);
@@ -1059,15 +1059,6 @@ class _PinepodsHomePageState extends State<PinepodsHomePage> with WidgetsBinding
     }
   }
 
-  void _launchEmail() async {
-    final uri = Uri.parse('mailto:mobile-support@pinepods.online');
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      throw 'Could not launch $uri';
-    }
-  }
 }
 
 /// Tracks whether the tab navigator is showing its root page. Dialogs and
@@ -1110,7 +1101,7 @@ class TitleWidget extends StatelessWidget {
         final email = settings.pinepodsUseGravatar ? settings.pinepodsEmail : null;
 
         if (username == null || username.isEmpty) {
-          // Fallback to PinePods logo if no user is logged in - make it clickable
+          // Fallback to Castaway logo if no user is logged in - make it clickable
           return GestureDetector(
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const PinepodsUserStats()));

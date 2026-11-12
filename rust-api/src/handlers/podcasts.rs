@@ -2543,7 +2543,7 @@ pub async fn get_extended_stats(
     }
 }
 
-// Get PinePods version - matches Python get_pinepods_version endpoint exactly
+// Get Castaway version - matches Python get_pinepods_version endpoint exactly
 #[utoipa::path(
     get,
     path = "/get_pinepods_version",
@@ -3628,7 +3628,7 @@ pub struct PodPeopleDiscoverQuery {
 }
 
 // Proxy PodPeopleDB's JSON discovery endpoints (top-hosts, recent-hosts, popular-podcasts, stats)
-// so the PinePods web app can surface a "Discover hosts" experience without talking to PodPeopleDB
+// so the Castaway web app can surface a "Discover hosts" experience without talking to PodPeopleDB
 // directly (PEOPLE_API_URL is backend-only). Returns the upstream JSON verbatim.
 #[utoipa::path(
     get,

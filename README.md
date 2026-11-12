@@ -1,288 +1,143 @@
 <p align="center">
-  <img width="240" src="./images/logo1024square.png" alt="PinePods logo">
+  <img width="240" src="./images/pinepods-logo.jpeg" alt="Castaway logo">
 </p>
 
-<h1 align="center">PinePods :evergreen_tree:</h1>
+<h1 align="center">Castaway</h1>
 
 <p align="center">
-  <em>A forest of podcasts, rooted in the spirit of self-hosting.</em>
-</p>
-
-<p align="center">
-  <a href="https://discord.gg/bKzHRa4GNc"><img src="https://img.shields.io/badge/discord-join%20chat-5B5EA6" alt="Discord"></a>
-  <a href="https://matrix.to/#/#pinepods:matrix.org"><img src="https://matrix.to/img/matrix-badge.svg" alt="Chat on Matrix"></a>
-  <a href="https://github.com/madeofpendletonwool/PinePods/actions"><img src="https://github.com/madeofpendletonwool/PinePods/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Container Build"></a>
-  <a href="https://github.com/madeofpendletonwool/PinePods/releases"><img src="https://img.shields.io/github/v/release/madeofpendletonwool/pinepods" alt="GitHub Release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue" alt="License"></a>
+  <em>Self-hosted podcasts for your whole household.</em>
 </p>
 
 <p align="center">
-  <a href="https://flathub.org/apps/com.gooseberrydevelopment.pinepods"><img src="https://flathub.org/api/badge?locale=en" alt="Get it on Flathub" height="50"></a>
-  <a href="https://apps.apple.com/us/app/pinepods/id6751441116"><img src="./images/Download_on_the_App_Store_Badge_US-UK_RGB_blk_092917.svg" alt="Download on the App Store" height="50"></a>
-  <a href="https://play.google.com/store/apps/details?id=com.gooseberrydevelopment.pinepods"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="50"></a>
-  <a href="https://apt.izzysoft.de/fdroid/index/apk/com.gooseberrydevelopment.pinepods"><img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroid" height="50"></a>
-  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.gooseberrydevelopment.pinepods%22%2C%22url%22%3A%22https%3A//github.com/madeofpendletonwool/PinePods%22%2C%22author%22%3A%22madeofpendletonwool%22%2C%22name%22%3A%22PinePods%22%2C%22installerUrl%22%3A%22https%3A//github.com/madeofpendletonwool/PinePods/releases/latest%22%7D"><img src="./images/badge_obtainium.png" alt="Get it on Obtainium" height="50"></a>
-</p>
-
-<p align="center">
-  <img src="./images/screenshots/homepage.png" alt="PinePods home screen" width="900">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue" alt="License: GPL-3.0"></a>
 </p>
 
 ---
 
-## What is PinePods?
+## What is Castaway?
 
-**PinePods is a complete, self-hosted podcast management system written in Rust.**
+**Castaway is a self-hosted podcast manager.** You run one server, everyone in your
+household connects to it, and each person's subscriptions, listening progress, queue and
+downloads follow them between devices, because everything lives in your own database.
+Listen in the browser, on the desktop, or on your phone.
 
-You run one server, your whole household connects to it, and your subscriptions,
-history, queue, downloads, and settings follow you from device to device — because
-everything lives in your own database. Listen in the browser, on the desktop, on
-your phone, in the car, or even from the terminal.
+- **Self-hosted and open source.** Your podcasts and listening data stay on your hardware.
+- **Multi-user.** One server for the whole family, each person with their own library,
+  stats and settings.
+- **Apps everywhere.** Web, Linux, Windows, macOS, Android and iOS.
+- **Bring your own apps.** A built-in gpodder-compatible sync server lets you keep using
+  AntennaPod and similar apps alongside Castaway.
+- **36 languages.**
 
-- :house: **Self-hosted & open source** — your podcasts and listening data stay on
-  your hardware (Postgres or MySQL/MariaDB).
-- :busts_in_silhouette: **Multi-user** — one instance serves your whole family, each
-  with their own library, stats, and settings.
-- :iphone: **Native apps everywhere** — web, Linux, Windows, macOS, Android, and iOS,
-  plus a CLI client.
-- :twisted_rightwards_arrows: **Bring your own apps** — a built-in gpodder-compatible
-  sync server lets you keep using AntennaPod and friends alongside PinePods.
-- :globe_with_meridians: **Speaks your language** — translated into 36 languages by
-  the community.
-
-> :point_right: Want the full story, deep configuration, and tutorials? Head to the
-> **[documentation site](https://www.pinepods.online/)**.
+Castaway is based on [PinePods](https://github.com/madeofpendletonwool/PinePods). See
+[Credits & licensing](#credits--licensing).
 
 ## Highlights
 
 | | |
 |---|---|
-| :headphones: **Listen** | Audio **and video** podcasts, variable speed, chapters, transcripts, downloads, a persistent queue panel, **serial auto-play**, and **per-podcast auto-download**. |
-| :card_index_dividers: **Organize** | Subscriptions, **smart playlists**, manual playlists, saved episodes, **favorites & favorite categories**, full history, and **local file-system podcasts**. |
-| :mag: **Discover** | Search across **Podcast Index, iTunes, and YouTube**, search **inside your own library** for episodes, follow **podcast hosts** via [PodPeople DB](https://podpeopledb.com), and generate **shareable episode links**. |
-| :twisted_rightwards_arrows: **Sync & apps** | Built-in **gpodder server** (AntennaPod, etc.), **OIDC / SSO**, **MFA / TOTP**, web + desktop + mobile clients with **CarPlay** and **Android Auto**, plus the **Firewood** CLI. |
-| :art: **Make it yours** | Multiple built-in themes plus a **custom theme creator**, detailed **listening stats**, OPML import/export, push notifications (ntfy / webhook), and **36 languages**. |
+| **Listen** | Audio **and video** podcasts, variable speed, chapters, transcripts, downloads, a persistent queue, serial auto-play and per-podcast auto-download. |
+| **Organize** | Subscriptions, smart and manual playlists, saved episodes, favorites, full history, and podcasts from local files. |
+| **Discover** | Search Podcast Index, iTunes and YouTube, search inside your own library, and follow podcast hosts. |
+| **Sync & apps** | Built-in **gpodder server** (AntennaPod and others), OIDC single sign-on, MFA, and web, desktop and mobile apps with CarPlay and Android Auto. |
+| **Make it yours** | Built-in themes plus a custom theme creator, listening stats, OPML import and export, and push notifications (ntfy or webhook). |
 
-See the [full feature catalog](https://www.pinepods.online/docs/intro) in the docs.
+## Quick start
 
-## Screenshots :camera:
+Castaway needs a database (PostgreSQL) and a Valkey or Redis server. The easiest way to run
+it is Docker Compose.
 
-<p align="center"><strong>A home dashboard that picks up where you left off — with dozens of built-in themes plus a custom theme creator</strong></p>
-<p align="center">
-  <img width="49%" src="./images/screenshots/homepage.png" alt="Home dashboard">
-  <img width="49%" src="./images/screenshots/tonsofthemes.png" alt="Theme picker with many themes">
-</p>
+**1. Build the image.** There's no published image yet, so build it from this repo:
 
-<p align="center"><strong>Browse your whole library and dig into any show</strong></p>
-<p align="center">
-  <img width="49%" src="./images/screenshots/podcastlayout.png" alt="Podcast library grid">
-  <img width="49%" src="./images/screenshots/singlepodcastpage.png" alt="Single podcast page">
-</p>
+```bash
+git clone https://github.com/Sc00tz/Castaway.git
+cd Castaway
+docker build -t castaway .
+```
 
-<p align="center"><strong>One unified feed of every new episode across your subscriptions</strong></p>
-<p align="center">
-  <img width="800" src="./images/screenshots/feedpage.png" alt="Unified episode feed">
-</p>
-
-<p align="center"><strong>Rich episode pages with show notes, chapters, and transcripts</strong></p>
-<p align="center">
-  <img width="800" src="./images/screenshots/singleepisodepage.png" alt="Episode page with notes, chapters, and transcript tabs">
-</p>
-
-<p align="center"><strong>Listen your way — full-screen audio and native video playback</strong></p>
-<p align="center">
-  <img width="32%" src="./images/screenshots/videoplayer.png" alt="Video player">
-  <img width="32%" src="./images/screenshots/fullscreenplayer.png" alt="Full-screen audio player">
-  <img width="32%" src="./images/screenshots/smallplayer.png" alt="Mini player">
-</p>
-
-<p align="center"><strong>A persistent queue, smart playlists, library search, and detailed stats</strong></p>
-<p align="center">
-  <img width="49%" src="./images/screenshots/queuepage.png" alt="Queue side panel">
-  <img width="49%" src="./images/screenshots/playlistcreator.png" alt="Smart playlist creator">
-</p>
-<p align="center">
-  <img width="49%" src="./images/screenshots/searchpage.png" alt="Search your library">
-  <img width="49%" src="./images/screenshots/userstats.png" alt="User statistics dashboard">
-</p>
-
-<p align="center"><strong>Mobile apps for iOS & Android, with CarPlay and Android Auto</strong></p>
-<p align="center">
-  <img width="280" src="./images/screenshots/mobile.png" alt="Mobile home">
-  <img width="280" src="./images/screenshots/mobileepisode.png" alt="Mobile episode">
-</p>
-
-## Try it out! :zap:
-
-A public demo instance lives at **[try.pinepods.online](https://try.pinepods.online)** —
-make an account and take a look before you self-host. It's for evaluation only;
-accounts there are wiped periodically, so run your own server for real use.
-
-## Quick Start :rocket:
-
-PinePods requires a database (PostgreSQL or MySQL/MariaDB) and a reachable Valkey
-or Redis server. The API connects to Valkey/Redis before it starts listening.
-Keep the `valkey` service below unless you configure an external server.
-
-The fastest way to run PinePods is Docker Compose with PostgreSQL. Create a
-`docker-compose.yml`:
+**2. Create a `docker-compose.yml`:**
 
 ```yaml
 services:
   db:
-    container_name: db
     image: postgres:18
     environment:
       POSTGRES_DB: pinepods_database
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: myS3curepass
+      POSTGRES_PASSWORD: change-me
       PGDATA: /var/lib/pgdata/pgdata
     volumes:
-      - /home/user/pinepods/pgdata:/var/lib/pgdata
+      - /home/user/castaway/pgdata:/var/lib/pgdata
     restart: always
 
   valkey:
     image: valkey/valkey:8-alpine
     restart: always
 
-  pinepods:
-    image: madeofpendletonwool/pinepods:latest
+  castaway:
+    image: castaway:latest
     ports:
       - "8040:8040"
     environment:
-      # Basic server info
-      SEARCH_API_URL: 'https://search.pinepods.online/api/search'
-      PEOPLE_API_URL: 'https://people.pinepods.online'
-      HOSTNAME: 'http://localhost:8040'
-      # Database
+      HOSTNAME: "http://localhost:8040"
       DB_TYPE: postgresql
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: postgres
-      DB_PASSWORD: myS3curepass
+      DB_PASSWORD: change-me
       DB_NAME: pinepods_database
-      # Valkey cache
       VALKEY_HOST: valkey
       VALKEY_PORT: 6379
-      DEBUG_MODE: false
       # Run as your host user so downloads stay accessible (optional)
       PUID: ${UID:-911}
       PGID: ${GID:-911}
-      # Local timezone (optional, used for logs)
       TZ: "America/New_York"
     volumes:
-      - /home/user/pinepods/downloads:/opt/pinepods/downloads
-      - /home/user/pinepods/backups:/opt/pinepods/backups
+      - /home/user/castaway/downloads:/opt/pinepods/downloads
+      - /home/user/castaway/backups:/opt/pinepods/backups
     restart: always
     depends_on:
       - db
       - valkey
 ```
 
-For an external Valkey/Redis server, set `VALKEY_HOST` and `VALKEY_PORT` on the
-`pinepods` service to an address it can reach. Set `VALKEY_PASSWORD` if the server
-requires password authentication, and `VALKEY_USERNAME` if it uses a named user.
-Remove the local `valkey` service and its `depends_on` entry when using an
-external server.
+**3. Start it** with `docker compose up -d`, open `http://localhost:8040`, and create your
+first admin account.
 
-If Valkey/Redis is unavailable at startup, the API cannot start. Nginx can return
-`502` for API requests, including `/api/health`, while the web page still loads. Check
-the Valkey/Redis service and its connection settings if you encounter this.
+More complete examples, including SQLite, the optional AI sidecar, single sign-on settings
+and allowing feeds hosted on your own network, are in
+[`deployment/docker/compose-files`](deployment/docker/compose-files).
 
-Then start it:
+### Moving from PinePods
 
-```bash
-sudo docker compose up -d
-```
+Castaway reads a PinePods database as-is. Point the `castaway` service at your existing
+database and download folders, with the same `DB_NAME`, and it picks up where PinePods
+left off. Some internal names, such as `pinepods_database` and the `/opt/pinepods` paths
+inside the container, keep their PinePods names for exactly this reason. Back up your
+database first.
 
-Open `http://localhost:8040` and you'll be prompted to create your first admin
-account. That's it — you're up.
+## Apps
 
-> :information_source: **On PostgreSQL 18 / upgrading from 17.** New installs default to
-> `postgres:18` and need no special steps. Two things to know when moving an existing
-> install to 18:
->
-> - **Data isn't auto-migrated across major versions.** `postgres:18` won't start
->   against a data directory created by 17 (`FATAL: database files are incompatible with
->   server`). Your data is safe — run `deployment/docker/upgrade-postgres.sh` (takes a
->   backup, then upgrades in place) or follow the
->   [Upgrading PostgreSQL](https://www.pinepods.online/docs/Troubleshooting/PostgresMajorUpgrade)
->   guide. Back up first — the upgrade is one-way.
-> - **The `postgres:18` image moved its data dir and `VOLUME`.** Bind-mounting to the
->   old `/var/lib/postgresql/data` can fail on some Linux/overlay2 hosts with
->   `change mount propagation through procfd ... no such file or directory`. The compose
->   above avoids this by mounting at `/var/lib/pgdata`, outside the image's `VOLUME`;
->   use that same pattern when you upgrade. See
->   [docker-library/postgres#1363](https://github.com/docker-library/postgres/issues/1363).
+The web app is served by the server itself: browse to your server's address. The Android,
+iOS and desktop apps aren't published to any store yet. Build them from
+[`mobile/`](mobile) (Flutter) and [`web/src-tauri`](web/src-tauri) (Tauri).
 
-**Need more?** Helm/Kubernetes, MySQL/MariaDB, admin bootstrap vars, the self-hosted
-search API, timezone tuning, PUID/PGID, and OIDC are all covered in the docs:
+## Contributing
 
-- :whale: **[Full server install guide](https://www.pinepods.online/docs/intro)**
-- :anchor: **Helm chart** — `helm repo add pinepods http://helm.pinepods.online`
-- :mag: **[Self-hosting the search API](https://www.pinepods.online/docs/API/search_api)**
-- :closed_lock_with_key: **[OIDC / SSO setup](https://www.pinepods.online/docs/tutorial-extras/OIDC-setup)**
+Bug reports and ideas go in the
+[issue tracker](https://github.com/Sc00tz/Castaway/issues). See
+[CONTRIBUTING.md](CONTRIBUTING.md) for development setup.
 
-## Clients
+## Credits & licensing
 
-Run the server, then connect any client by pointing it at your server URL and signing
-in. The web client is served by the server itself — the rest are optional native apps.
+Castaway is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE).
 
-| Platform | How to get it | Notes |
-|---|---|---|
-| :globe_with_meridians: **Web** | Built in — browse to your server's port | No install needed |
-| :penguin: **Linux** | [Flathub](https://flathub.org/apps/com.gooseberrydevelopment.pinepods), [AUR](https://aur.archlinux.org/packages/pinepods) (`paru -S pinepods`), or AppImage / `.deb` / `.rpm` on [Releases](https://github.com/madeofpendletonwool/PinePods/releases) | Flatpak recommended |
-| :window: **Windows** | `.exe` (installer) or `.msi` (portable) on [Releases](https://github.com/madeofpendletonwool/PinePods/releases) | |
-| :apple: **macOS** | `.dmg` (installer) or portable build on [Releases](https://github.com/madeofpendletonwool/PinePods/releases) | |
-| :iphone: **iOS** | [App Store](https://apps.apple.com/us/app/pinepods/id6751441116) | CarPlay supported |
-| :robot: **Android** | [Google Play](https://play.google.com/store/apps/details?id=com.gooseberrydevelopment.pinepods), [IzzyOnDroid](https://apt.izzysoft.de/fdroid/index/apk/com.gooseberrydevelopment.pinepods), or [Obtainium](https://github.com/madeofpendletonwool/PinePods/releases) | Android Auto supported |
-| :computer: **Terminal** | [Pinepods Firewood](https://github.com/madeofpendletonwool/pinepods-firewood) (CLI) | |
+Castaway is based on **[PinePods](https://github.com/madeofpendletonwool/PinePods)**,
+© Gooseberry Development, also licensed under the GPL-3.0. Thank you to its author and
+contributors for the foundation this project is built on.
 
-ARM devices — including 64-bit Raspberry Pis — are fully supported; the `latest` tag
-auto-pulls the right architecture. Client setup details live in the
-[clients docs](https://www.pinepods.online/docs/tutorial-basics/clients).
-
-## Ecosystem
-
-**PodPeople DB** — A community database that supplements podcast *person* tags so you
-can follow hosts across every show they appear on, even when a feed doesn't publish
-host info. Use the hosted instance at [podpeopledb.com](https://podpeopledb.com) or
-[self-host your own](https://podpeopledb.com/docs/self-host).
-[Repo](https://github.com/madeofpendletonwool/podpeople-db) ·
-[Why it exists](https://www.pinepods.online/blog).
-
-**Pinepods Firewood** — A terminal-only client for enjoying your podcasts from the
-comfort of the command line.
-[Check it out](https://github.com/madeofpendletonwool/pinepods-firewood).
-
-**Helm chart** — Deploy on Kubernetes with `helm repo add pinepods
-http://helm.pinepods.online`. See the [install docs](https://www.pinepods.online/docs/intro)
-for values.
-
-## Docs & Community
-
-- :books: **Documentation:** [pinepods.online](https://www.pinepods.online/)
-- :speech_balloon: **Discord:** [join the chat](https://discord.gg/bKzHRa4GNc)
-- :speech_balloon: **Matrix:** [#pinepods:matrix.org](https://matrix.to/#/#pinepods:matrix.org)
-- :memo: **Blog:** [pinepods.online/blog](https://www.pinepods.online/blog)
-- :earth_africa: **Translate PinePods:** contribute on
-  [Weblate](https://hosted.weblate.org) — 36 languages and counting.
-- :bug: **Issues & contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md) and the
-  [issue tracker](https://github.com/madeofpendletonwool/PinePods/issues).
-
-## Credits & Licensing
-
-PinePods is an open-source podcast player developed by **Gooseberry Development** and
-licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
-
-The mobile app includes code adapted from the excellent
-[Anytime Podcast Player](https://github.com/amugofjava/anytime_podcast_player) by Ben
-Hills.
-
-> **Anytime Podcast Player** — © 2020 Ben Hills and contributors, licensed under the
-> BSD 3-Clause License. Affected files retain the original BSD license and attribution
-> at the top; see `LICENSE.ben_hills` in the `mobile/` directory. Huge thanks to Ben
-> Hills for open-sourcing Anytime — it accelerated PinePods' mobile development
-> enormously.
-
-ARM container images are made possible by [Runs-On](https://runs-on.com).
+The mobile app includes code adapted from the
+[Anytime Podcast Player](https://github.com/amugofjava/anytime_podcast_player),
+© 2020 Ben Hills and contributors, licensed under the BSD 3-Clause License. Affected files
+keep their original license and attribution; see the license files in
+[`mobile/`](mobile).

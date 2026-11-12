@@ -38,7 +38,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
             final settings = snapshot.data!;
 
-            // Check if PinePods server is configured
+            // Check if Castaway server is configured
             final hasServer = settings.pinepodsServer != null &&
                 settings.pinepodsServer!.isNotEmpty;
             final hasApiKey = settings.pinepodsApiKey != null &&

@@ -83,7 +83,7 @@ pub async fn set_auto_refresh(
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct PodcastRefreshResult {
-    /// `refreshed`, `throttled` (the feed's host asked Pinepods to wait) or `failed`.
+    /// `refreshed`, `throttled` (the feed's host asked Castaway to wait) or `failed`.
     pub status: String,
     /// What went wrong, when it failed.
     pub detail: Option<String>,
@@ -116,7 +116,7 @@ pub async fn refresh_podcast(
         PodcastRefresh::NotFound => return Err(AppError::not_found("Podcast not found")),
         PodcastRefresh::Throttled => PodcastRefreshResult {
             status: "throttled".into(),
-            detail: Some("The feed's host asked Pinepods to wait before reading it again".into()),
+            detail: Some("The feed's host asked Castaway to wait before reading it again".into()),
             new_episodes: Vec::new(),
         },
         PodcastRefresh::Done(new_episodes) => PodcastRefreshResult { status: "refreshed".into(), detail: None, new_episodes },

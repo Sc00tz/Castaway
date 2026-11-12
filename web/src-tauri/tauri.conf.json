@@ -5,8 +5,8 @@
     "devUrl": "http://localhost:8080",
     "frontendDist": "../dist"
   },
-  "identifier": "com.gooseberrydevelopment.pinepods",
-  "productName": "Pinepods",
+  "identifier": "com.sc00tz.castaway",
+  "productName": "Castaway",
   "version": "0.9.2",
   "app": {
     "trayIcon": {
@@ -22,7 +22,7 @@
         "fullscreen": false,
         "height": 1000,
         "resizable": true,
-        "title": "Pinepods",
+        "title": "Castaway",
         "width": 1200
       }
     ]
@@ -35,7 +35,7 @@
       "deb": {
         "depends": [],
         "files": {
-          "/usr/share/metainfo/com.gooseberrydevelopment.pinepods.metainfo.xml": "./com.gooseberrydevelopment.pinepods.metainfo.xml"
+          "/usr/share/metainfo/com.sc00tz.castaway.metainfo.xml": "./com.sc00tz.castaway.metainfo.xml"
         }
       }
     },

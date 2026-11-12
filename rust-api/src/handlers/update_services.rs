@@ -1,4 +1,4 @@
-// The outside services Pinepods uses to find and update podcasts, for the admin settings: whether
+// The outside services Castaway uses to find and update podcasts, for the admin settings: whether
 // the search service answers, and Podping (on/off, the relay's state, what this server did).
 
 use std::time::{Duration, Instant};
@@ -105,7 +105,7 @@ pub struct SetPodping {
     path = "/update_services/podping",
     tag = "settings",
     summary = "Turn Podping on or off",
-    description = "Admin only. When on, Pinepods reads which feeds Podping announced from the relay and refreshes the ones it has right away. Only announcements are fetched; what this server subscribes to is never sent.",
+    description = "Admin only. When on, Castaway reads which feeds Podping announced from the relay and refreshes the ones it has right away. Only announcements are fetched; what this server subscribes to is never sent.",
     request_body = SetPodping,
     security(("api_key" = [])),
     responses(

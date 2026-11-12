@@ -46,7 +46,7 @@ class PodcastGridTile extends StatelessWidget {
   }
 
   Future<void> _navigateToPodcastDetails(BuildContext context, PodcastBloc podcastBloc) async {
-    // Check if this is a PinePods setup and if the podcast is already subscribed
+    // Check if this is a Castaway setup and if the podcast is already subscribed
     final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     final settings = settingsBloc.currentSettings;
     
@@ -66,14 +66,14 @@ class PodcastGridTile extends StatelessWidget {
         );
         
         if (isSubscribed) {
-          // Get the internal PinePods database ID
+          // Get the internal Castaway database ID
           final internalPodcastId = await pinepodsService.getPodcastId(
             settings.pinepodsUserId!,
             podcast.url!,
             podcast.title
           );
           
-          // Use PinePods podcast details for subscribed podcasts
+          // Use Castaway podcast details for subscribed podcasts
           final unifiedPodcast = UnifiedPinepodsPodcast(
             id: internalPodcastId ?? 0,
             indexId: 0, // Default for subscribed podcasts
@@ -111,7 +111,7 @@ class PodcastGridTile extends StatelessWidget {
       }
     }
     
-    // Use standard podcast details for non-subscribed or non-PinePods setups
+    // Use standard podcast details for non-subscribed or non-Castaway setups
     if (context.mounted) {
       Navigator.push(
         context,
@@ -171,7 +171,7 @@ class PodcastTitledGridTile extends StatelessWidget {
   }
 
   Future<void> _navigateToPodcastDetails(BuildContext context, PodcastBloc podcastBloc) async {
-    // Check if this is a PinePods setup and if the podcast is already subscribed
+    // Check if this is a Castaway setup and if the podcast is already subscribed
     final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     final settings = settingsBloc.currentSettings;
     
@@ -191,14 +191,14 @@ class PodcastTitledGridTile extends StatelessWidget {
         );
         
         if (isSubscribed) {
-          // Get the internal PinePods database ID
+          // Get the internal Castaway database ID
           final internalPodcastId = await pinepodsService.getPodcastId(
             settings.pinepodsUserId!,
             podcast.url!,
             podcast.title
           );
           
-          // Use PinePods podcast details for subscribed podcasts
+          // Use Castaway podcast details for subscribed podcasts
           final unifiedPodcast = UnifiedPinepodsPodcast(
             id: internalPodcastId ?? 0,
             indexId: 0, // Default for subscribed podcasts
@@ -236,7 +236,7 @@ class PodcastTitledGridTile extends StatelessWidget {
       }
     }
     
-    // Use standard podcast details for non-subscribed or non-PinePods setups
+    // Use standard podcast details for non-subscribed or non-Castaway setups
     if (context.mounted) {
       Navigator.push(
         context,

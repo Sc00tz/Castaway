@@ -46,8 +46,8 @@ async fn remote_gpodder(state: &AppState, t: &SyncTargetRow) -> AppResult<Gpodde
     Ok(remote)
 }
 
-/// Devices in the old shape: the PinePods server's when it's on, else the external gpodder
-/// server's (Pinepods' own marked default), else none.
+/// Devices in the old shape: the Castaway server's when it's on, else the external gpodder
+/// server's (Castaway's own marked default), else none.
 async fn legacy_devices(state: &AppState, user_id: i32) -> AppResult<Vec<serde_json::Value>> {
     if state.db_pool.sync_server_enabled(user_id).await? {
         return Ok(state
@@ -79,7 +79,7 @@ pub struct UpdateGpodderSyncRequest {
     pub enabled: bool,
 }
 
-// Pinepods picks its own device now, so there's no default to set; kept for older clients.
+// Castaway picks its own device now, so there's no default to set; kept for older clients.
 #[utoipa::path(
     post,
     path = "/set_default/{device_id}",
@@ -186,7 +186,7 @@ pub async fn gpodder_force_sync(
     let mut synced = false;
     let mut errors: Vec<String> = Vec::new();
 
-    // The PinePods gpodder server reads the same database; republish local state.
+    // The Castaway gpodder server reads the same database; republish local state.
     if matches!(status.sync_type.as_str(), "gpodder" | "both") {
         match state.db_pool.gpodder_publish_episode_state(user_id).await {
             Ok(_) => synced = true,
@@ -242,7 +242,7 @@ pub async fn gpodder_sync(
 
     let user_id = state.db_pool.get_user_id_from_api_key(&api_key).await?;
     
-    // The PinePods gpodder server works on the same database, so only an external server syncs.
+    // The Castaway gpodder server works on the same database, so only an external server syncs.
     // "No changes" is a successful sync, not a failure.
     let summary = engine::run_for_user(&state.db_pool, &state.task_spawner, user_id, RunMode::Incremental).await?;
     let had_changes = summary.is_some_and(|s| {
@@ -471,7 +471,7 @@ pub async fn gpodder_get_default_device(
     require_valid_api_key(&state, &api_key).await?;
 
     let user_id = state.db_pool.get_user_id_from_api_key(&api_key).await?;
-    // Pinepods' own device: on the PinePods server, else on the external gpodder server.
+    // Castaway's own device: on the Castaway server, else on the external gpodder server.
     let device = if state.db_pool.sync_server_enabled(user_id).await? {
         state.db_pool.gpodder_device_list(user_id).await?.into_iter().find(|d| d.system).map(|d| {
             let caption = d.caption.clone().unwrap_or_else(|| d.name.clone());
@@ -481,7 +481,7 @@ pub async fn gpodder_get_default_device(
         gpodder_target(&state, user_id)
             .await?
             .and_then(|t| t.device_name)
-            .map(|name| device_json(&name, "server", "PinePods", true, false))
+            .map(|name| device_json(&name, "server", "Castaway", true, false))
     };
     Ok(Json(serde_json::json!(device)))
 }
@@ -652,7 +652,7 @@ async fn legacy_statistics(state: &AppState, user_id: i32) -> AppResult<GpodderS
         target
             .as_ref()
             .and_then(|t| t.device_name.clone())
-            .map(|name| ServerDevice { id: name, caption: "PinePods".into(), device_type: "server".into(), subscriptions: library })
+            .map(|name| ServerDevice { id: name, caption: "Castaway".into(), device_type: "server".into(), subscriptions: library })
             .into_iter()
             .collect()
     };
@@ -667,7 +667,7 @@ async fn legacy_statistics(state: &AppState, user_id: i32) -> AppResult<GpodderS
             },
             t.last_success_at.and_then(|at| rfc3339(at.and_utc().timestamp())),
         ),
-        None => ("PinePods gpodder server".to_string(), "Connected".to_string(), stats.last_change.and_then(rfc3339)),
+        None => ("Castaway gpodder server".to_string(), "Connected".to_string(), stats.last_change.and_then(rfc3339)),
     };
     Ok(GpodderStatistics {
         server_url,

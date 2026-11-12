@@ -10,7 +10,7 @@ pub mod store;
 
 use serde::{Deserialize, Serialize};
 
-/// Where PodPeopleDB and the PinePods search API (Podcast Index) live, from the server config.
+/// Where PodPeopleDB and the Castaway search API (Podcast Index) live, from the server config.
 #[derive(Debug, Clone)]
 pub struct Endpoints {
     pub people: String,
@@ -33,7 +33,7 @@ pub const SOURCE_PODPEOPLE: &str = "podpeople";
 /// A person as shown on a podcast or episode page.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CreditedPerson {
-    /// PinePods person id (`Persons.PersonID`); use it for the person page and follows.
+    /// Castaway person id (`Persons.PersonID`); use it for the person page and follows.
     pub id: i32,
     pub podpeople_id: Option<i32>,
     pub name: String,

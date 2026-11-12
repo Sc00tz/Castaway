@@ -232,34 +232,22 @@ fn welcome_home() -> Html {
     let hero_subtitle = i18n.t("home.welcome_hero_subtitle").to_string();
     let intro = i18n.t("home.welcome_intro").to_string();
     let get_started = i18n.t("home.welcome_get_started").to_string();
-    let docs_button = i18n.t("home.welcome_docs_button").to_string();
     let tips_heading = i18n.t("home.welcome_tips_heading").to_string();
     let tip_search_title = i18n.t("home.welcome_tip_search_title").to_string();
     let tip_search_desc = i18n.t("home.welcome_tip_search_desc").to_string();
     let tip_feed_title = i18n.t("home.welcome_tip_feed_title").to_string();
     let tip_feed_desc = i18n.t("home.welcome_tip_feed_desc").to_string();
-    let tip_docs_title = i18n.t("home.welcome_tip_docs_title").to_string();
-    let tip_docs_desc = i18n.t("home.welcome_tip_docs_desc").to_string();
     let welcome_title = i18n.t("home.welcome_to_pinepods").to_string();
     let open_podcasts = i18n.t("home.welcome_open_podcasts").to_string();
 
     html! {
         <div class="welcome-container">
             <div class="welcome-hero">
-                <img src="static/assets/favicon.png" alt="Pinepods" class="welcome-logo" />
+                <img src="static/assets/favicon.png" alt="Castaway" class="welcome-logo" />
                 <h1 class="welcome-title">{ welcome_title }</h1>
                 <p class="welcome-subtitle">{ hero_subtitle }</p>
                 <p class="welcome-intro">{ intro }</p>
                 <div class="welcome-actions">
-                    <a
-                        href="https://pinepods.online/docs/intro"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="welcome-btn welcome-btn-secondary"
-                    >
-                        <i class="ph ph-book"></i>
-                        <span>{ docs_button }</span>
-                    </a>
                     <Link<Route> to={Route::Podcasts} classes="welcome-btn welcome-btn-secondary">
                         <i class="ph ph-microphone-stage"></i>
                         <span>{ open_podcasts }</span>
@@ -279,11 +267,6 @@ fn welcome_home() -> Html {
                         icon="ph-rss"
                         title={tip_feed_title}
                         description={tip_feed_desc}
-                    />
-                    <WelcomeTip
-                        icon="ph-binoculars"
-                        title={tip_docs_title}
-                        description={tip_docs_desc}
                     />
                 </div>
             </div>

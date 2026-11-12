@@ -54,25 +54,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:pathPrefix="/subscribe" />
-                <data android:scheme="pinepods-subscribe" />
-            </intent-filter>
-
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:host="pinepods.online" />
-                <data android:pathPrefix="/subscribe" />
-                <data android:scheme="https" />
-                <data android:scheme="http" />
+                <data android:scheme="castaway-subscribe" />
             </intent-filter>
 
         </activity>
 
         <!-- OIDC authentication callback handler for flutter_web_auth_2.
-             Captures the pinepods:// redirect from the Chrome Custom Tab. -->
+             Captures the castaway:// redirect from the Chrome Custom Tab. -->
         <activity
                 android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
                 android:exported="true"
@@ -83,7 +71,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:scheme="pinepods" />
+                <data android:scheme="castaway" />
             </intent-filter>
         </activity>
 

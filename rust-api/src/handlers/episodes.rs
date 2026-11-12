@@ -467,7 +467,7 @@ pub async fn download_episode_file(
         request
     };
 
-    let mut response = build_request("PinePods/1.0")
+    let mut response = build_request("Castaway/1.0")
         .send()
         .await
         .map_err(|e| AppError::internal(&format!("Failed to download episode: {}", crate::services::http::describe_error(&e))))?;

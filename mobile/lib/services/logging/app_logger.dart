@@ -257,7 +257,6 @@ class AppLogger {
     buffer.writeln();
     buffer.writeln('=' * 50);
     buffer.writeln('End of logs - Total entries: ${_logs.length}');
-    buffer.writeln('Bug reports: https://github.com/madeofpendletonwool/pinepods/issues');
     
     return buffer.toString();
   }
@@ -493,7 +492,6 @@ class AppLogger {
     buffer.writeln('=' * 50);
     buffer.writeln('End of logs - Total entries: ${_logs.length}');
     buffer.writeln('Session file: ${_currentSessionFile?.path}');
-    buffer.writeln('Bug reports: https://github.com/madeofpendletonwool/pinepods/issues');
     
     return buffer.toString();
   }

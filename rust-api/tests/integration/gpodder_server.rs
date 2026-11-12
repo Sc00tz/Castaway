@@ -1,4 +1,4 @@
-//! The Pinepods gpodder server beyond the protocol suite: authentication, upload cursors, PUT
+//! The Castaway gpodder server beyond the protocol suite: authentication, upload cursors, PUT
 //! diffs, and turning the server on from the settings page.
 
 use std::time::Duration;

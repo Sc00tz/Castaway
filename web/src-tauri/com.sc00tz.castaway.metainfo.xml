@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.sc00tz.castaway</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+
+  <name>Castaway</name>
+  <summary>A complete, self-hosted podcast management system</summary>
+
+  <developer id="com.sc00tz">
+    <name>Castaway</name>
+  </developer>
+
+  <description>
+    <p>
+      Castaway is a self-hosted podcast manager. Your subscriptions, listening progress and
+      downloads live on your own server, and follow you between the web, desktop and mobile
+      apps. It supports multiple users, and works with gpodder-compatible sync so you can keep
+      using apps like AntennaPod too.
+    </p>
+    <p>
+      This is the desktop client. It needs a Castaway server to connect to.
+    </p>
+    <p>
+      Castaway is based on PinePods by Gooseberry Development.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.sc00tz.castaway.desktop</launchable>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <display_length compare="ge">548</display_length>
+  </recommends>
+
+  <content_rating type="oars-1.1" />
+</component>

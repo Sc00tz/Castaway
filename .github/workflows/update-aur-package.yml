@@ -55,7 +55,7 @@ jobs:
           pkgname=pinepods
           pkgver=$VERSION
           pkgrel=$PKGREL
-          pkgdesc="Pinepods is a complete podcast management system and allows you to play, download, and keep track of podcasts you enjoy. All self hosted and enjoyed on your own server!"
+          pkgdesc="Castaway is a complete podcast management system and allows you to play, download, and keep track of podcasts you enjoy. All self hosted and enjoyed on your own server!"
           arch=('x86_64' 'aarch64')
           url="https://github.com/madeofpendletonwool/PinePods"
           license=('gpl3')
@@ -76,7 +76,7 @@ jobs:
 
             # Ensure correct permissions
             chmod 755 "\$pkgdir/usr/bin/app"
-            chmod 644 "\$pkgdir/usr/share/applications/Pinepods.desktop"
+            chmod 644 "\$pkgdir/usr/share/applications/Castaway.desktop"
             find "\$pkgdir/usr/share/icons" -type f -exec chmod 644 {} +
             find "\$pkgdir" -type d -exec chmod 755 {} +
           }

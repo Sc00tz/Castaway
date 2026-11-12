@@ -1108,7 +1108,7 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
         _showErrorSnackBar(L.of(context)!.audio_service_not_available);
         return;
       }
-      // Route through the unified PinePods path. The audio service prefers an
+      // Route through the unified Castaway path. The audio service prefers an
       // on-device download when one exists, otherwise streams the server's
       // downloaded copy (these episodes carry downloaded == true), falling back
       // to the source URL — so no source branching is needed here.
@@ -1133,7 +1133,7 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
         _showErrorSnackBar(L.of(context)!.audio_service_not_available);
         return;
       }
-      // Play through the unified PinePods path so position/duration tracking and
+      // Play through the unified Castaway path so position/duration tracking and
       // interaction recording work the same as for server episodes.
       final pe = LocalDownloadUtils.toPinepodsEpisode(episode);
       await playPinepodsEpisodeWithOptionalFullScreen(

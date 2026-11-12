@@ -6,7 +6,7 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-pub const PINEPODS_USER_AGENT: &str = "PinePods/1.0";
+pub const PINEPODS_USER_AGENT: &str = "Castaway/1.0";
 
 /// Some hosts block podcast-app user agents; feeds retry once with this on 403/406.
 pub const BROWSER_USER_AGENT: &str =
@@ -66,7 +66,7 @@ pub fn download_client() -> &'static reqwest::Client {
     &DOWNLOAD_CLIENT
 }
 
-/// RSS feed fetches: PinePods UA, 30s timeout, SSRF guard on every DNS answer and redirect.
+/// RSS feed fetches: Castaway UA, 30s timeout, SSRF guard on every DNS answer and redirect.
 pub fn feed_client() -> &'static reqwest::Client {
     &FEED_CLIENT
 }

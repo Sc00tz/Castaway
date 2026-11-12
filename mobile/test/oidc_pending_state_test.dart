@@ -25,7 +25,7 @@ void main() {
   });
 
   test('parses the state the server sends back with the key', () {
-    final result = OidcService.parseCallback('pinepods://auth/callback?api_key=k&state=abc');
+    final result = OidcService.parseCallback('castaway://auth/callback?api_key=k&state=abc');
     expect(result.hasApiKey, isTrue);
     expect(result.state, 'abc');
   });

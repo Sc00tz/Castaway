@@ -97,10 +97,10 @@ class PinepodsMediaService : MediaLibraryService() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val channel = android.app.NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "Pinepods Playback",
+                "Castaway Playback",
                 android.app.NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Pinepods podcast playback controls"
+                description = "Castaway podcast playback controls"
                 setShowBadge(false)
             }
             val notificationManager = getSystemService(android.app.NotificationManager::class.java)
@@ -217,7 +217,7 @@ class PinepodsMediaService : MediaLibraryService() {
         // makes some shows fail to start at all.
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("PinePods/1.0 (Android; Podcast Client)")
+            .setUserAgent("Castaway/1.0 (Android; Podcast Client)")
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
         // Streams go through a disk cache, so rewinding past the in-memory
@@ -846,7 +846,7 @@ class PinepodsMediaService : MediaLibraryService() {
         }
 
         val currentMetadata = player?.currentMediaItem?.mediaMetadata
-        val title = currentMetadata?.title?.toString() ?: "Pinepods"
+        val title = currentMetadata?.title?.toString() ?: "Castaway"
         val artist = currentMetadata?.artist?.toString() ?: "Loading..."
 
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)

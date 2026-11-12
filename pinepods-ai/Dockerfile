@@ -1,4 +1,4 @@
-# Optional PinePods AI sidecar (transcription #726 + ad detection #790).
+# Optional Castaway AI sidecar (transcription #726 + ad detection #790).
 # Build/run only if you want the AI-based features.
 FROM python:3.14-slim
 

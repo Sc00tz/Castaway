@@ -1,10 +1,10 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
 export "FLUTTER_ROOT=/Users/collin_pendleton/development/flutter"
-export "FLUTTER_APPLICATION_PATH=/Users/collin_pendleton/Documents/github/PinePods/mobile"
-export "FLUTTER_FRAMEWORK_SWIFT_PACKAGE_PATH=/Users/collin_pendleton/Documents/github/PinePods/mobile/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework"
+export "FLUTTER_APPLICATION_PATH=/Users/collin_pendleton/Documents/github/Castaway/mobile"
+export "FLUTTER_FRAMEWORK_SWIFT_PACKAGE_PATH=/Users/collin_pendleton/Documents/github/Castaway/mobile/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
-export "FLUTTER_TARGET=/Users/collin_pendleton/Documents/github/PinePods/mobile/lib/main.dart"
+export "FLUTTER_TARGET=/Users/collin_pendleton/Documents/github/Castaway/mobile/lib/main.dart"
 export "FLUTTER_BUILD_DIR=build"
 export "FLUTTER_BUILD_NAME=0.9.0"
 export "FLUTTER_BUILD_NUMBER=20252489"
@@ -12,4 +12,4 @@ export "DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDQuNQ==,RkxVVFRFUl9DSEFOTkVMPXN0YW
 export "DART_OBFUSCATION=false"
 export "TRACK_WIDGET_CREATION=true"
 export "TREE_SHAKE_ICONS=false"
-export "PACKAGE_CONFIG=/Users/collin_pendleton/Documents/github/PinePods/mobile/.dart_tool/package_config.json"
+export "PACKAGE_CONFIG=/Users/collin_pendleton/Documents/github/Castaway/mobile/.dart_tool/package_config.json"

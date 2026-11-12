@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "PinePods API",
-    "description": "HTTP API for the PinePods podcast server. Most endpoints require an `Api-Key` header tied to a user account; admin-only endpoints additionally require an admin (or web) key. This reference is generated directly from the backend source, so it stays in sync with the running code.",
+    "title": "Castaway API",
+    "description": "HTTP API for the Castaway podcast server. Most endpoints require an `Api-Key` header tied to a user account; admin-only endpoints additionally require an admin (or web) key. This reference is generated directly from the backend source, so it stays in sync with the running code.",
     "license": {
       "name": "GPL-3.0-or-later"
     },
@@ -11,7 +11,7 @@
   "servers": [
     {
       "url": "/",
-      "description": "This PinePods server (same origin as the API)"
+      "description": "This Castaway server (same origin as the API)"
     }
   ],
   "paths": {
@@ -3472,7 +3472,7 @@
           "podcasts"
         ],
         "summary": "Try adding a failed sync import again",
-        "description": "Starts the import now (also after Pinepods stopped retrying). It shows in the activity panel.",
+        "description": "Starts the import now (also after Castaway stopped retrying). It shows in the activity panel.",
         "operationId": "retry_import",
         "parameters": [
           {
@@ -6797,7 +6797,7 @@
           {
             "name": "person_id",
             "in": "path",
-            "description": "PinePods person id",
+            "description": "Castaway person id",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6866,7 +6866,7 @@
           {
             "name": "person_id",
             "in": "path",
-            "description": "PinePods person id",
+            "description": "Castaway person id",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6906,7 +6906,7 @@
           {
             "name": "person_id",
             "in": "path",
-            "description": "PinePods person id",
+            "description": "Castaway person id",
             "required": true,
             "schema": {
               "type": "integer",
@@ -10430,7 +10430,7 @@
           "settings"
         ],
         "summary": "Turn Podping on or off",
-        "description": "Admin only. When on, Pinepods reads which feeds Podping announced from the relay and refreshes the ones it has right away. Only announcements are fetched; what this server subscribes to is never sent.",
+        "description": "Admin only. When on, Castaway reads which feeds Podping announced from the relay and refreshes the ones it has right away. Only announcements are fetched; what this server subscribes to is never sent.",
         "operationId": "set_podping",
         "requestBody": {
           "content": {
@@ -12576,11 +12576,11 @@
         "tags": [
           "health"
         ],
-        "summary": "PinePods instance check endpoint - matches Python API exactly\nGET /api/pinepods_check",
+        "summary": "Castaway instance check endpoint - matches Python API exactly\nGET /api/pinepods_check",
         "operationId": "pinepods_check",
         "responses": {
           "200": {
-            "description": "Confirms this is a PinePods instance",
+            "description": "Confirms this is a Castaway instance",
             "content": {
               "application/json": {
                 "schema": {
@@ -12624,7 +12624,7 @@
         "tags": [
           "sync"
         ],
-        "summary": "Devices on the PinePods gpodder server",
+        "summary": "Devices on the Castaway gpodder server",
         "operationId": "list_devices",
         "responses": {
           "200": {
@@ -12697,7 +12697,7 @@
             "description": "Invalid or missing API key"
           },
           "403": {
-            "description": "PinePods' own device"
+            "description": "Castaway's own device"
           },
           "404": {
             "description": "No such device"
@@ -12742,7 +12742,7 @@
             "description": "Invalid or missing API key"
           },
           "403": {
-            "description": "PinePods' own device"
+            "description": "Castaway's own device"
           },
           "404": {
             "description": "No such device"
@@ -12835,7 +12835,7 @@
         "tags": [
           "sync"
         ],
-        "summary": "PinePods gpodder server settings",
+        "summary": "Castaway gpodder server settings",
         "operationId": "get_server",
         "responses": {
           "200": {
@@ -12862,7 +12862,7 @@
         "tags": [
           "sync"
         ],
-        "summary": "Turn the PinePods gpodder server on or off",
+        "summary": "Turn the Castaway gpodder server on or off",
         "operationId": "put_server",
         "requestBody": {
           "content": {
@@ -14323,7 +14323,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "A person PinePods already knows (from a credit or search result)."
+            "description": "A person Castaway already knows (from a credit or search result)."
           },
           "podpeople_id": {
             "type": [
@@ -14784,7 +14784,7 @@
           "id": {
             "type": "integer",
             "format": "int32",
-            "description": "PinePods person id (`Persons.PersonID`); use it for the person page and follows."
+            "description": "Castaway person id (`Persons.PersonID`); use it for the person page and follows."
           },
           "podpeople_id": {
             "type": [
@@ -16058,7 +16058,7 @@
           },
           "source": {
             "type": "string",
-            "description": "Where the subscription came from: `client` (an app on the PinePods gpodder server) or\n`target` (the external sync server)."
+            "description": "Where the subscription came from: `client` (an app on the Castaway gpodder server) or\n`target` (the external sync server)."
           },
           "kind": {
             "$ref": "#/components/schemas/FeedErrorKind"
@@ -16088,7 +16088,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "`None`: Pinepods stopped retrying."
+            "description": "`None`: Castaway stopped retrying."
           }
         }
       },
@@ -16615,7 +16615,7 @@
       },
       "OidcDiscovery": {
         "type": "object",
-        "description": "The parts of an OpenID Provider configuration document that PinePods uses.",
+        "description": "The parts of an OpenID Provider configuration document that Castaway uses.",
         "required": [
           "authorization_endpoint",
           "token_endpoint",
@@ -16815,7 +16815,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "PinePods person id, when this server already knows them."
+            "description": "Castaway person id, when this server already knows them."
           },
           "podpeople_id": {
             "type": [
@@ -17331,7 +17331,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "description": "`refreshed`, `throttled` (the feed's host asked Pinepods to wait) or `failed`."
+            "description": "`refreshed`, `throttled` (the feed's host asked Castaway to wait) or `failed`."
           },
           "detail": {
             "type": [
@@ -19106,7 +19106,7 @@
           },
           "origin": {
             "type": "string",
-            "description": "`pinepods`, `client` (an app on the PinePods server) or `target` (the external server)."
+            "description": "`pinepods`, `client` (an app on the Castaway server) or `target` (the external server)."
           }
         }
       },
@@ -19144,7 +19144,7 @@
           },
           "protected": {
             "type": "boolean",
-            "description": "Pinepods' own device: can't be renamed or removed."
+            "description": "Castaway's own device: can't be renamed or removed."
           }
         }
       },
@@ -19170,7 +19170,7 @@
           },
           "server_url_configured": {
             "type": "boolean",
-            "description": "`server_url` comes from `PINEPODS_PUBLIC_URL`; otherwise it was guessed from the request\nand a client may prefer the URL it reached Pinepods at."
+            "description": "`server_url` comes from `PINEPODS_PUBLIC_URL`; otherwise it was guessed from the request\nand a client may prefer the URL it reached Castaway at."
           },
           "notice": {
             "type": [
@@ -19201,7 +19201,7 @@
           },
           "devices": {
             "type": "integer",
-            "description": "Apps on the PinePods server (not counting Pinepods itself).",
+            "description": "Apps on the Castaway server (not counting Castaway itself).",
             "minimum": 0
           },
           "total_episode_actions": {
@@ -19261,7 +19261,7 @@
               "string",
               "null"
             ],
-            "description": "Pinepods' device on a gpodder server."
+            "description": "Castaway's device on a gpodder server."
           },
           "enabled": {
             "type": "boolean"
@@ -19394,7 +19394,7 @@
               "string",
               "null"
             ],
-            "description": "gpodder only: the device Pinepods syncs as. Left out: keep the current one, or pick one."
+            "description": "gpodder only: the device Castaway syncs as. Left out: keep the current one, or pick one."
           }
         }
       },
@@ -19534,7 +19534,7 @@
               "string",
               "null"
             ],
-            "description": "gpodder only: the device Pinepods would sync as."
+            "description": "gpodder only: the device Castaway would sync as."
           }
         }
       },

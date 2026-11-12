@@ -54,7 +54,7 @@ async fn the_test_email_reaches_the_recipient() {
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].from, "pinepods@example.test");
     assert_eq!(sent[0].to, ["listener@example.test"]);
-    assert_eq!(sent[0].header("Subject").as_deref(), Some("PinePods - Test Email"));
+    assert_eq!(sent[0].header("Subject").as_deref(), Some("Castaway - Test Email"));
     let html = sent[0].body();
     assert!(html.contains("hello from the settings page"), "{html}");
     // base64 of the sandbox's favicon.png: the logo is embedded in the message.
@@ -205,7 +205,7 @@ async fn a_reset_code_from_email_changes_the_password() {
     let sent = smtp.sent();
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].to, [user.email.clone()]);
-    assert_eq!(sent[0].header("Subject").as_deref(), Some("PinePods - Password Reset Code"));
+    assert_eq!(sent[0].header("Subject").as_deref(), Some("Castaway - Password Reset Code"));
     let html = sent[0].body();
     let code = html
         .split("code-block\">")

@@ -214,7 +214,7 @@ async fn the_api_key_never_goes_to_a_foreign_origin() {
 #[tokio::test(flavor = "multi_thread")]
 async fn store_state_rejects_foreign_redirect_uris() {
     let app = TestApp::new().await;
-    for bad in ["https://evil.example.test/collect", "pinepods://auth/callback", "not a url"] {
+    for bad in ["https://evil.example.test/collect", "castaway://auth/callback", "not a url"] {
         app.post("/api/auth/store_state")
             .json(&json!({ "state": "s", "client_id": "c", "redirect_uri": bad }))
             .send()

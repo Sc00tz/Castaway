@@ -315,7 +315,7 @@ async fn ntfy_can_sign_in_with_a_username_and_password() {
     assert_eq!(hits.len(), 1, "{hits:?}");
     let expected = pinepods_basic("listener", "ntfy-pass");
     assert_eq!(hits[0].headers.get("authorization"), Some(&expected));
-    assert_eq!(String::from_utf8_lossy(&hits[0].body), "Test notification from PinePods");
+    assert_eq!(String::from_utf8_lossy(&hits[0].body), "Test notification from Castaway");
 }
 
 fn pinepods_basic(user: &str, password: &str) -> String {
@@ -347,7 +347,7 @@ async fn gotify_announces_new_episodes_and_sends_test_messages() {
         assert!(hit.query.as_deref().is_some_and(|q| q.contains("token=gotify-token")), "{hit:?}");
     }
     let test: Value = serde_json::from_slice(&hits[0].body).expect("json body");
-    assert_eq!(test["title"], "PinePods Test");
+    assert_eq!(test["title"], "Castaway Test");
     let announced: Value = serde_json::from_slice(&hits[1].body).expect("json body");
     let message = announced["message"].as_str().unwrap_or_default();
     assert!(message.contains("Fresh gotify episode"), "{announced}");

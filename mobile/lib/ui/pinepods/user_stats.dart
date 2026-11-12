@@ -227,24 +227,19 @@ class _PinepodsUserStatsState extends State<PinepodsUserStats> {
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
-              link(PhosphorIconsRegular.fileText, L.of(context)!.pinepods_documentation, () => _launchUrl('https://pinepods.online')),
-              link(PhosphorIconsRegular.code, L.of(context)!.pinepods_on_github,
-                  () => _launchUrl('https://github.com/madeofpendletonwool/pinepods')),
-              link(PhosphorIconsRegular.coffee, L.of(context)!.buy_me_a_coffee,
-                  () => _launchUrl('https://www.buymeacoffee.com/collinscoffee')),
               link(PhosphorIconsRegular.article, L.of(context)!.open_source_licenses, () => showLicensePage(context: context)),
             ],
           ),
         ),
         const SizedBox(height: 16),
         Text(
-          'Copyright © 2025 Gooseberry Development', // i18n-ignore
+          'Based on PinePods, Copyright © 2025 Gooseberry Development (GPL-3.0)', // i18n-ignore
           style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w500),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 6),
         Text(
-          'The PinePods Mobile App is an open-source podcast player adapted from the Anytime Podcast Player (© 2020 Ben Hills). Portions of this application retain the original BSD 3-Clause license.', // i18n-ignore
+          'The Castaway mobile app is open source, built on the PinePods mobile app, which was adapted from the Anytime Podcast Player (© 2020 Ben Hills). Portions of this application retain the original BSD 3-Clause license.', // i18n-ignore
           style: TextStyle(fontSize: 12, color: muted, height: 1.3),
           textAlign: TextAlign.center,
         ),

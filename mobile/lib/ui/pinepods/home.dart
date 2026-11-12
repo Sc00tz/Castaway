@@ -694,7 +694,7 @@ class _PinepodsHomeState extends State<PinepodsHome> with WidgetsBindingObserver
     }
   }
 
-  /// Offline landing shown on the Home tab when the PinePods server is
+  /// Offline landing shown on the Home tab when the Castaway server is
   /// unreachable (#935). Rather than a dead error page, surface the on-device
   /// Downloads library so already-downloaded episodes stay browsable/playable,
   /// and offer a jump to the full Downloads tab.

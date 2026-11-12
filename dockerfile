@@ -83,7 +83,6 @@ RUN cargo build --release && strip target/release/pinepods-api
 # Final stage for setting up runtime environment
 FROM alpine
 # Metadata
-LABEL maintainer="Collin Pendleton <collinp@collinpendleton.com>"
 # Install runtime dependencies
 # su-exec: drop privileges to PUID:PGID at startup. shadow: usermod/groupmod to remap the runtime user's IDs.
 RUN apk add --no-cache tzdata nginx openssl bash mariadb-client postgresql-client curl ffmpeg wget jq mariadb-connector-c-dev su-exec shadow
@@ -125,7 +124,7 @@ WORKDIR /
 # Copy startup scripts
 COPY startup/startup.sh /startup.sh
 RUN chmod +x /startup.sh
-# Copy Pinepods runtime files
+# Copy Castaway runtime files
 RUN mkdir -p /pinepods
 RUN mkdir -p /var/log/pinepods/ && mkdir -p /etc/horust/services/
 COPY startup/ /pinepods/startup/
@@ -136,16 +135,12 @@ RUN chmod +x /pinepods/startup/startup.sh
 ENV APP_ROOT=/pinepods
 # Define the build argument
 ARG PINEPODS_VERSION
-# Write the Pinepods version to the current_version file
+# Write the Castaway version to the current_version file
 RUN echo "${PINEPODS_VERSION}" > /pinepods/current_version
 # OCI image metadata (shown by registries and `docker inspect`)
-LABEL org.opencontainers.image.title="PinePods" \
+LABEL org.opencontainers.image.title="Castaway" \
       org.opencontainers.image.description="Self-hosted podcast management server and player" \
       org.opencontainers.image.version="${PINEPODS_VERSION}" \
-      org.opencontainers.image.url="https://pinepods.online" \
-      org.opencontainers.image.documentation="https://www.pinepods.online/docs/Introduction" \
-      org.opencontainers.image.source="https://github.com/madeofpendletonwool/PinePods" \
-      org.opencontainers.image.vendor="Gooseberry Development" \
       org.opencontainers.image.licenses="GPL-3.0-or-later"
 # Configure Nginx
 COPY startup/nginx.conf /etc/nginx/nginx.conf

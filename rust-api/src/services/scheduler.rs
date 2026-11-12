@@ -173,7 +173,7 @@ impl BackgroundScheduler {
         })?;
 
         // Daily yt-dlp self-update (#793). YouTube breaks whenever Google changes its internals;
-        // keeping yt-dlp current on a schedule decouples YouTube fixes from PinePods releases.
+        // keeping yt-dlp current on a schedule decouples YouTube fixes from Castaway releases.
         // Guarded by the admin auto-update toggle inside the run method.
         let ytdlp_state = app_state.clone();
         let ytdlp_job = Job::new_async("0 30 3 * * *", move |_uuid, _l| {

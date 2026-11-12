@@ -6,14 +6,14 @@ use crate::{
     AppState,
 };
 
-/// PinePods instance check endpoint - matches Python API exactly
+/// Castaway instance check endpoint - matches Python API exactly
 /// GET /api/pinepods_check
 #[utoipa::path(
     get,
     path = "/api/pinepods_check",
     tag = "health",
     responses(
-        (status = 200, description = "Confirms this is a PinePods instance", body = PinepodsCheckResponse),
+        (status = 200, description = "Confirms this is a Castaway instance", body = PinepodsCheckResponse),
     ),
 )]
 pub async fn pinepods_check() -> Json<PinepodsCheckResponse> {

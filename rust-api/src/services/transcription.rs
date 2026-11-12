@@ -228,7 +228,7 @@ async fn fetch_episode_audio_temp(db_pool: &DatabasePool, episode_id: i32) -> Re
 
     let mut req = crate::services::http::download_client()
         .get(&url)
-        .header("User-Agent", "PinePods/1.0")
+        .header("User-Agent", "Castaway/1.0")
         .header("Accept", "*/*");
     if let (Some(u), Some(p)) = (&username, &password) {
         if !u.is_empty() {

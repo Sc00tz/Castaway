@@ -6194,7 +6194,7 @@ input:checked + .notification-toggle-slider:before {
 
 /* ============================================================
    Activity center — Direction 2 "Status cards", drawer + compact.
-   Ported from the PinePods Design System (ui_kits/web/notifications.css).
+   Ported from the Castaway Design System (ui_kits/web/notifications.css).
    Everything resolves to theme CSS vars so it re-skins per theme.
    ============================================================ */
 .notification-center { position: relative; display: inline-flex; }

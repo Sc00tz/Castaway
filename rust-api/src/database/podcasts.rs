@@ -1320,7 +1320,7 @@ impl DatabasePool {
             return Err(AppError::bad_request(format!("Refused to fetch feed URL: {}", reason)));
         }
 
-        // PinePods UA first — many hosts serve full feeds to podcast apps but truncated
+        // Castaway UA first — many hosts serve full feeds to podcast apps but truncated
         // versions to browser UAs.
         let response = Self::feed_get(crate::services::http::feed_client(), feed_url, username, password)
             .send()
@@ -1719,34 +1719,6 @@ impl DatabasePool {
                 Ok(row.is_some())
             },
         })
-    }
-
-    // Add PinePods news feed to admin users - matches Python add_news_feed_if_not_added function
-    pub async fn add_news_feed_if_not_added(&self) -> AppResult<()> {
-        let admin_user_ids = self.get_all_admin_user_ids().await?;
-        let feed_url = "https://news.pinepods.online/feed.xml";
-
-        for user_id in admin_user_ids {
-            // Check if this user already has the news feed
-            if !self.user_has_podcast_feed(user_id, feed_url).await? {
-                // Add the PinePods news feed using existing functions - matches Python add_custom_podcast
-                match self.get_podcast_values_with_body(feed_url, user_id, None, None).await {
-                    Ok((podcast_values, body)) => {
-                        let feed_cutoff = 30; // Default cutoff like Python
-                        if let Err(e) = self.add_podcast_from_values(&podcast_values, user_id, feed_cutoff, None, None, Some(&body), crate::services::sync::SyncOrigin::Pinepods).await {
-                            error!("Failed to add PinePods news feed for user {}: {}", user_id, e);
-                            // Continue with other users even if one fails
-                        }
-                    },
-                    Err(e) => {
-                        error!("Failed to get podcast values for PinePods news feed for user {}: {}", user_id, e);
-                        // Continue with other users even if one fails
-                    }
-                }
-            }
-        }
-
-        Ok(())
     }
 
     // Get podcast ID by feed URL and title - for get_podcast_details_dynamic

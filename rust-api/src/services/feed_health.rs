@@ -25,15 +25,15 @@ pub const CATEGORY_RECOVERED: &str = "feed_recovered";
 pub enum FeedErrorKind {
     /// 404 / 410: the feed isn't there any more.
     Gone,
-    /// 401 / 403: the host wants credentials or refuses Pinepods.
+    /// 401 / 403: the host wants credentials or refuses Castaway.
     Auth,
-    /// The response isn't a feed Pinepods can read.
+    /// The response isn't a feed Castaway can read.
     NotFeed,
     /// No answer: DNS, connection, TLS or timeout.
     Unreachable,
     /// 5xx from the host.
     Server,
-    /// 429 / 503 with Retry-After: the host asked Pinepods to wait.
+    /// 429 / 503 with Retry-After: the host asked Castaway to wait.
     Throttled,
     Other,
 }

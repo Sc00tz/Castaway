@@ -125,7 +125,7 @@ clients use it. `PINEPODS_TEST_GPODDER` picks the server:
 `harness/antennapod.rs` holds AntennaPod's response parsing as assertions: a `play` action
 without `started >= 0`, `position > 0` and `total > 0` resets the episode to 0 there.
 
-Library assertions are skipped against `mock`, which has no Pinepods database behind it.
+Library assertions are skipped against `mock`, which has no Castaway database behind it.
 
 ## Files, mail, AI and sockets
 

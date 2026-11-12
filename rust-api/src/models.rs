@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use utoipa::ToSchema;
 
-// PinePods check response
+// Castaway check response
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PinepodsCheckResponse {
     pub status_code: u16,

@@ -305,7 +305,7 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
     }
 
     try {
-      // Start playing the episode with full PinePods integration
+      // Start playing the episode with full Castaway integration
       await playPinepodsEpisodeWithOptionalFullScreen(
         context,
         _audioService!,
@@ -766,7 +766,7 @@ class _PinepodsFeedState extends State<PinepodsFeed> with WidgetsBindingObserver
     _hideContextMenu();
   }
 
-  // Generate consistent GUID for PinePods episodes for local downloads
+  // Generate consistent GUID for Castaway episodes for local downloads
   String _generateEpisodeGuid(PinepodsEpisode episode) {
     return 'pinepods_${episode.episodeId}';
   }

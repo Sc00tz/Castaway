@@ -45,8 +45,6 @@ pub async fn startup_tasks(
     }
 
     // Execute the startup tasks
-    state.db_pool.add_news_feed_if_not_added().await?;
-    
     // Create default playlists for any users that might be missing them
     state.db_pool.create_missing_default_playlists().await?;
 

@@ -1,5 +1,5 @@
 // Podping: podcast hosts announce feed updates on the Hive blockchain, and the search service
-// relays them. When an admin turns it on, Pinepods asks the relay every minute which feeds
+// relays them. When an admin turns it on, Castaway asks the relay every minute which feeds
 // were announced, matches them against its own subscriptions locally (the relay never learns
 // what this server follows) and refreshes the matches straight away.
 

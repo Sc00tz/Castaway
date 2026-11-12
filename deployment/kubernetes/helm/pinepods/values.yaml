@@ -304,7 +304,7 @@ podpeople:
 
 ## AI sidecar configuration (OPTIONAL — disabled by default)
 ## Provides AI features such as transcript generation (#726) via faster-whisper.
-## When disabled, PinePods simply hides/disables the AI features — nothing else changes.
+## When disabled, Castaway simply hides/disables the AI features — nothing else changes.
 ## When enabled, the app is pointed at this service via PINEPODS_AI_URL automatically.
 ##
 ## IMPORTANT: the AI container must be able to READ the same downloads volume the main app

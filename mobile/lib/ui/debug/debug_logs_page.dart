@@ -171,23 +171,6 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
     }
   }
 
-  Future<void> _openBugTracker() async {
-    const url = 'https://github.com/madeofpendletonwool/pinepods/issues';
-    try {
-      final uri = Uri.parse(url);
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(L.of(context)!.could_not_open_bug_tracker(e.toString())),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   void _clearLogs() {
     showDialog(
       context: context,
@@ -352,18 +335,6 @@ class _DebugLogsPageState extends State<DebugLogsPage> {
                         label: Text(L.of(context)!.copy_current),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _openBugTracker,
-                        icon: const Icon(PhosphorIconsRegular.bug),
-                        label: Text(L.of(context)!.report_bug),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                         ),
                       ),

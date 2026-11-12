@@ -33,7 +33,7 @@ class CertificateState {
 /// [SecurityContext.defaultContext]. This manager lets a user import:
 ///
 ///  * a **server CA** (`.pem`/`.crt`/`.der`) so a private / self-signed server
-///    certificate is trusted (fixes "not a valid PinePods server" for reverse
+///    certificate is trusted (fixes "not a valid Castaway server" for reverse
 ///    proxies behind Tailscale etc.), and
 ///  * a **client certificate** (`.p12`/`.pfx` + password) for **mTLS** — the
 ///    client presenting a certificate to the server (issue #800).

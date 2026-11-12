@@ -1,6 +1,6 @@
 // Shared helpers for formatting episode publish dates.
 //
-// The PinePods backend serializes episode pubdates as *naive UTC* strings such
+// The Castaway backend serializes episode pubdates as *naive UTC* strings such
 // as "2024-01-15T14:30:00" (no `Z`/offset). Dart's `DateTime.parse()` treats a
 // suffix-less string as device-local, which would silently shift every pubdate
 // by the device's UTC offset. These helpers reinterpret such strings as UTC and

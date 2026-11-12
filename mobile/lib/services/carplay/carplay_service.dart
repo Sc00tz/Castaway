@@ -916,7 +916,7 @@ class CarPlayService {
   Future<void> _playEpisode(Episode episode) async {
     log.info('Playing episode from CarPlay: ${episode.title}');
 
-    // PinePods episodes go through the same path as the app UI and Android
+    // Castaway episodes go through the same path as the app UI and Android
     // Auto, so progress is tracked and synced. Playing them straight on the
     // native player would leave the server position untouched for the whole
     // drive, and pause would sync against whatever episode the app last played.
@@ -963,7 +963,7 @@ class CarPlayService {
 
   // MARK: - Episode Conversion
 
-  /// Rebuilds the PinePods episode behind a CarPlay list item, or null when
+  /// Rebuilds the Castaway episode behind a CarPlay list item, or null when
   /// the item has no `pinepods_<id>` guid. Built from the item itself (no
   /// network) so it still works offline; the server-download and YouTube flags
   /// are recovered from the stream URL the item was given. playPinepodsEpisode

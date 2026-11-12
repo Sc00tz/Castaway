@@ -389,7 +389,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
       }
 
       // Legacy Anytime "Up Next" queue (never populated by PinePods playback,
-      // but kept for the non-PinePods path).
+      // but kept for the non-Castaway path).
       if (_queue.isNotEmpty) {
         final nextEpisode = _queue.removeAt(0);
         _updateQueueState();
@@ -397,12 +397,12 @@ class NativeAudioPlayerService extends AudioPlayerService {
         return;
       }
 
-      // PinePods auto-advance: continue the playlist / auto-play-next / server
+      // Castaway auto-advance: continue the playlist / auto-play-next / server
       // queue. Keep the player on screen (buffering) during the network round
       // trip so it doesn't flicker to "stopped"; the next episode's playEpisode
       // emits its own buffering/playing, and if nothing is queued we stop.
       //
-      // NOTE: we deliberately do NOT gate on the Episode.guid here — PinePods
+      // NOTE: we deliberately do NOT gate on the Episode.guid here — Castaway
       // episodes are played with guid == episode URL (see
       // PinepodsAudioService._convertToEpisode), not "pinepods_<id>". The
       // PinepodsAudioService knows whether it is tracking an episode and returns
@@ -1030,7 +1030,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
   // Android Auto / CarPlay browsing methods. Each reads the same server API as
   // the matching app screen.
 
-  /// The shared PinePods client with credentials applied, and the user id, or
+  /// The shared Castaway client with credentials applied, and the user id, or
   /// null when not connected to a server.
   ({PinepodsService api, int userId})? _carApi(String what) {
     final api = GlobalServices.pinepodsService;
@@ -1038,7 +1038,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
     final apiKey = settingsService.pinepodsApiKey;
     final userId = settingsService.pinepodsUserId;
     if (api == null || server == null || apiKey == null || userId == null) {
-      log.warning('Not connected to a PinePods server for $what');
+      log.warning('Not connected to a Castaway server for $what');
       _refreshCarBrowseWhenReady();
       return null;
     }

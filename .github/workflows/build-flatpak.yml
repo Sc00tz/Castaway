@@ -1,4 +1,4 @@
-name: Build Pinepods Flatpak
+name: Build Castaway Flatpak
 
 permissions:
   contents: read

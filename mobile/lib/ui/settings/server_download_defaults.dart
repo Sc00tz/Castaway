@@ -1,6 +1,6 @@
 // lib/ui/settings/server_download_defaults.dart
 //
-// The user's defaults for downloads kept on the Pinepods server: delete an
+// The user's defaults for downloads kept on the Castaway server: delete an
 // episode's server download once it's finished, and delete server downloads
 // after a number of days. Each podcast's "Server downloads" sheet can override
 // them. Hidden until signed in to a server.

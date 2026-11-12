@@ -1,4 +1,4 @@
-//! OpenAPI document definition for the PinePods API.
+//! OpenAPI document definition for the Castaway API.
 //!
 //! The concrete paths/schemas are collected automatically from the
 //! `#[utoipa::path]`-annotated handlers registered on the `OpenApiRouter`
@@ -11,16 +11,16 @@ use utoipa::{Modify, OpenApi};
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "PinePods API",
+        title = "Castaway API",
         version = env!("CARGO_PKG_VERSION"),
-        description = "HTTP API for the PinePods podcast server. Most endpoints require an \
+        description = "HTTP API for the Castaway podcast server. Most endpoints require an \
             `Api-Key` header tied to a user account; admin-only endpoints additionally \
             require an admin (or web) key. This reference is generated directly from the \
             backend source, so it stays in sync with the running code.",
         license(name = "GPL-3.0-or-later"),
     ),
     servers(
-        (url = "/", description = "This PinePods server (same origin as the API)"),
+        (url = "/", description = "This Castaway server (same origin as the API)"),
     ),
     modifiers(&SecurityAddon),
     tags(

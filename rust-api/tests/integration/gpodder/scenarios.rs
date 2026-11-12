@@ -206,7 +206,7 @@ async fn subscription_upload_never_waits_on_feed_hosts() {
 async fn failed_batch_rolls_back_and_blocks_nothing() {
     conformance("rollback", async {
         let s = GpodderScene::start().await;
-        // A real Pinepods episode, so servers that mirror plays into listen history touch it.
+        // A real Castaway episode, so servers that mirror plays into listen history touch it.
         let feed_url = s.app.feed("rollback.xml", &Feed::with_episodes("Rollback", 1));
         let episode_url = "https://cdn.example.invalid/audio/ep1.mp3";
         if s.has_library() {
@@ -280,7 +280,7 @@ async fn put_from_one_device_keeps_other_devices_subscriptions() {
     .await;
 }
 
-/// The same for podcasts added in Pinepods itself, which no gpodder device ever reported.
+/// The same for podcasts added in Castaway itself, which no gpodder device ever reported.
 #[tokio::test(flavor = "multi_thread")]
 async fn put_keeps_podcasts_added_in_pinepods() {
     conformance("put library", async {
@@ -307,7 +307,7 @@ async fn put_keeps_podcasts_added_in_pinepods() {
         }
 
         let pods = s.app.podcasts(&s.user).await;
-        assert!(pods.iter().any(|p| p["feedurl"] == a.as_str()), "Pinepods podcast deleted by a device PUT: {pods:#?}");
+        assert!(pods.iter().any(|p| p["feedurl"] == a.as_str()), "Castaway podcast deleted by a device PUT: {pods:#?}");
         let saved = s.app.get(&format!("/api/data/saved_episode_list/{}", s.user.id)).key(&s.user).send().await.ok_json();
         assert!(saved.to_string().contains("Episode 1"), "saved episode lost: {saved}");
     })

@@ -310,7 +310,7 @@ struct Resolved {
     resolved: Vec<Option<i32>>,
 }
 
-/// Leave out pulled actions Pinepods already has: sent from its own device, already in the log
+/// Leave out pulled actions Castaway already has: sent from its own device, already in the log
 /// (pushed from here, or sent again by a `>=` cursor), or exactly the local state (the echo of a
 /// full sync's state push on servers without devices).
 async fn drop_echoes(db: &DatabasePool, user_id: i32, own_device: Option<&str>, actions: Vec<EpisodeAction>) -> AppResult<Resolved> {
@@ -402,7 +402,7 @@ async fn push_action_log(db: &DatabasePool, remote: &dyn SyncTarget, t: &SyncTar
 pub struct ConnectionCheck {
     /// The account's devices (gpodder servers only).
     pub devices: Vec<RemoteDevice>,
-    /// The device Pinepods would sync as (gpodder servers only).
+    /// The device Castaway would sync as (gpodder servers only).
     pub device_name: Option<String>,
 }
 

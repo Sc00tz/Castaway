@@ -26,7 +26,7 @@ class NowPlayingManager {
             // Create a simple colored placeholder if no app icon is available
             let size = CGSize(width: 300, height: 300)
             UIGraphicsBeginImageContextWithOptions(size, true, 0)
-            UIColor(red: 0.33, green: 0.62, blue: 0.54, alpha: 1.0).setFill()  // PinePods green
+            UIColor(red: 0.33, green: 0.62, blue: 0.54, alpha: 1.0).setFill()  // Castaway green
             UIRectFill(CGRect(origin: .zero, size: size))
             if let placeholderImage = UIGraphicsGetImageFromCurrentImageContext() {
                 defaultArtwork = MPMediaItemArtwork(boundsSize: placeholderImage.size) { _ in

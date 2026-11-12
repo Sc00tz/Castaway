@@ -491,12 +491,6 @@ pub async fn create_first_admin(
         &request.password, // Password should already be hashed by frontend
     ).await?;
     
-    // Add PinePods news feed to admin users (matches Python startup tasks)
-    if let Err(e) = state.db_pool.add_news_feed_if_not_added().await {
-        error!("Failed to add PinePods news feed during first admin creation: {}", e);
-        // Don't fail the admin creation if news feed addition fails
-    }
-    
     // Create default playlists for the new admin user
     if let Err(e) = state.db_pool.create_missing_default_playlists().await {
         error!("Failed to create default playlists during first admin creation: {}", e);
@@ -1140,7 +1134,7 @@ pub async fn store_oidc_state(
     Ok(Json(serde_json::json!({ "status": "success" })))
 }
 
-const MOBILE_OIDC_CALLBACK: &str = "pinepods://auth/callback";
+const MOBILE_OIDC_CALLBACK: &str = "castaway://auth/callback";
 
 /// Hosts this server answers on: the callback request's own host, plus the configured public URLs.
 fn oidc_allowed_hosts(headers: &HeaderMap) -> Vec<String> {
@@ -1302,7 +1296,7 @@ mod oidc_account_tests {
 
 // Helper function to create proper redirect URLs for both web and mobile
 fn create_oidc_redirect_url(frontend_base: &str, params: &str) -> String {
-    let redirect_url = if frontend_base.starts_with("pinepods://") {
+    let redirect_url = if frontend_base.starts_with("castaway://") {
         // Mobile deep link - append params directly to the exact URL
         if frontend_base.contains('?') {
             // URL already has query params, append with &
@@ -1322,12 +1316,12 @@ fn create_oidc_redirect_url(frontend_base: &str, params: &str) -> String {
 fn create_oidc_response(frontend_base: &str, params: &str) -> axum::response::Response {
     let redirect_url = create_oidc_redirect_url(frontend_base, params);
     
-    if frontend_base.starts_with("pinepods://") {
+    if frontend_base.starts_with("castaway://") {
         // Mobile deep link - return HTML page with JavaScript redirect
         let html_content = format!(r#"<!DOCTYPE html>
 <html>
 <head>
-    <title>PinePods Authentication</title>
+    <title>Castaway Authentication</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -1365,7 +1359,7 @@ fn create_oidc_response(frontend_base: &str, params: &str) -> axum::response::Re
 </head>
 <body>
     <div class="container">
-        <div class="logo">PinePods</div>
+        <div class="logo">Castaway</div>
         <div class="message">Authentication successful!</div>
         <div class="loading">Redirecting to app...</div>
     </div>
@@ -1378,7 +1372,7 @@ fn create_oidc_response(frontend_base: &str, params: &str) -> axum::response::Re
         // Fallback: If the deep link doesn't work, show instructions
         setTimeout(function() {{
             document.querySelector('.loading').innerHTML = 
-                'If the app didn\'t open automatically, please manually open the PinePods app.';
+                'If the app didn\'t open automatically, please manually open the Castaway app.';
         }}, 3000);
     </script>
 </body>
@@ -1535,7 +1529,7 @@ pub async fn oidc_callback(
     // Get user info from OIDC provider - EXACT match to Python
     let userinfo_response = match client.get(&userinfo_url)
         .header("Authorization", format!("Bearer {}", access_token))
-        .header("User-Agent", "PinePods/1.0")
+        .header("User-Agent", "Castaway/1.0")
         .header("Accept", "application/json")
         .send()
         .await
@@ -1569,7 +1563,7 @@ pub async fn oidc_callback(
     if email.is_none() && is_github {
         if let Ok(emails_response) = client.get("https://api.github.com/user/emails")
             .header("Authorization", format!("Bearer {}", access_token))
-            .header("User-Agent", "PinePods/1.0")
+            .header("User-Agent", "Castaway/1.0")
             .header("Accept", "application/json")
             .send()
             .await
@@ -2142,7 +2136,7 @@ pub async fn reset_password_create_code(
                 // Create email payload
                 let email_request = crate::handlers::settings::SendEmailRequest {
                     to_email: request.email.clone(),
-                    subject: "Pinepods Password Reset Code".to_string(),
+                    subject: "Castaway Password Reset Code".to_string(),
                     message: format!("Your password reset code is {}", code),
                 };
                 
@@ -2253,8 +2247,8 @@ mod tests {
         let allowed = hosts(&["pods.example.com"]);
         assert_eq!(oidc_frontend_base("https://pods.example.com", &allowed).as_deref(), Some("https://pods.example.com"));
         assert_eq!(oidc_frontend_base("https://Pods.Example.com:8443/login?x=1", &allowed).as_deref(), Some("https://pods.example.com:8443"));
-        assert_eq!(oidc_frontend_base("pinepods://auth/callback", &allowed).as_deref(), Some("pinepods://auth/callback"));
-        assert_eq!(oidc_frontend_base("pinepods://auth/callback?server=x", &allowed).as_deref(), Some("pinepods://auth/callback?server=x"));
+        assert_eq!(oidc_frontend_base("castaway://auth/callback", &allowed).as_deref(), Some("castaway://auth/callback"));
+        assert_eq!(oidc_frontend_base("castaway://auth/callback?server=x", &allowed).as_deref(), Some("castaway://auth/callback?server=x"));
 
         for hostile in [
             "https://attacker.example",
@@ -2263,7 +2257,7 @@ mod tests {
             "//attacker.example",
             "attacker.example",
             "javascript:alert(1)",
-            "pinepods://auth/callbackevil",
+            "castaway://auth/callbackevil",
             "",
         ] {
             assert_eq!(oidc_frontend_base(hostile, &allowed), None, "{hostile}");

@@ -168,7 +168,7 @@ fn assert_shows(shown: &str, expected: &str) {
 
 #[wasm_bindgen_test]
 async fn the_home_page_welcomes_a_new_listener() {
-    assert_shows(&shown_when_signed_in(Page::Home, json!({})).await, "Welcome to Pinepods");
+    assert_shows(&shown_when_signed_in(Page::Home, json!({})).await, "Welcome to Castaway");
 }
 
 #[wasm_bindgen_test]

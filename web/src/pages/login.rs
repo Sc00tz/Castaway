@@ -1841,7 +1841,7 @@ pub fn login() -> Html {
                 <div class="flex justify-center items-start pt-[10vh] h-screen">
                     <div class="login-card">
                         <div class="flex justify-center items-center">
-                            <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt="Pinepods Logo" />
+                            <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt="Castaway Logo" />
                         </div>
                         <h1 class="item_container-text text-xl font-bold mb-2 text-center">{&i18n_pinepods}</h1>
                         <p class="item_container-text text-center">{ &i18n_tagline }</p>
@@ -2999,7 +2999,7 @@ pub fn login() -> Html {
             <div class="flex justify-center items-center h-screen">
                 <div class="login-card">
                     <div class="flex justify-center items-center">
-                        <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt="Pinepods Logo" />
+                        <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt="Castaway Logo" />
                     </div>
                     <h1 class="item_container-text text-xl font-bold mb-2 text-center">{ &i18n_pinepods }</h1>
                     <p class="item_container-text text-center">{ &i18n_tagline }</p>

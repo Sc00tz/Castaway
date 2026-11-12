@@ -177,7 +177,7 @@ class PinepodsAudioService {
     await playPinepodsEpisode(pinepodsEpisode: episode, startAt: seconds);
   }
 
-  /// Play a PinePods episode with full server integration. [startAt] (seconds)
+  /// Play a Castaway episode with full server integration. [startAt] (seconds)
   /// starts there instead of at the saved position.
   Future<void> playPinepodsEpisode({
     required PinepodsEpisode pinepodsEpisode,
@@ -340,7 +340,7 @@ class PinepodsAudioService {
         podcast2Data: podcast2Data,
       );
     } catch (e) {
-      log.severe('Error playing PinePods episode: $e');
+      log.severe('Error playing Castaway episode: $e');
       rethrow;
     }
   }

@@ -1,5 +1,5 @@
 // Feed problems for the calling user: their podcasts whose refresh keeps failing, and feeds a sync
-// app subscribed to that Pinepods couldn't import, with what can be done about each.
+// app subscribed to that Castaway couldn't import, with what can be done about each.
 
 use axum::{
     extract::{Path, State},
@@ -86,7 +86,7 @@ async fn own_import(state: &AppState, user_id: i32, id: i32) -> AppResult<Import
     path = "/feed_problems/imports/{id}/retry",
     tag = "podcasts",
     summary = "Try adding a failed sync import again",
-    description = "Starts the import now (also after Pinepods stopped retrying). It shows in the activity panel.",
+    description = "Starts the import now (also after Castaway stopped retrying). It shows in the activity panel.",
     params(("id" = i32, Path)),
     security(("api_key" = [])),
     responses(

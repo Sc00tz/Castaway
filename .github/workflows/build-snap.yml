@@ -1,4 +1,4 @@
-name: Build Pinepods Snap
+name: Build Castaway Snap
 
 permissions:
   contents: read

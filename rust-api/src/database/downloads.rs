@@ -946,8 +946,6 @@ impl DatabasePool {
         })
     }
 
-    // Add news feed if not already added - matches Python add_news_feed_if_not_added function exactly
-
     // Cleanup old episodes - matches Python cleanup_old_episodes function exactly
     pub async fn cleanup_old_episodes(&self) -> AppResult<()> {
         self.cleanup_expired_shared_episodes().await?;

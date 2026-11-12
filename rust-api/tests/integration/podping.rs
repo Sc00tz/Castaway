@@ -1,4 +1,4 @@
-//! Podping: an admin turns it on, Pinepods joins the relay at its current position, and feeds
+//! Podping: an admin turns it on, Castaway joins the relay at its current position, and feeds
 //! the relay announces are refreshed right away when this server has them.
 
 use pinepods_api::services::podping;

@@ -1,4 +1,4 @@
-//! Pinepods-generated RSS feeds and RSS keys.
+//! Castaway-generated RSS feeds and RSS keys.
 
 use super::*;
 
@@ -401,7 +401,7 @@ impl DatabasePool {
                 },
             })
         } else {
-            ("All Podcasts".to_string(), format!("{}/static/assets/favicon.png", domain), "RSS feed for all podcasts from Pinepods".to_string())
+            ("All Podcasts".to_string(), format!("{}/static/assets/favicon.png", domain), "RSS feed for all podcasts from Castaway".to_string())
         };
 
         // Stream URLs carry the user's RSS key, except for a scoped key: handing out the
@@ -416,21 +416,23 @@ impl DatabasePool {
         let episodes = self.get_rss_episodes(user_id, limit, source_type, &effective_podcast_ids, podcast_filter, domain, &user_rss_key).await?;
 
         Self::write_rss_document(
-            &format!("Pinepods - {}", podcast_name),
+            &format!("Castaway - {}", podcast_name),
             &feed_description,
             &username,
             &feed_image,
+            domain,
             &episodes,
         )
     }
 
     /// Serialize a channel + its episodes into an RSS 2.0 (iTunes) XML document.
-    /// Shared by the subscriptions feed and the per-collection feeds.
+    /// Shared by the subscriptions feed and the per-collection feeds. `link` is this server's address.
     pub(super) fn write_rss_document(
         title: &str,
         description: &str,
         author: &str,
         image: &str,
+        link: &str,
         episodes: &[RssEpisode],
     ) -> AppResult<String> {
         use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText, BytesCData};
@@ -457,7 +459,7 @@ impl DatabasePool {
         writer.write_event(Event::End(BytesEnd::new("title")))?;
 
         writer.write_event(Event::Start(BytesStart::new("link")))?;
-        writer.write_event(Event::Text(BytesText::new("https://github.com/madeofpendletonwool/pinepods")))?;
+        writer.write_event(Event::Text(BytesText::new(link)))?;
         writer.write_event(Event::End(BytesEnd::new("link")))?;
 
         writer.write_event(Event::Start(BytesStart::new("description")))?;
@@ -489,7 +491,7 @@ impl DatabasePool {
         writer.write_event(Event::End(BytesEnd::new("title")))?;
 
         writer.write_event(Event::Start(BytesStart::new("link")))?;
-        writer.write_event(Event::Text(BytesText::new("https://github.com/madeofpendletonwool/pinepods")))?;
+        writer.write_event(Event::Text(BytesText::new(link)))?;
         writer.write_event(Event::End(BytesEnd::new("link")))?;
 
         writer.write_event(Event::End(BytesEnd::new("image")))?;
@@ -717,7 +719,7 @@ impl DatabasePool {
                     e.episodeurl, &e.episodepubdate, e.episodeduration, Some(e.episodeartwork),
                     Some(e.podcastname), e.downloaded, e.is_youtube,
                 )).collect();
-                ("Saved Episodes".to_string(), "Your saved episodes from Pinepods".to_string(), items)
+                ("Saved Episodes".to_string(), "Your saved episodes from Castaway".to_string(), items)
             }
             FeedSource::Queue => {
                 let eps = self.get_queued_episodes(user_id).await?;
@@ -726,7 +728,7 @@ impl DatabasePool {
                     e.episodeurl, &e.episodepubdate, e.episodeduration, Some(e.episodeartwork),
                     Some(e.podcastname), e.downloaded, e.is_youtube,
                 )).collect();
-                ("Queue".to_string(), "Your episode queue from Pinepods".to_string(), items)
+                ("Queue".to_string(), "Your episode queue from Castaway".to_string(), items)
             }
             FeedSource::Downloads => {
                 let eps = self.download_episode_list(user_id).await?;
@@ -735,14 +737,14 @@ impl DatabasePool {
                     e.episodeurl, &e.episodepubdate, e.episodeduration, e.episodeartwork,
                     Some(e.podcastname), e.downloaded, e.is_youtube,
                 )).collect();
-                ("Downloads".to_string(), "Your downloaded episodes from Pinepods".to_string(), items)
+                ("Downloads".to_string(), "Your downloaded episodes from Castaway".to_string(), items)
             }
             FeedSource::History => {
                 let (rows, _) = self.user_history(user_id, lim, 0, "date", "desc", "").await?;
                 let items = rows.iter()
                     .map(|v| Self::build_rss_episode_from_json(domain, &user_rss_key, user_id, v))
                     .collect();
-                ("History".to_string(), "Your recently played episodes from Pinepods".to_string(), items)
+                ("History".to_string(), "Your recently played episodes from Castaway".to_string(), items)
             }
             FeedSource::Playlist(playlist_id) => {
                 let value = self.get_playlist_episodes(user_id, playlist_id).await?;
@@ -759,7 +761,7 @@ impl DatabasePool {
                         .map(|v| Self::build_rss_episode_from_json(domain, &user_rss_key, user_id, v))
                         .collect())
                     .unwrap_or_default();
-                let desc = format!("Episodes from your \"{}\" playlist in Pinepods", name);
+                let desc = format!("Episodes from your \"{}\" playlist in Castaway", name);
                 (name, desc, items)
             }
             FeedSource::Collection(collection_id) => {
@@ -784,16 +786,17 @@ impl DatabasePool {
                     .find(|c| c.collection_id == collection_id)
                     .map(|c| c.name)
                     .unwrap_or_else(|| "Collection".to_string());
-                let desc = format!("Episodes from your \"{}\" collection in Pinepods", name);
+                let desc = format!("Episodes from your \"{}\" collection in Castaway", name);
                 (name, desc, items)
             }
         };
 
         Self::write_rss_document(
-            &format!("Pinepods - {}", feed_name),
+            &format!("Castaway - {}", feed_name),
             &feed_description,
             &username,
             &default_image,
+            domain,
             &episodes,
         )
     }

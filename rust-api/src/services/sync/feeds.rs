@@ -1,5 +1,5 @@
 // Which of a user's podcasts a feed address belongs to. Sync apps can hold a feed under another
-// address than Pinepods (they follow feed moves, or write the address differently), so addresses
+// address than Castaway (they follow feed moves, or write the address differently), so addresses
 // are compared loosely, a podcast's other addresses are remembered in PodcastFeedAliases, and a
 // feed that turns out to be a show the user already has is never added a second time.
 

@@ -14,7 +14,7 @@ class Person {
   final String? image;
   final String? link;
 
-  /// PinePods person id, when the server knows this person; lets the player open their page.
+  /// Castaway person id, when the server knows this person; lets the player open their page.
   final int? personId;
 
   Person({

@@ -6,7 +6,7 @@ import 'package:pinepods_mobile/ui/pinepods/downloads.dart';
 import 'package:flutter/material.dart';
 
 /// Displays a list of currently downloaded podcast episodes.
-/// This is a wrapper that redirects to the new PinePods downloads implementation.
+/// This is a wrapper that redirects to the new Castaway downloads implementation.
 class Downloads extends StatelessWidget {
   const Downloads({
     super.key,

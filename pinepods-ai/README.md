@@ -1,8 +1,8 @@
-# PinePods AI (optional)
+# Castaway AI (optional)
 
-A small, **optional**, stateless sidecar that gives PinePods AI-powered features.
+A small, **optional**, stateless sidecar that gives Castaway AI-powered features.
 It is modeled on Immich's `immich-machine-learning` container: a separate service
-the main PinePods API talks to over HTTP. If it isn't running, PinePods simply
+the main Castaway API talks to over HTTP. If it isn't running, Castaway simply
 hides/disables the AI features — nothing else breaks.
 
 Currently it provides **speech-to-text transcription** (GitHub #726) using

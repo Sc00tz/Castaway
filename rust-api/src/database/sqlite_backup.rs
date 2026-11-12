@@ -1,7 +1,7 @@
 //! Server backup and restore on SQLite. A backup is a SQL dump of the schema and data, taken
 //! from one read snapshot. A restore loads it into a scratch database, then replaces every
 //! table's rows from it in one write transaction, copying the columns both schemas have, so a
-//! backup from an older Pinepods version still restores.
+//! backup from an older Castaway version still restores.
 
 use std::path::{Path, PathBuf};
 
@@ -14,7 +14,7 @@ use super::dialect::lite::lock_writer;
 use crate::error::{AppError, AppResult};
 
 /// First line of every SQLite backup.
-pub const HEADER: &str = "-- Pinepods SQLite backup";
+pub const HEADER: &str = "-- Castaway SQLite backup";
 
 /// Login-token tables: their rows are never backed up or restored.
 const SKIP_DATA: &[&str] = &["Sessions", "GpodderSessions"];
@@ -290,7 +290,7 @@ async fn copy_tables(conn: &mut SqliteConnection) -> AppResult<()> {
             .fetch_one(&mut *conn)
             .await?;
     if !has_migrations {
-        return Err(AppError::bad_request("This file isn't a complete Pinepods backup"));
+        return Err(AppError::bad_request("This file isn't a complete Castaway backup"));
     }
     let newer: Vec<String> = sqlx::query_scalar(
         "SELECT version FROM bak.schema_migrations WHERE version NOT IN (SELECT version FROM main.schema_migrations)",
@@ -299,7 +299,7 @@ async fn copy_tables(conn: &mut SqliteConnection) -> AppResult<()> {
     .await?;
     if !newer.is_empty() {
         return Err(AppError::bad_request(
-            "This backup is from a newer Pinepods version. Upgrade Pinepods before restoring it.",
+            "This backup is from a newer Castaway version. Upgrade Castaway before restoring it.",
         ));
     }
 
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn splits_statements() {
-        let text = "-- Pinepods SQLite backup\nCREATE TABLE \"a;b\" (x TEXT);\nINSERT INTO \"a;b\" VALUES('it''s; -- not\na comment');INSERT INTO t VALUES(1);\n\
+        let text = "-- Castaway SQLite backup\nCREATE TABLE \"a;b\" (x TEXT);\nINSERT INTO \"a;b\" VALUES('it''s; -- not\na comment');INSERT INTO t VALUES(1);\n\
                     CREATE TRIGGER tr AFTER INSERT ON t BEGIN UPDATE t SET x = 1; END;\n";
         assert_eq!(
             split(text),

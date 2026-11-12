@@ -55,9 +55,9 @@ jobs:
           echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           echo "Using previous tag: $PREVIOUS_TAG"
 
-      - name: Start previous PinePods version
+      - name: Start previous Castaway version
         run: |
-          echo "🚀 Starting PinePods ${{ steps.get_previous_tag.outputs.previous_tag }}"
+          echo "🚀 Starting Castaway ${{ steps.get_previous_tag.outputs.previous_tag }}"
 
           # Create docker-compose for previous version
           cat > docker-compose.previous.yml << EOF
@@ -117,14 +117,14 @@ jobs:
 
       - name: Stop previous version
         run: |
-          echo "🛑 Stopping previous PinePods version"
+          echo "🛑 Stopping previous Castaway version"
           docker compose -f docker-compose.previous.yml stop pinepods_previous
           echo "✅ Previous version stopped (database preserved)"
 
 
       - name: Build current version
         run: |
-          echo "🔨 Building current PinePods version from source"
+          echo "🔨 Building current Castaway version from source"
           docker build -f dockerfile -t pinepods-current:test .
           echo "✅ Build complete"
 
@@ -176,7 +176,7 @@ jobs:
               driver: bridge
           EOF
 
-          echo "🚀 Starting current PinePods version"
+          echo "🚀 Starting current Castaway version"
           # Start current version
           docker compose -f docker-compose.current.yml up -d pinepods_current
 
@@ -263,9 +263,9 @@ jobs:
           echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           echo "Using previous tag: $PREVIOUS_TAG"
 
-      - name: Start previous PinePods version
+      - name: Start previous Castaway version
         run: |
-          echo "🚀 Starting PinePods ${{ steps.get_previous_tag.outputs.previous_tag }} (PostgreSQL)"
+          echo "🚀 Starting Castaway ${{ steps.get_previous_tag.outputs.previous_tag }} (PostgreSQL)"
 
           cat > docker-compose.postgres-previous.yml << EOF
           version: '3.8'
@@ -317,19 +317,19 @@ jobs:
 
       - name: Stop previous version
         run: |
-          echo "🛑 Stopping previous PinePods version"
+          echo "🛑 Stopping previous Castaway version"
           docker compose -f docker-compose.postgres-previous.yml stop pinepods_previous
           echo "✅ Previous version stopped (database preserved)"
 
       - name: Build current version (PostgreSQL)
         run: |
-          echo "🔨 Building current PinePods version from source"
+          echo "🔨 Building current Castaway version from source"
           docker build -f dockerfile -t pinepods-current:test .
           echo "✅ Build complete"
 
       - name: Test current version (PostgreSQL)
         run: |
-          echo "🚀 Starting current PinePods version with PostgreSQL"
+          echo "🚀 Starting current Castaway version with PostgreSQL"
 
           # Create docker-compose for current version
           cat > docker-compose.postgres-current.yml << EOF

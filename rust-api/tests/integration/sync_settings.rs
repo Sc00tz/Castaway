@@ -1,4 +1,4 @@
-//! The sync settings API (/api/sync/*): the PinePods gpodder server with its app passwords and
+//! The sync settings API (/api/sync/*): the Castaway gpodder server with its app passwords and
 //! devices, the external server's test/save/status/run/remove, statistics, and the old
 //! /api/gpodder routes answering in their old shapes on top of it.
 
@@ -92,12 +92,12 @@ async fn devices_can_be_renamed_and_removed_except_pinepods_own() {
 
     let devices = app.get("/api/sync/devices").key(&user).send().await.ok_json();
     let list = devices.as_array().unwrap();
-    let own = list.iter().find(|d| d["protected"] == true).unwrap_or_else(|| panic!("Pinepods' device in {devices}"));
+    let own = list.iter().find(|d| d["protected"] == true).unwrap_or_else(|| panic!("Castaway's device in {devices}"));
     let phone_dev = list.iter().find(|d| d["name"] == "phone").unwrap_or_else(|| panic!("phone in {devices}"));
     assert!(phone_dev["last_seen"].as_i64().is_some(), "{devices}");
     let (own_id, phone_id) = (own["id"].as_i64().unwrap(), phone_dev["id"].as_i64().unwrap());
 
-    // Pinepods' own device is shown but can't be renamed or removed.
+    // Castaway's own device is shown but can't be renamed or removed.
     app.put(&format!("/api/sync/devices/{own_id}")).key(&user).json(&json!({ "caption": "Mine" })).send().await.assert_status(403);
     app.delete(&format!("/api/sync/devices/{own_id}")).key(&user).send().await.assert_status(403);
 

@@ -27,7 +27,7 @@ class ServerErrorPage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // PinePods Logo
+          // Castaway Logo
           if (showLogo) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(16),

@@ -1186,15 +1186,14 @@ fn create_html_email_template(subject: &str, content: &str, logo_base64: &str) -
 <body>
     <div class="email-container">
         <div class="header">
-            <img src="data:image/png;base64,{}" alt="PinePods Logo" class="logo">
-            <h1>PinePods</h1>
+            <img src="data:image/png;base64,{}" alt="Castaway Logo" class="logo">
+            <h1>Castaway</h1>
         </div>
         <div class="content">
             {}
         </div>
         <div class="footer">
-            <p>This email was sent from your PinePods server.</p>
-            <p>Visit <a href="https://github.com/madeofpendletonwool/PinePods">PinePods on GitHub</a> for more information.</p>
+            <p>This email was sent from your Castaway server.</p>
         </div>
     </div>
 </body>
@@ -1218,7 +1217,7 @@ async fn send_email_internal(request: &SendTestEmailRequest) -> Result<String, A
     let logo_base64 = read_logo_as_base64().await.unwrap_or_default();
     let html_content = format!(r#"
         <h2>📧 Test Email</h2>
-        <p>This is a test email from your PinePods server to verify your email configuration is working correctly.</p>
+        <p>This is a test email from your Castaway server to verify your email configuration is working correctly.</p>
         <p><strong>Your message:</strong></p>
         <p style="background-color: #f8f9fa; padding: 16px; border-radius: 6px; border-left: 4px solid #539e8a;">{}</p>
         <p>If you received this email, your email settings are configured properly! 🎉</p>
@@ -1232,7 +1231,7 @@ async fn send_email_internal(request: &SendTestEmailRequest) -> Result<String, A
             .map_err(|_| AppError::bad_request("Invalid from email"))?)
         .to(request.to_email.parse()
             .map_err(|_| AppError::bad_request("Invalid to email"))?)
-        .subject("PinePods - Test Email")
+        .subject("Castaway - Test Email")
         .header(ContentType::TEXT_HTML)
         .body(html_body)
         .map_err(|e| AppError::internal(&format!("Failed to build email: {}", e)))?;
@@ -1386,7 +1385,7 @@ pub async fn send_email_with_settings(
         let reset_code = request.message.trim_start_matches("Your password reset code is ");
         let content = format!(r#"
             <h2>🔐 Password Reset Request</h2>
-            <p>You have requested a password reset for your PinePods account.</p>
+            <p>You have requested a password reset for your Castaway account.</p>
             <p>Please use the following code to reset your password:</p>
             <div class="code-block">{}</div>
             <p><strong>Important:</strong></p>
@@ -1397,7 +1396,7 @@ pub async fn send_email_with_settings(
             </ul>
             <p>For security reasons, never share this code with anyone.</p>
         "#, reset_code);
-        (content, "PinePods - Password Reset Code".to_string())
+        (content, "Castaway - Password Reset Code".to_string())
     } else {
         // For other emails, wrap the message content
         let content = format!(r#"

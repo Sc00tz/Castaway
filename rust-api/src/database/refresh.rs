@@ -1214,7 +1214,7 @@ impl DatabasePool {
             return Err(AppError::bad_request(format!("Refused to fetch feed URL: {}", reason)));
         }
 
-        // PinePods UA first — many hosts (e.g. Omny) return full episode lists to podcast apps
+        // Castaway UA first — many hosts (e.g. Omny) return full episode lists to podcast apps
         // but truncated/paginated feeds to browser UAs.
         let response = Self::feed_get(crate::services::http::feed_client(), url, username, password)
             .send()

@@ -93,7 +93,7 @@ pub(crate) async fn upload_changes(
 }
 
 /// Replace a device's list: only what differs from what this device reported before changes,
-/// so other devices' and Pinepods' own subscriptions are never removed by it.
+/// so other devices' and Castaway's own subscriptions are never removed by it.
 async fn put_device_list(state: &AppState, auth: &Authed, device: &str, urls: Vec<String>) -> GResult<()> {
     let db = &state.db_pool;
     let device = db.gpodder_ensure_device(auth.user_id, device).await?;
@@ -158,7 +158,7 @@ async fn render(state: &AppState, user_id: i32, format: Format, q: &HashMap<Stri
         Format::Opml | Format::Xml => {
             let info = state.db_pool.gpodder_podcast_info(user_id).await?;
             let mut body = String::from(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"2.0\">\n  <head><title>PinePods subscriptions</title></head>\n  <body>\n",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"2.0\">\n  <head><title>Castaway subscriptions</title></head>\n  <body>\n",
             );
             for url in &urls {
                 let title = info.get(url).and_then(|i| i.title.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| url.clone());

@@ -15,11 +15,11 @@ import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
 import 'package:pinepods_mobile/entities/app_settings.dart';
 import 'package:provider/provider.dart';
 
-/// Utility class for managing local downloads of PinePods episodes
+/// Utility class for managing local downloads of Castaway episodes
 class LocalDownloadUtils {
   static final Map<String, bool> _localDownloadStatusCache = {};
 
-  /// Generate consistent GUID for PinePods episodes for local downloads
+  /// Generate consistent GUID for Castaway episodes for local downloads
   static String generateEpisodeGuid(PinepodsEpisode episode) {
     return 'pinepods_${episode.episodeId}';
   }
@@ -180,7 +180,7 @@ class LocalDownloadUtils {
     _localDownloadStatusCache[guid] = isDownloaded;
   }
 
-  /// Locally stored PinePods rows grouped by server episode id, so a list can
+  /// Locally stored Castaway rows grouped by server episode id, so a list can
   /// be matched against the store in one read instead of one per episode.
   static Future<Map<int, List<Episode>>> localEpisodesById(Repository repository) async {
     final byId = <int, List<Episode>>{};

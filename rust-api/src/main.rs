@@ -42,8 +42,8 @@ async fn main() -> AppResult<()> {
         .with_env_filter(env_filter)
         .init();
 
-    info!("🚀 Starting PinePods Rust API...");
-    info!("Starting PinePods Rust API");
+    info!("🚀 Starting Castaway Rust API...");
+    info!("Starting Castaway Rust API");
 
     // Load configuration
     let config = Config::new()?;
@@ -139,14 +139,14 @@ async fn main() -> AppResult<()> {
 
     // Determine the address to bind to
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
-    info!("🌐 PinePods Rust API listening on http://{}", addr);
+    info!("🌐 Castaway Rust API listening on http://{}", addr);
     info!("📊 Health check available at: http://{}/api/health", addr);
     debug!("🔍 API check available at: http://{}/api/pinepods_check", addr);
     info!("Server listening on {}", addr);
 
     // Start the server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    debug!("✅ PinePods Rust API server started successfully!");
+    debug!("✅ Castaway Rust API server started successfully!");
 
     // The startup refresh runs in the background once requests are accepted.
     tokio::spawn(BackgroundScheduler::run_startup_refresh(scheduler_state.clone()));

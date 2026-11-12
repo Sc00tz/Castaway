@@ -20,7 +20,7 @@ use yewdux::prelude::*;
 
 const PAGE_SIZE: i64 = 50;
 
-/// How the URL names the person: `/person/12` (PinePods id), `/person/pp-34` (a PodPeopleDB id,
+/// How the URL names the person: `/person/12` (Castaway id), `/person/pp-34` (a PodPeopleDB id,
 /// from discover) or `/person/Jane%20Doe` (old links by name).
 #[derive(Clone, PartialEq, Debug)]
 enum PersonKey {
@@ -55,7 +55,7 @@ enum Load {
 
 #[derive(Clone, Properties, PartialEq)]
 pub struct PersonProps {
-    /// PinePods person id, `pp-<PodPeopleDB id>`, or a name.
+    /// Castaway person id, `pp-<PodPeopleDB id>`, or a name.
     pub person_key: String,
 }
 

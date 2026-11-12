@@ -7,7 +7,7 @@ data:
   SEARCH_API_URL: "https://search.pinepods.online/api/search"
   USERNAME: "myadminuser01"
   PASSWORD: "myS3curepass"
-  FULLNAME: "Pinepods Admin"
+  FULLNAME: "Castaway Admin"
   EMAIL: "user@pinepods.online"
   DB_TYPE: "postgresql"
   DB_HOST: "postgres"

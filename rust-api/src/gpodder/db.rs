@@ -118,7 +118,7 @@ fn reserved(name: &str) -> AppError {
 
 // ---- devices (inside a transaction) -------------------------------------------------------
 
-// The device `name`, created if missing and reactivated if inactive. Pinepods' own device
+// The device `name`, created if missing and reactivated if inactive. Castaway's own device
 // can't be used by a client.
 dialect_fn!([pg_ensure_device, lite_ensure_device]
     async fn(conn: &mut q::Conn, user_id: i32, name: &str) -> AppResult<Device> {
@@ -443,7 +443,7 @@ impl DatabasePool {
         Ok(())
     }
 
-    /// The user's active devices, Pinepods' own included.
+    /// The user's active devices, Castaway's own included.
     pub(crate) async fn gpodder_devices(&self, user_id: i32) -> AppResult<Vec<Device>> {
         let rows = dialect_match!(self, {
             pg(pool) => q::query(
@@ -1065,11 +1065,11 @@ impl DatabasePool {
         Ok(())
     }
 
-    // ---- Pinepods side ------------------------------------------------------------------------
+    // ---- Castaway side ------------------------------------------------------------------------
 
-    /// Write the user's current listening state to the log as Pinepods' own `play` actions, so
+    /// Write the user's current listening state to the log as Castaway's own `play` actions, so
     /// clients connecting to the server get it on their first sync. Skips episodes whose state is
-    /// already logged (a Pinepods action at or after the history row's time). Returns the count.
+    /// already logged (a Castaway action at or after the history row's time). Returns the count.
     pub async fn gpodder_publish_episode_state(&self, user_id: i32) -> AppResult<u64> {
         // Position: the episode's duration if completed, else the saved position.
         let inserted = dialect_match!(self, {
@@ -1230,7 +1230,7 @@ impl DatabasePool {
     }
 }
 
-/// A device as the sync settings show it. `system` = Pinepods' own device (can't be renamed
+/// A device as the sync settings show it. `system` = Castaway's own device (can't be renamed
 /// or removed). Times are unix seconds.
 #[derive(Debug, Clone)]
 pub struct DeviceInfo {
@@ -1274,7 +1274,7 @@ impl DatabasePool {
         }))
     }
 
-    /// The user's active devices, Pinepods' own included, with when each last synced.
+    /// The user's active devices, Castaway's own included, with when each last synced.
     pub async fn gpodder_device_list(&self, user_id: i32) -> AppResult<Vec<DeviceInfo>> {
         let rows: Vec<DeviceInfoRow> = dialect_match!(self, {
             pg(pool) => q::query_as(
@@ -1301,8 +1301,8 @@ impl DatabasePool {
         Ok(self.gpodder_device_list(user_id).await?.into_iter().find(|d| d.id == device_id))
     }
 
-    /// Name a client device in Pinepods. Its own caption stays underneath, so the app
-    /// configuring the device again doesn't undo it. Pinepods' own device is left alone (false).
+    /// Name a client device in Castaway. Its own caption stays underneath, so the app
+    /// configuring the device again doesn't undo it. Castaway's own device is left alone (false).
     pub async fn gpodder_rename_device(&self, user_id: i32, device_id: i32, caption: &str) -> AppResult<bool> {
         let n = dialect_match!(self, {
             pg(pool) => q::query(
@@ -1328,7 +1328,7 @@ impl DatabasePool {
     }
 
     /// Remove a client device. Its log rows stay (device set NULL), its subscription list goes.
-    /// The client gets a new device the next time it syncs. Pinepods' own device is never removed.
+    /// The client gets a new device the next time it syncs. Castaway's own device is never removed.
     pub async fn gpodder_remove_device(&self, user_id: i32, device_id: i32) -> AppResult<bool> {
         // Clearing the device on log rows writes to the log, so lock the targets first.
         let n = dialect_match!(self, {

@@ -1,7 +1,7 @@
 //! Sync data model migrations: old-shape data is seeded, the
 //! migrations are forgotten and re-run through the real runner, and the result is checked.
 //! 068 moves Users.Pod_Sync_Type to GpodderServerEnabled / SyncTargets / app passwords; 111/112
-//! extend the action and subscription logs (110 first drops old actions newer ones replaced); 113 marks Pinepods' own device; 069 makes listen
+//! extend the action and subscription logs (110 first drops old actions newer ones replaced); 113 marks Castaway's own device; 069 makes listen
 //! history one row per user and episode on MySQL; 116 ties gpodder sessions to the app password
 //! that opened them.
 
@@ -290,7 +290,7 @@ async fn the_internal_sync_device_is_marked_as_the_pinepods_device() {
         Some(format!("pinepods-internal-{uid}"))
     );
     assert_eq!(int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {uid} AND SystemRole IS NOT NULL"#)).await, Some(1));
-    // One Pinepods device per user.
+    // One Castaway device per user.
     let second = format!(r#"UPDATE "GpodderDevices" SET SystemRole = 'pinepods' WHERE UserID = {uid} AND DeviceName = 'pinepods'"#);
     let rejected = match app.db() {
         pinepods_api::database::DatabasePool::Postgres(pool) => sqlx::raw_sql(sqlx::AssertSqlSafe(second)).execute(pool).await.is_err(),

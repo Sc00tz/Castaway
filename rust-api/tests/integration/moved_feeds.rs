@@ -1,5 +1,5 @@
 //! A sync app that knows a show under another address (it followed a feed move, or writes the
-//! address differently) never makes Pinepods subscribe to it twice: the address is remembered
+//! address differently) never makes Castaway subscribe to it twice: the address is remembered
 //! as an alias of the podcast, and removing it under that address unsubscribes the podcast.
 
 use crate::harness::gpodder::*;

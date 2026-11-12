@@ -7,8 +7,8 @@ lazy_static! {
     static ref TEMP_MFA_SECRETS: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
-// Build the TOTP verifier/provisioner used for all PinePods MFA: SHA1, 6 digits,
-// 30s step, +/-1 step skew, issuer "Pinepods". `secret_b32` is the stored unpadded
+// Build the TOTP verifier/provisioner used for all Castaway MFA: SHA1, 6 digits,
+// 30s step, +/-1 step skew, issuer "Castaway". `secret_b32` is the stored unpadded
 // RFC4648 base32 secret.
 pub fn build_totp(secret_b32: &str, account_name: &str) -> AppResult<totp_rs::Totp> {
     let secret = totp_rs::Secret::try_from_base32(secret_b32)
@@ -19,7 +19,7 @@ pub fn build_totp(secret_b32: &str, account_name: &str) -> AppResult<totp_rs::To
         .with_skew(1)
         .with_step_duration(30)
         .with_secret(secret)
-        .with_issuer(Some("Pinepods"))
+        .with_issuer(Some("Castaway"))
         .with_account_name(account_name)
         .build()
         .map_err(|e| AppError::internal(&format!("TOTP creation failed: {}", e)))
@@ -264,7 +264,7 @@ mod totp_tests {
     fn provisioning_url_has_issuer_and_secret() {
         let url = build_totp(SECRET, "user@example.com").unwrap().to_url().unwrap();
         assert!(url.starts_with("otpauth://totp/"));
-        assert!(url.contains("issuer=Pinepods"));
+        assert!(url.contains("issuer=Castaway"));
         assert!(url.contains(&format!("secret={SECRET}")));
     }
 }

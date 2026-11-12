@@ -40,7 +40,7 @@ class PersonAvatar extends StatelessWidget {
     }
   }
 
-  /// Open their PinePods person page when the server knows them, otherwise their own link.
+  /// Open their Castaway person page when the server knows them, otherwise their own link.
   VoidCallback? _onTap(BuildContext context) {
     final id = person.personId ?? 0;
     if (id > 0) {

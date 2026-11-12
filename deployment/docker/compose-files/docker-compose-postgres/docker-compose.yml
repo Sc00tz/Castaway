@@ -1,4 +1,4 @@
-# Production setup: Pinepods with its own database server and Valkey. For the easiest
+# Production setup: Castaway with its own database server and Valkey. For the easiest
 # single-container install, see docker-compose-sqlite.
 services:
   db:
@@ -10,15 +10,15 @@ services:
       POSTGRES_PASSWORD: myS3curepass
       PGDATA: /var/lib/pgdata/pgdata
     volumes:
-      - /home/user/pinepods/pgdata:/var/lib/pgdata
+      - /home/user/castaway/pgdata:/var/lib/pgdata
     restart: always
 
   valkey:
     image: valkey/valkey:8-alpine
     restart: always
 
-  pinepods:
-    image: madeofpendletonwool/pinepods:latest
+  castaway:
+    image: castaway:latest  # build it from the repo root: docker build -t castaway .
     ports:
       - "8040:8040"
     environment:
@@ -56,14 +56,14 @@ services:
       # verified. Only for a provider you control that never sends email_verified:
       # OIDC_TRUST_UNVERIFIED_EMAIL: "true"
       # Optional AI features (#726 transcripts, #790 ad detection). Uncomment + run the
-      # pinepods-ai service below to enable; leave unset to keep AI features disabled.
-      # PINEPODS_AI_URL: "http://pinepods-ai:8100"
+      # castaway-ai service below to enable; leave unset to keep AI features disabled.
+      # PINEPODS_AI_URL: "http://castaway-ai:8100"
     volumes:
       # Mount the download and backup locations on the server
-      - /home/user/pinepods/downloads:/opt/pinepods/downloads
-      - /home/user/pinepods/backups:/opt/pinepods/backups
+      - /home/user/castaway/downloads:/opt/pinepods/downloads
+      - /home/user/castaway/backups:/opt/pinepods/backups
       # Mount local media files to use the Add Local Podcast feature (optional)
-      - /home/user/pinepods/local-media:/opt/pinepods/local-media
+      - /home/user/castaway/local-media:/opt/pinepods/local-media
       # Timezone volumes, HIGHLY optional. Read the timezone notes below
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -76,8 +76,8 @@ services:
   # default — uncomment this whole service AND the PINEPODS_AI_URL var above to enable.
   # Model choices are managed at runtime from Settings → AI in the web UI; the env vars
   # below are only initial defaults. It only needs read-only access to the downloads dir.
-  # pinepods-ai:
-  #   image: madeofpendletonwool/pinepods-ai:latest
+  # castaway-ai:
+  #   image: castaway-ai:latest  # build it: docker build -t castaway-ai ./pinepods-ai
   #   environment:
   #     WHISPER_MODEL: "base"        # tiny|base|small|medium|large-v3
   #     WHISPER_DEVICE: "cpu"        # cuda if using a GPU image
@@ -89,9 +89,9 @@ services:
   #     # AI_LLM_API_KEY: ""
   #     # AI_LLM_MODEL_NAME: "qwen2.5:3b"
   #   volumes:
-  #     - /home/user/pinepods/downloads:/opt/pinepods/downloads:ro
-  #     - pinepods-ai-models:/models
+  #     - /home/user/castaway/downloads:/opt/pinepods/downloads:ro
+  #     - castaway-ai-models:/models
   #   restart: always
 
 # volumes:
-#   pinepods-ai-models:
+#   castaway-ai-models:

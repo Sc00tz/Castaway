@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
 
 class OidcService {
-  static const String userAgent = 'PinePods Mobile/1.0'; // i18n-ignore
-  static const String callbackUrlScheme = 'pinepods';
+  static const String userAgent = 'Castaway Mobile/1.0'; // i18n-ignore
+  static const String callbackUrlScheme = 'castaway';
   static const String callbackPath = '/auth/callback';
   
   /// Get available OIDC providers from server
@@ -123,7 +123,7 @@ class OidcService {
         serverUrl: serverUrl,
         state: state,
         clientId: provider.clientId,
-        originUrl: '$callbackUrlScheme:/$callbackPath', // pinepods://auth/callback
+        originUrl: '$callbackUrlScheme:/$callbackPath', // castaway://auth/callback
         codeVerifier: pkce?.codeVerifier, // Include PKCE code verifier
         redirectUri: redirectUri,
       );
@@ -172,7 +172,7 @@ class OidcService {
         );
       }
       
-      // Check if we have an API key directly (PinePods backend provides this)
+      // Check if we have an API key directly (Castaway backend provides this)
       final apiKey = queryParams['api_key'];
       if (apiKey != null && apiKey.isNotEmpty) {
         return OidcCallbackResult.success(

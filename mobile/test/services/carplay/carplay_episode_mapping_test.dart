@@ -1,4 +1,4 @@
-// CarPlay list items are plain Episodes; playback rebuilds the PinePods episode
+// CarPlay list items are plain Episodes; playback rebuilds the Castaway episode
 // from them so it goes through the tracked play path. The server-download and
 // YouTube flags decide the stream URL, so they must survive the round trip.
 
@@ -42,7 +42,7 @@ void main() {
     expect(youtube.downloaded, isFalse);
   });
 
-  test('items without a PinePods id are left to the direct play path', () {
+  test('items without a Castaway id are left to the direct play path', () {
     expect(CarPlayService.toPinepodsEpisode(buildEpisode(guid: 'https://feed/ep')), isNull);
     expect(CarPlayService.toPinepodsEpisode(buildEpisode(guid: 'pinepods_x')), isNull);
   });

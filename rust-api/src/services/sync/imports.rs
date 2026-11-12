@@ -1,4 +1,4 @@
-// Feeds a sync app or external server subscribed to that Pinepods couldn't import. They're kept
+// Feeds a sync app or external server subscribed to that Castaway couldn't import. They're kept
 // per user, retried with backoff, and listed with the feed problems until they import, or the user
 // removes (unsubscribes everywhere) or dismisses them.
 
@@ -30,7 +30,7 @@ pub fn retry_delay(attempts: i32) -> Option<chrono::Duration> {
 pub struct ImportFailure {
     pub id: i32,
     pub feed_url: String,
-    /// Where the subscription came from: `client` (an app on the PinePods gpodder server) or
+    /// Where the subscription came from: `client` (an app on the Castaway gpodder server) or
     /// `target` (the external sync server).
     pub source: String,
     pub kind: FeedErrorKind,
@@ -39,7 +39,7 @@ pub struct ImportFailure {
     /// Unix seconds.
     pub first_failed_at: i64,
     pub last_attempt_at: i64,
-    /// `None`: Pinepods stopped retrying.
+    /// `None`: Castaway stopped retrying.
     pub next_attempt_at: Option<i64>,
     /// The stored origin, used when retrying.
     #[serde(skip)]
@@ -58,7 +58,7 @@ pub fn parse_origin(value: &str) -> SyncOrigin {
     }
 }
 
-/// An import failed: remember it, schedule the next attempt, and tell the user once Pinepods
+/// An import failed: remember it, schedule the next attempt, and tell the user once Castaway
 /// gives up.
 pub async fn failed(db: &DatabasePool, tasks: &TaskManager, user_id: i32, feed_url: &str, origin: SyncOrigin, error: &AppError) {
     let kind = FeedErrorKind::of(error);

@@ -1349,7 +1349,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
   Future<void> _toggleFollow() async {
     // Prevent concurrent operations
     if (_isFollowButtonLoading) {
-      print('PinePods Follow button: Already processing, ignoring click');
+      print('Castaway Follow button: Already processing, ignoring click');
       return;
     }
 
@@ -1391,12 +1391,12 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
       );
 
       if (confirmed != true) {
-        print('PinePods Follow button: User cancelled unfollow');
+        print('Castaway Follow button: User cancelled unfollow');
         return;
       }
     }
 
-    print('PinePods Follow button: CLICKED - Setting loading to true');
+    print('Castaway Follow button: CLICKED - Setting loading to true');
     setState(() {
       _isFollowButtonLoading = true;
     });
@@ -1406,7 +1406,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
       final oldFollowingState = _isFollowing;
 
       if (oldFollowingState) {
-        print('PinePods: Attempting to remove podcast');
+        print('Castaway: Attempting to remove podcast');
         success = _isYoutube
             ? await _pinepodsService.removeYouTubeChannel(_podcast.title, _podcast.url, userId)
             : await _pinepodsService.removePodcast(
@@ -1414,7 +1414,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
                 _podcast.url,
                 userId,
               );
-        print('PinePods: Remove podcast result: $success');
+        print('Castaway: Remove podcast result: $success');
         if (success) {
           setState(() {
             _isFollowing = false;
@@ -1425,7 +1425,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
           _showSnackBar(_isYoutube ? L.current.unsubscribed : L.current.podcast_removed, Colors.orange);
         }
       } else {
-        print('PinePods: Attempting to add podcast');
+        print('Castaway: Attempting to add podcast');
         if (_isYoutube) {
           final channelId = Uri.parse(_podcast.url).pathSegments.last;
           final podcastId = await _pinepodsService.subscribeToYouTubeChannel(channelId, userId);
@@ -1434,7 +1434,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
         } else {
           success = await _pinepodsService.addPodcast(_podcast, userId);
         }
-        print('PinePods: Add podcast result: $success');
+        print('Castaway: Add podcast result: $success');
         if (success) {
           setState(() {
             _isFollowing = true;
@@ -1448,7 +1448,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
       if (success) {
         // Always reload episodes when follow status changes
         // This will switch between server episodes (followed) and RSS episodes (unfollowed)
-        print('PinePods: Reloading podcast feed after ${oldFollowingState ? 'unfollow' : 'follow'}');
+        print('Castaway: Reloading podcast feed after ${oldFollowingState ? 'unfollow' : 'follow'}');
         await _loadPodcastFeed();
       } else {
         // Revert state change if the operation failed
@@ -1458,7 +1458,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
         _showSnackBar(oldFollowingState ? L.current.failed_to_remove_podcast : L.current.failed_to_add_podcast, Colors.red);
       }
     } catch (e) {
-      print('PinePods: Error in _toggleFollow: $e');
+      print('Castaway: Error in _toggleFollow: $e');
       _showSnackBar(L.current.error_with_detail(e.toString()), Colors.red);
     } finally {
       // Always reset loading state
@@ -1467,7 +1467,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
           _isFollowButtonLoading = false;
         });
       }
-      print('PinePods Follow button: Loading state reset to false');
+      print('Castaway Follow button: Loading state reset to false');
     }
   }
 

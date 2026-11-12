@@ -40,7 +40,7 @@ import MediaPlayer
 
         // Set up placeholder now playing info so CarPlay recognizes us as an audio app
         var nowPlayingInfo = [String: Any]()
-        nowPlayingInfo[MPMediaItemPropertyTitle] = "PinePods"
+        nowPlayingInfo[MPMediaItemPropertyTitle] = "Castaway"
         nowPlayingInfo[MPMediaItemPropertyArtist] = "Podcast Player"
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo

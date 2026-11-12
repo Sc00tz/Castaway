@@ -11,7 +11,7 @@ use bigdecimal::ToPrimitive;
 use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use base64;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 pub mod dialect;
 use dialect::{dialect_fn, dialect_match, dialect_method};
@@ -80,7 +80,7 @@ fn is_write_conflict(e: &AppError) -> bool {
     db.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().is_some_and(|m| matches!(m.number(), 1020 | 1213))
 }
 
-/// `Users.GpodderUrl` of users on the PinePods gpodder server. Not a real address any more;
+/// `Users.GpodderUrl` of users on the Castaway gpodder server. Not a real address any more;
 /// clients and the UI read it as "internal".
 pub const INTERNAL_GPODDER_URL: &str = "http://localhost:8042";
 

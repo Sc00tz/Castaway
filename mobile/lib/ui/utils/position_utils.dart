@@ -17,7 +17,7 @@ import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
 /// local player database. That kept stale positions alive and hid rewinds, and
 /// Home didn't apply it at all, so screens disagreed.)
 class PositionUtils {
-  /// Generate consistent GUID for PinePods episodes
+  /// Generate consistent GUID for Castaway episodes
   static String generateEpisodeGuid(PinepodsEpisode episode) {
     return 'pinepods_${episode.episodeId}';
   }

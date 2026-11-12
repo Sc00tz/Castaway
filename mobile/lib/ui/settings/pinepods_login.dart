@@ -46,7 +46,7 @@ class _PinepodsLoginWidgetState extends State<PinepodsLoginWidget> {
     var settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     var settings = settingsBloc.currentSettings;
 
-    // Check if we have PinePods settings
+    // Check if we have Castaway settings
     setState(() {
       _isLoggedIn = false;
       _connectedServer = null;
@@ -203,7 +203,7 @@ class _PinepodsLoginWidgetState extends State<PinepodsLoginWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Add a divider label for the PinePods section
+    // Add a divider label for the Castaway section
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

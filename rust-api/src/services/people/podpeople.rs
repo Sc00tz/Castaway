@@ -1,4 +1,4 @@
-//! PodPeopleDB client: the background credits sync, contributions made from PinePods, and
+//! PodPeopleDB client: the background credits sync, contributions made from Castaway, and
 //! people search. Nothing here runs on a page load except an explicit search or contribution.
 
 use std::collections::{HashMap, HashSet};
@@ -25,7 +25,7 @@ pub fn sync_enabled() -> bool {
 fn client(timeout_secs: u64) -> AppResult<reqwest::Client> {
     Ok(reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout_secs))
-        .user_agent(concat!("PinePods/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Castaway/", env!("CARGO_PKG_VERSION")))
         .build()?)
 }
 
@@ -352,7 +352,7 @@ pub async fn sync_pending(db: &DatabasePool, api: &Endpoints) {
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct ContributePerson {
-    /// A person PinePods already knows (from a credit or search result).
+    /// A person Castaway already knows (from a credit or search result).
     pub person_id: Option<i32>,
     /// A PodPeopleDB person (from search results).
     pub podpeople_id: Option<i64>,
@@ -382,7 +382,7 @@ struct SubmissionResult {
     credits: Vec<AddedCredit>,
 }
 
-/// Identifies this PinePods server to PodPeopleDB without revealing anything about it.
+/// Identifies this Castaway server to PodPeopleDB without revealing anything about it.
 async fn instance_id(db: &DatabasePool) -> Option<String> {
     use sha2::Digest;
     let key = db.get_encryption_key().await.ok()?;
@@ -553,7 +553,7 @@ async fn same_feed_podcasts(db: &DatabasePool, podcast_id: i32) -> AppResult<Vec
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonHit {
-    /// PinePods person id, when this server already knows them.
+    /// Castaway person id, when this server already knows them.
     pub person_id: Option<i32>,
     pub podpeople_id: Option<i64>,
     pub name: String,
@@ -626,7 +626,7 @@ pub async fn search(db: &DatabasePool, api: &Endpoints, user_id: i32, query: &st
     Ok(hits)
 }
 
-/// A PinePods person for a PodPeopleDB person (creating them), so a search hit can be opened
+/// A Castaway person for a PodPeopleDB person (creating them), so a search hit can be opened
 /// and followed.
 pub async fn person_for_podpeople(db: &DatabasePool, api: &Endpoints, podpeople_id: i64) -> AppResult<i32> {
     if let Some(id) = fetch_optional!(

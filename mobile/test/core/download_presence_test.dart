@@ -14,7 +14,7 @@ import 'package:pinepods_mobile/entities/episode.dart';
 Episode _episode({
   required String guid,
   DownloadState downloadState = DownloadState.downloaded,
-  String? filepath = '/storage/PinePods/some-podcast',
+  String? filepath = '/storage/Castaway/some-podcast',
   String? filename = 'episode.mp3',
 }) {
   return Episode(
@@ -35,7 +35,7 @@ void main() {
 
       final result = findStaleDownloadRecords(
         [target, other],
-        filepath: '/storage/PinePods/some-podcast',
+        filepath: '/storage/Castaway/some-podcast',
         filename: 'episode.mp3',
       );
 
@@ -48,7 +48,7 @@ void main() {
 
       final result = findStaleDownloadRecords(
         [first, legacyDuplicate],
-        filepath: '/storage/PinePods/some-podcast',
+        filepath: '/storage/Castaway/some-podcast',
         filename: 'episode.mp3',
       );
 
@@ -61,7 +61,7 @@ void main() {
 
       final result = findStaleDownloadRecords(
         [notDownloaded],
-        filepath: '/storage/PinePods/some-podcast',
+        filepath: '/storage/Castaway/some-podcast',
         filename: 'episode.mp3',
       );
 

@@ -1,4 +1,4 @@
-# 🚀 PinePods Mobile - Complete Store Deployment Guide
+# 🚀 Castaway Mobile - Complete Store Deployment Guide
 
 This guide covers deployment to **Google Play Store**, **iOS App Store**, **F-Droid**, and **IzzyOnDroid**.
 
@@ -56,7 +56,7 @@ base64 upload-keystore.jks > keystore.base64.txt
 3. **Create App Store Provisioning Profile**:
    - Go to [Apple Developer Portal](https://developer.apple.com/)
    - Certificates, Identifiers & Profiles
-   - Create App ID: `com.gooseberrydevelopment.pinepods`
+   - Create App ID: `com.sc00tz.castaway`
    - Create App Store Provisioning Profile linked to your App ID
    - Download .mobileprovision file
    - Convert: `base64 profile.mobileprovision > ios-profile.base64.txt`
@@ -107,8 +107,8 @@ Go to your repo → **Settings** → **Secrets and variables** → **Actions** �
 ### **Setup:**
 1. **Create Google Play Console Account** ($25 one-time fee): https://play.google.com/console
 2. **Create App Listing**:
-   - Create app → Package name: `com.gooseberrydevelopment.pinepods`
-   - App name: "PinePods"
+   - Create app → Package name: `com.sc00tz.castaway`
+   - App name: "Castaway"
    - Select "App" (not game)
 
 ### **Required Assets:**
@@ -145,8 +145,8 @@ git push origin v0.7.9
 1. **App Store Connect**: https://appstoreconnect.apple.com/
 2. **Create App Record**:
    - Apps → "+" → New App
-   - Bundle ID: `com.gooseberrydevelopment.pinepods`
-   - App name: "PinePods"
+   - Bundle ID: `com.sc00tz.castaway`
+   - App name: "Castaway"
 
 ### **Required Assets:**
 Create these images and place in `mobile/fastlane/metadata/ios/en-US/images/`:
@@ -194,10 +194,10 @@ F-Droid builds apps from source automatically. No signing required from your end
    cd fdroiddata
 
    # Create app directory
-   mkdir metadata/com.gooseberrydevelopment.pinepods.yml
+   mkdir metadata/com.sc00tz.castaway.yml
    ```
 
-3. **Create Metadata File** (`metadata/com.gooseberrydevelopment.pinepods.yml`):
+3. **Create Metadata File** (`metadata/com.sc00tz.castaway.yml`):
    ```yaml
    Categories:
      - Multimedia
@@ -207,7 +207,7 @@ F-Droid builds apps from source automatically. No signing required from your end
    SourceCode: https://github.com/madeofpendletonwool/PinePods
    IssueTracker: https://github.com/madeofpendletonwool/PinePods/issues
 
-   AutoName: PinePods
+   AutoName: Castaway
    Description: |-
        A beautiful, self-hosted podcast app with powerful server synchronization.
 
@@ -223,7 +223,7 @@ F-Droid builds apps from source automatically. No signing required from your end
        * Background audio playback
        * Sleep timer and playback speed controls
 
-       Note: This app requires a PinePods server to be set up.
+       Note: This app requires a Castaway server to be set up.
 
    RepoType: git
    Repo: https://github.com/madeofpendletonwool/PinePods.git
@@ -248,8 +248,8 @@ F-Droid builds apps from source automatically. No signing required from your end
 
 4. **Submit Merge Request**:
    ```bash
-   git add metadata/com.gooseberrydevelopment.pinepods.yml
-   git commit -m "Add PinePods podcast app"
+   git add metadata/com.sc00tz.castaway.yml
+   git commit -m "Add Castaway podcast app"
    git push origin master
    # Create merge request in GitLab
    ```
@@ -298,10 +298,10 @@ IzzyOnDroid accepts APKs directly and offers faster updates than F-Droid.
 
 3. **Submit to IzzyOnDroid**:
    - **Email**: android@izzysoft.de
-   - **Subject**: "New app submission: PinePods"
+   - **Subject**: "New app submission: Castaway"
    - **Include**:
-     - App name: PinePods
-     - Package name: com.gooseberrydevelopment.pinepods
+     - App name: Castaway
+     - Package name: com.sc00tz.castaway
      - Source code: https://github.com/madeofpendletonwool/PinePods
      - APK download: Link to GitHub release
      - Brief description of your app

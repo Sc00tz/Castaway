@@ -111,7 +111,7 @@ fn locked(rows: Vec<(i64, bool)>) -> LockedTargets {
 }
 
 // The user's pinepods device, created on first use. The pre-overhaul internal device
-// (`pinepods-internal-<uid>`) is claimed if nothing has the role yet, so Pinepods keeps one
+// (`pinepods-internal-<uid>`) is claimed if nothing has the role yet, so Castaway keeps one
 // device. A client may already own the name `pinepods` (UNIQUE(UserID, DeviceName)), so other
 // names are tried after it.
 dialect_fn!([pg_pinepods_device, lite_pinepods_device]
@@ -1103,7 +1103,7 @@ const MYSQL_IMPORT_FAILURE_COLUMNS: &str = "FailureID, FeedURL, Origin, ErrorKin
 
 impl DatabasePool {
     /// Record a failed import and schedule the next attempt. True when this failure made
-    /// Pinepods give up.
+    /// Castaway give up.
     pub async fn sync_import_failed(
         &self,
         user_id: i32,
@@ -1274,7 +1274,7 @@ impl DatabasePool {
         Ok(n > 0)
     }
 
-    /// Forget a failed import and unsubscribe from it everywhere: a Pinepods `remove` goes to the
+    /// Forget a failed import and unsubscribe from it everywhere: a Castaway `remove` goes to the
     /// log, so apps and the external server drop it too. False when there's no such row.
     pub async fn sync_import_remove(&self, user_id: i32, id: i32) -> AppResult<bool> {
         let Some(failure) = self.sync_import_failure(user_id, id).await? else { return Ok(false) };

@@ -85,7 +85,7 @@ class PinepodsService {
       }
       return false;
     } catch (e) {
-      _devLog('Error verifying PinePods instance: $e');
+      _devLog('Error verifying Castaway instance: $e');
       return false;
     }
   }
@@ -142,13 +142,13 @@ class PinepodsService {
     }
   }
 
-  // Add method to fetch podcasts from PinePods
+  // Add method to fetch podcasts from Castaway
   Future<List<Map<String, dynamic>>> fetchPodcasts() async {
     if (_server == null || _apiKey == null) {
       return [];
     }
 
-    // This endpoint would need to be implemented in your PinePods backend
+    // This endpoint would need to be implemented in your Castaway backend
     final url = Uri.parse('$_server/api/data/podcasts');
 
     try {
@@ -604,7 +604,7 @@ class PinepodsService {
   // Check one podcast for new episodes now: its feed, YouTube channel or
   // local folder. Returns how many episodes it added (YouTube channels
   // report none; reload the list). Throws with the server's reason when the
-  // check failed or the host asked Pinepods to wait.
+  // check failed or the host asked Castaway to wait.
   Future<int> refreshPodcast(int podcastId) async {
     if (_server == null || _apiKey == null) {
       throw Exception('Not authenticated');
@@ -2211,7 +2211,7 @@ class PinepodsService {
     }
   }
 
-  // Search for podcasts using PinePods search API
+  // Search for podcasts using Castaway search API
   Future<PinepodsSearchResult> searchPodcasts(
     String query,
     SearchProvider provider,
@@ -2670,7 +2670,7 @@ class PinepodsService {
     }
   }
 
-  // Get PinePods version
+  // Get Castaway version
   Future<String> getPinepodsVersion() async {
     if (_server == null || _apiKey == null) {
       throw Exception('Not authenticated');
@@ -2689,11 +2689,11 @@ class PinepodsService {
         return data['data'] ?? 'Unknown';
       } else {
         throw Exception(
-          'Failed to get PinePods version: ${response.statusCode}',
+          'Failed to get Castaway version: ${response.statusCode}',
         );
       }
     } catch (e) {
-      _devLog('Error getting PinePods version: $e');
+      _devLog('Error getting Castaway version: $e');
       return 'Unknown';
     }
   }
@@ -3231,7 +3231,7 @@ class PinepodsService {
   }
 
   /// Resolve a PodPeopleDB id (e.g. a search result not yet on this server) to a
-  /// PinePods person id.
+  /// Castaway person id.
   Future<int?> lookupPerson({int? podpeopleId, String? name}) async {
     final response = await _get(
       _peopleUrl('lookup', {

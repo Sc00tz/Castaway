@@ -1,6 +1,6 @@
 // Request layer for the Discover page's podcast discovery (#103): personalized
 // recommendations, category-filtered trending, and the category taxonomy — all proxied
-// through the PinePods backend (rust-api), which forwards to the search microservice.
+// through the Castaway backend (rust-api), which forwards to the search microservice.
 
 use crate::requests::search_pods::UnifiedPodcast;
 use anyhow::Error;

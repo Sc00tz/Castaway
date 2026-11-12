@@ -4,7 +4,7 @@
 //! - **Reference server** for the protocol tests (`PINEPODS_TEST_GPODDER=mock`): it follows
 //!   the cursor rules below, so the tests are checked against
 //!   something correct while the Rust port doesn't exist yet.
-//! - **Stand-in external server** for the external sync engine: Pinepods talks to
+//! - **Stand-in external server** for the external sync engine: Castaway talks to
 //!   it as it would to oPodSync or a Nextcloud with the gpoddersync app. Every request is
 //!   recorded, and failures can be injected.
 //!

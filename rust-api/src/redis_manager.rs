@@ -107,7 +107,7 @@ impl NotificationManager {
         let mut request = client
             .post(&url)
             .header("Content-Type", "text/plain")
-            .body("Test notification from PinePods");
+            .body("Test notification from Castaway");
         
         // Add authentication if provided
         if let Some(token) = access_token.filter(|t| !t.is_empty()) {
@@ -144,8 +144,8 @@ impl NotificationManager {
         let url = format!("{}/message?token={}", gotify_url, gotify_token);
         
         let payload = serde_json::json!({
-            "title": "PinePods Test",
-            "message": "Test notification from PinePods",
+            "title": "Castaway Test",
+            "message": "Test notification from Castaway",
             "priority": 5
         });
 
@@ -176,9 +176,9 @@ impl NotificationManager {
             "GET" => {
                 // For GET requests, add message as query parameter
                 let url_with_params = if http_url.contains('?') {
-                    format!("{}&message={}", http_url, urlencoding::encode("Test notification from PinePods"))
+                    format!("{}&message={}", http_url, urlencoding::encode("Test notification from Castaway"))
                 } else {
-                    format!("{}?message={}", http_url, urlencoding::encode("Test notification from PinePods"))
+                    format!("{}?message={}", http_url, urlencoding::encode("Test notification from Castaway"))
                 };
                 client.get(&url_with_params)
             },
@@ -191,14 +191,14 @@ impl NotificationManager {
                     
                     serde_json::json!({
                         "chat_id": chat_id,
-                        "text": "Test notification from PinePods"
+                        "text": "Test notification from Castaway"
                     })
                 } else {
                     // Generic JSON payload
                     serde_json::json!({
-                        "title": "PinePods Test",
-                        "message": "Test notification from PinePods",
-                        "text": "Test notification from PinePods"
+                        "title": "Castaway Test",
+                        "message": "Test notification from Castaway",
+                        "text": "Test notification from Castaway"
                     })
                 };
                 

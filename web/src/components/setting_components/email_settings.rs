@@ -241,7 +241,7 @@ pub fn email_settings() -> Html {
                         email_username: form_username.deref().clone(),
                         email_password: form_password.deref().clone(),
                         to_email: user_email.unwrap(),
-                        message: "This is a test email from PinePods! If you received this, your email settings are working correctly.".to_string(),
+                        message: "This is a test email from Castaway! If you received this, your email settings are working correctly.".to_string(),
                     };
 
                     match call_send_test_email(server_name, api_key.unwrap(), test_settings).await {

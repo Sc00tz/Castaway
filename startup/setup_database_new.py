@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-New Idempotent Database Setup for PinePods
+New Idempotent Database Setup for Castaway
 
 This script replaces the old setupdatabase.py and setuppostgresdatabase.py
 with a proper migration-based system that is fully idempotent.
@@ -44,7 +44,7 @@ def get_db_wait_timeout():
 def wait_for_database(label, db_host, db_port, probe):
     """Call probe() until it succeeds or DB_WAIT_TIMEOUT runs out.
 
-    The database container often starts slower than PinePods (first-boot init,
+    The database container often starts slower than Castaway (first-boot init,
     slow hosts, no orchestrator-level health gating), so every failure is
     treated as transient and retried with a short backoff.
     """
@@ -234,7 +234,7 @@ def ensure_web_api_key_file():
 def main():
     """Main setup function"""
     try:
-        logger.info("Starting PinePods database setup...")
+        logger.info("Starting Castaway database setup...")
         
         # Step 1: Create database if needed (PostgreSQL only)
         create_database_if_not_exists()

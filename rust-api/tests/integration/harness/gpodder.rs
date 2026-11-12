@@ -3,7 +3,7 @@
 //! Which server answers is chosen by `PINEPODS_TEST_GPODDER`:
 //!
 //! - `rust` (default): the rust-api router itself, served on a real socket.
-//! - `mock`: the in-memory reference server in [`super::mock_gpodder`]. It has no Pinepods
+//! - `mock`: the in-memory reference server in [`super::mock_gpodder`]. It has no Castaway
 //!   library behind it, so tests that look at the library skip themselves; everything else
 //!   must pass, which is how the protocol tests themselves are checked.
 
@@ -136,7 +136,7 @@ impl TestApp {
 
 // ---- scene ------------------------------------------------------------------------------
 
-/// One Pinepods instance with a user who has the internal gpodder server switched on.
+/// One Castaway instance with a user who has the internal gpodder server switched on.
 /// `password` is what that user's apps sign in with.
 pub struct GpodderScene {
     pub server: GpodderServer,
@@ -154,7 +154,7 @@ impl GpodderScene {
         GpodderScene { server, app, user, password }
     }
 
-    /// True when the server shares Pinepods' database, so library state can be asserted.
+    /// True when the server shares Castaway's database, so library state can be asserted.
     pub fn has_library(&self) -> bool {
         self.server.imp != Impl::Mock
     }
@@ -166,7 +166,7 @@ impl GpodderScene {
         c
     }
 
-    /// A second Pinepods user with gpodder enabled, on the same server, and their app password.
+    /// A second Castaway user with gpodder enabled, on the same server, and their app password.
     pub async fn other_user(&self, name: &str) -> (TestUser, String) {
         let u = self.app.user(name).await;
         let password = self.app.enable_gpodder(&self.server, &u).await;

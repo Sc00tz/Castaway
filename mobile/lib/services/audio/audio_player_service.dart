@@ -44,7 +44,7 @@ class PositionState {
         buffered = Duration.zero;
 }
 
-/// This class defines the audio playback options supported by Pinepods.
+/// This class defines the audio playback options supported by Castaway.
 ///
 /// The implementing classes will then handle the specifics for the platform we are running on.
 abstract class AudioPlayerService {
@@ -57,7 +57,7 @@ abstract class AudioPlayerService {
   /// transcript links) to the playing episode, if it is still [guid].
   void updateNowPlayingDetails(String guid, void Function(Episode episode) update);
 
-  /// Look up a locally-downloaded copy of a PinePods episode by its server
+  /// Look up a locally-downloaded copy of a Castaway episode by its server
   /// episode id. Returns the stored [Episode] (carrying filepath/filename) if a
   /// completed download exists, otherwise null. Used to prefer the on-disk file
   /// over streaming when playing.

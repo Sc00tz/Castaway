@@ -11,7 +11,7 @@ import 'dart:async';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
 
-/// PinePods version of the Up Next queue that shows the server queue.
+/// Castaway version of the Up Next queue that shows the server queue.
 ///
 /// This replaces the local queue functionality with server-based queue management.
 class PinepodsUpNextView extends StatefulWidget {

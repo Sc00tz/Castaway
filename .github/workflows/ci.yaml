@@ -1,4 +1,4 @@
-name: Pinepods CI
+name: Castaway CI
 
 permissions:
   contents: read

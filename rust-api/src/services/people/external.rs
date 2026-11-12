@@ -94,7 +94,7 @@ fn parse_date(s: &str) -> Option<chrono::NaiveDateTime> {
         .or_else(|| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok())
 }
 
-/// Podcast Index episodes tagged with (or mentioning) the person, through the PinePods search API.
+/// Podcast Index episodes tagged with (or mentioning) the person, through the Castaway search API.
 async fn from_index(http: &reqwest::Client, api: &Endpoints, name: &str) -> Vec<Found> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -161,7 +161,7 @@ pub async fn refresh(db: &DatabasePool, api: &Endpoints, person_id: i32) -> AppR
     };
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
-        .user_agent(concat!("PinePods/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Castaway/", env!("CARGO_PKG_VERSION")))
         .build()?;
     let (community, index) = tokio::join!(
         async {

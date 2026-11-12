@@ -1,4 +1,4 @@
-// Sync settings for the calling user: the PinePods gpodder server (on/off, the URL apps use, app
+// Sync settings for the calling user: the Castaway gpodder server (on/off, the URL apps use, app
 // passwords, devices), the external sync server (gpodder or Nextcloud) with its status, manual
 // runs, and statistics read from the sync log.
 
@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// Overrides the server URL shown for gpodder apps (behind a reverse proxy, the URL users
-/// reach Pinepods at). Without it the URL is worked out from the request.
+/// reach Castaway at). Without it the URL is worked out from the request.
 pub const PUBLIC_URL_ENV: &str = "PINEPODS_PUBLIC_URL";
 
 const APP_PASSWORD_LABEL: &str = "App password";
@@ -54,7 +54,7 @@ fn epoch(t: Option<NaiveDateTime>) -> Option<i64> {
     t.map(|t| t.and_utc().timestamp())
 }
 
-// ---- the PinePods gpodder server ----------------------------------------------------------------
+// ---- the Castaway gpodder server ----------------------------------------------------------------
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct SyncServerInfo {
@@ -64,7 +64,7 @@ pub struct SyncServerInfo {
     /// The server URL to enter in apps.
     pub server_url: String,
     /// `server_url` comes from `PINEPODS_PUBLIC_URL`; otherwise it was guessed from the request
-    /// and a client may prefer the URL it reached Pinepods at.
+    /// and a client may prefer the URL it reached Castaway at.
     pub server_url_configured: bool,
     /// A notice for the settings page, e.g. `reenter_external`: the external sync server has to
     /// be entered again.
@@ -87,7 +87,7 @@ async fn server_info(state: &AppState, headers: &HeaderMap, user_id: i32) -> App
     get,
     path = "/server",
     tag = "sync",
-    summary = "PinePods gpodder server settings",
+    summary = "Castaway gpodder server settings",
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Success", body = SyncServerInfo),
@@ -104,13 +104,13 @@ pub struct SetServerRequest {
     pub enabled: bool,
 }
 
-/// Turn the PinePods gpodder server on or off. Turning it on publishes the current listening
+/// Turn the Castaway gpodder server on or off. Turning it on publishes the current listening
 /// state for apps; an external sync server is left as it is either way.
 #[utoipa::path(
     put,
     path = "/server",
     tag = "sync",
-    summary = "Turn the PinePods gpodder server on or off",
+    summary = "Turn the Castaway gpodder server on or off",
     request_body = SetServerRequest,
     security(("api_key" = [])),
     responses(
@@ -268,7 +268,7 @@ pub async fn dismiss_notice(State(state): State<AppState>, headers: HeaderMap) -
     Ok(Json(SuccessResponse { success: true }))
 }
 
-// ---- devices on the PinePods server ------------------------------------------------------------
+// ---- devices on the Castaway server ------------------------------------------------------------
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct SyncDeviceEntry {
@@ -280,7 +280,7 @@ pub struct SyncDeviceEntry {
     pub kind: String,
     /// Unix seconds.
     pub last_seen: Option<i64>,
-    /// Pinepods' own device: can't be renamed or removed.
+    /// Castaway's own device: can't be renamed or removed.
     pub protected: bool,
 }
 
@@ -288,7 +288,7 @@ pub struct SyncDeviceEntry {
     get,
     path = "/devices",
     tag = "sync",
-    summary = "Devices on the PinePods gpodder server",
+    summary = "Devices on the Castaway gpodder server",
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Success", body = Vec<SyncDeviceEntry>),
@@ -316,7 +316,7 @@ pub async fn list_devices(State(state): State<AppState>, headers: HeaderMap) -> 
 async fn client_device(state: &AppState, user_id: i32, device_id: i32) -> AppResult<()> {
     match state.db_pool.gpodder_device_by_id(user_id, device_id).await? {
         None => Err(AppError::not_found("Device not found")),
-        Some(d) if d.system => Err(AppError::forbidden("PinePods' own device can't be renamed or removed")),
+        Some(d) if d.system => Err(AppError::forbidden("Castaway's own device can't be renamed or removed")),
         Some(_) => Ok(()),
     }
 }
@@ -338,7 +338,7 @@ pub struct RenameDeviceRequest {
         (status = 200, description = "Success", body = SuccessResponse),
         (status = 400, description = "Empty or too long name"),
         (status = 401, description = "Invalid or missing API key"),
-        (status = 403, description = "PinePods' own device"),
+        (status = 403, description = "Castaway's own device"),
         (status = 404, description = "No such device"),
     ),
 )]
@@ -369,7 +369,7 @@ pub async fn rename_device(
     responses(
         (status = 200, description = "Success", body = SuccessResponse),
         (status = 401, description = "Invalid or missing API key"),
-        (status = 403, description = "PinePods' own device"),
+        (status = 403, description = "Castaway's own device"),
         (status = 404, description = "No such device"),
     ),
 )]
@@ -392,7 +392,7 @@ pub struct SyncTargetInfo {
     pub kind: String,
     pub url: String,
     pub username: String,
-    /// Pinepods' device on a gpodder server.
+    /// Castaway's device on a gpodder server.
     pub device_name: Option<String>,
     pub enabled: bool,
     /// The next run is a full sync (new server, or a full sync that hasn't succeeded yet).
@@ -461,7 +461,7 @@ pub struct TargetCredentials {
     pub username: String,
     /// Leave out to reuse the stored password of the same server and account.
     pub password: Option<String>,
-    /// gpodder only: the device Pinepods syncs as. Left out: keep the current one, or pick one.
+    /// gpodder only: the device Castaway syncs as. Left out: keep the current one, or pick one.
     pub device_name: Option<String>,
 }
 
@@ -518,7 +518,7 @@ pub struct TestTargetResponse {
     pub message: String,
     /// gpodder only: the account's devices.
     pub devices: Vec<RemoteDeviceEntry>,
-    /// gpodder only: the device Pinepods would sync as.
+    /// gpodder only: the device Castaway would sync as.
     pub device_name: Option<String>,
 }
 
@@ -722,7 +722,7 @@ pub struct SyncActionEntry {
     pub timestamp: i64,
     pub position: Option<i32>,
     pub device: Option<String>,
-    /// `pinepods`, `client` (an app on the PinePods server) or `target` (the external server).
+    /// `pinepods`, `client` (an app on the Castaway server) or `target` (the external server).
     pub origin: String,
 }
 
@@ -742,7 +742,7 @@ pub struct SyncStats {
     pub server_enabled: bool,
     /// Podcasts shared with apps and the external server.
     pub subscriptions: usize,
-    /// Apps on the PinePods server (not counting Pinepods itself).
+    /// Apps on the Castaway server (not counting Castaway itself).
     pub devices: usize,
     pub total_episode_actions: i64,
     /// Unix seconds: when the newest episode action was received.

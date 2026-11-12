@@ -174,7 +174,7 @@ pub async fn download_artwork(url: &str) -> Result<Vec<u8>, Box<dyn std::error::
     crate::services::url_guard::ensure_safe_public_url_async(url).await?;
     let mut response = crate::services::http::download_client()
         .get(url)
-        .header("User-Agent", "PinePods/1.0")
+        .header("User-Agent", "Castaway/1.0")
         .timeout(std::time::Duration::from_secs(30))
         .send()
         .await?;

@@ -1,4 +1,4 @@
-//! PinePods API library crate.
+//! Castaway API library crate.
 //!
 //! Everything the server is made of lives here so the binary (`main.rs`) stays a thin
 //! startup shim and integration tests (`tests/`) can build the exact same router via

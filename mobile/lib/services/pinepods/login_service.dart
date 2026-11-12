@@ -4,11 +4,11 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:pinepods_mobile/l10n/L.dart';
 
-/// Outcome of checking whether a URL is a reachable PinePods server.
+/// Outcome of checking whether a URL is a reachable Castaway server.
 ///
 /// Distinguishes the failure modes that the old generic
-/// "Not a valid PinePods server" message used to collapse together (TLS/cert
-/// trust, DNS/connection, timeout, non-PinePods response) so the UI can tell
+/// "Not a valid Castaway server" message used to collapse together (TLS/cert
+/// trust, DNS/connection, timeout, non-Castaway response) so the UI can tell
 /// the user what actually went wrong.
 class ServerCheckResult {
   const ServerCheckResult._(this.isPinepods, this.errorMessage);
@@ -22,10 +22,10 @@ class ServerCheckResult {
 }
 
 class PinepodsLoginService {
-  static const String userAgent = 'PinePods Mobile/1.0'; // i18n-ignore
+  static const String userAgent = 'Castaway Mobile/1.0'; // i18n-ignore
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  /// Verify if the server is a valid PinePods instance.
+  /// Verify if the server is a valid Castaway instance.
   ///
   /// Kept for backwards compatibility; prefer [checkServer] which reports *why*
   /// a check failed.
@@ -33,9 +33,9 @@ class PinepodsLoginService {
     return (await checkServer(serverUrl)).isPinepods;
   }
 
-  /// Check whether [serverUrl] is a reachable PinePods instance, surfacing the
+  /// Check whether [serverUrl] is a reachable Castaway instance, surfacing the
   /// specific failure reason (TLS/certificate, DNS/connection, timeout, or a
-  /// reachable-but-not-PinePods host).
+  /// reachable-but-not-Castaway host).
   ///
   /// [client] is injectable so this can be unit-tested against canned responses
   /// and failures without touching the network; when omitted a short-lived
@@ -58,7 +58,7 @@ class PinepodsLoginService {
             return ServerCheckResult.ok;
           }
         } on FormatException {
-          // fall through to the not-PinePods message below
+          // fall through to the not-Castaway message below
         }
         return ServerCheckResult.error(
             L.current.not_a_pinepods_server);

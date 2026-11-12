@@ -163,7 +163,7 @@ class FundingLink {
   /// Check the consent status. If this is the first time we have been
   /// requested to open a funding link, present the user with and
   /// information dialog first to make clear that the link is provided
-  /// by the podcast owner and not Pinepods.
+  /// by the podcast owner and not Castaway.
   static Future<bool> fundingLink(String url, bool consent, BuildContext context) async {
     bool? result = false;
 

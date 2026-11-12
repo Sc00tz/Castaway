@@ -1,11 +1,11 @@
 {
-  "name": "Pinepods",
-  "short_name": "Pinepods",
-  "description": "Pinepods is a complete podcast management system and allows you to play, download, and keep track of podcasts you enjoy. All self hosted and enjoyed on your own server! ",
+  "name": "Castaway",
+  "short_name": "Castaway",
+  "description": "Castaway is a complete podcast management system and allows you to play, download, and keep track of podcasts you enjoy. All self hosted and enjoyed on your own server! ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#18273a",
+  "theme_color": "#18273a",
   "icons": [
     {
       "src": "assets/favicon-70x70.png",

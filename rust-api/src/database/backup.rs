@@ -289,7 +289,7 @@ impl DatabasePool {
         // each episode per user, which this schema can't take.
         if !dump_has_shared_episodes(path).await? {
             return Err(AppError::bad_request(
-                "This backup is from a Pinepods version before episodes were shared between users and can't be restored here",
+                "This backup is from a Castaway version before episodes were shared between users and can't be restored here",
             ));
         }
 

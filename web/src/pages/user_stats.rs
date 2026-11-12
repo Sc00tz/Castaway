@@ -194,7 +194,7 @@ pub fn user_stats() -> Html {
                     let formatted_date = format_date(&stats.UserCreated);
                     let time_formatted = format_time_mins(stats.TimeListened);
 
-                    // The PinePods server and an external one can both be on; older servers
+                    // The Castaway server and an external one can both be on; older servers
                     // only send Pod_Sync_Type and GpodderUrl.
                     let sync_lines: Vec<(String, String)> = match stats.SyncServerEnabled {
                         Some(server_on) => {
@@ -387,15 +387,11 @@ pub fn user_stats() -> Html {
             }
 
             <div class="large-card">
-                <img src="static/assets/favicon.png" alt="Pinepods Logo" class="large-card-image"/>
+                <img src="static/assets/favicon.png" alt="Castaway Logo" class="large-card-image"/>
                 <div class="about-info">
                     <p class="large-card-paragraph item_container-text">{ format!("{}{}", i18n.t("user_stats.current_version"), display_version) }</p>
                     <p class="large-card-paragraph item_container-text">{i18n.t("user_stats.about_text")}</p>
-                    <div class="about-links">
-                        <a href="https://pinepods.online" target="_blank" class="large-card-button focus:ring-4 font-medium rounded-lg text-sm px-5 py-2.5 focus:outline-none">{i18n.t("user_stats.pinepods_documentation")}</a>
-                        <a href="https://github.com/madeofpendletonwool/pinepods" target="_blank" class="large-card-button focus:ring-4 font-medium rounded-lg text-sm px-5 py-2.5 focus:outline-none">{i18n.t("user_stats.pinepods_github_repo")}</a>
-                        <a href="https://www.buymeacoffee.com/collinscoffee" target="_blank" class="large-card-button focus:ring-4 font-medium rounded-lg text-sm px-5 py-2.5 focus:outline-none">{i18n.t("user_stats.buy_me_coffee")}</a>
-                    </div>
+                    <p class="large-card-paragraph item_container-text">{i18n.t("user_stats.based_on")}</p>
                 </div>
             </div>
 

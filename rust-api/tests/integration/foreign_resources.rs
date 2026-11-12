@@ -235,7 +235,7 @@ async fn users_cannot_reach_each_others_resources_by_id() {
     let playlists = fetch("/api/data/get_playlists".into()).await;
     let themes = fetch(format!("/api/data/user/custom_themes/{}", victim.id)).await;
     let keys = fetch(format!("/api/data/get_api_info/{}", victim.id)).await;
-    // A gpodder app on the victim's PinePods server, and an app password for it.
+    // A gpodder app on the victim's Castaway server, and an app password for it.
     app.put("/api/sync/server").key(&victim).json(&json!({ "enabled": true })).send().await.assert_ok();
     exec(&app, &format!(r#"INSERT INTO "GpodderDevices" (UserID, DeviceName, DeviceType) VALUES ({}, 'victim-phone', 'mobile')"#, victim.id)).await;
     let app_password = app.post("/api/sync/server/app-passwords").key(&victim).json(&json!({ "label": "victim" })).send().await.ok_json();

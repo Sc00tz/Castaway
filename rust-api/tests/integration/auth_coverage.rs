@@ -1,6 +1,6 @@
 //! Every endpoint in the API either rejects strangers or is *deliberately* public.
 //!
-//! PinePods enforces auth inside each handler (no middleware), so a single forgotten
+//! Castaway enforces auth inside each handler (no middleware), so a single forgotten
 //! `extract_api_key` exposes an endpoint. These tests walk the live OpenAPI document — the
 //! same one the server builds at startup — so a new route is covered the moment it's added:
 //!

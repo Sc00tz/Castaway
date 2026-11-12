@@ -382,7 +382,7 @@ async fn the_old_internal_device_is_claimed_as_the_pinepods_device() {
     let legacy = format!("pinepods-internal-{}", user.id);
     exec(
         &app,
-        &format!(r#"INSERT INTO "GpodderDevices" (UserID, DeviceName, DeviceType, DeviceCaption) VALUES ({}, '{legacy}', 'server', 'Pinepods')"#, user.id),
+        &format!(r#"INSERT INTO "GpodderDevices" (UserID, DeviceName, DeviceType, DeviceCaption) VALUES ({}, '{legacy}', 'server', 'Castaway')"#, user.id),
     )
     .await;
     enable_sync(&app, &user).await;
@@ -390,7 +390,7 @@ async fn the_old_internal_device_is_claimed_as_the_pinepods_device() {
     app.subscribe(&user, &url, 1).await;
 
     let devices = int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {}"#, user.id)).await;
-    assert_eq!(devices, Some(1), "no second Pinepods device");
+    assert_eq!(devices, Some(1), "no second Castaway device");
     let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await;
     assert_eq!(device, Some(legacy));
 }
@@ -534,7 +534,7 @@ async fn an_action_for_an_episode_not_yet_ingested_is_applied_after_refresh() {
     let url = app.feed("early.xml", &feed);
     let pod = app.subscribe(&user, &url, 1).await;
 
-    // A client uploads a play for episode 2 before Pinepods has seen it (as the gpodder server
+    // A client uploads a play for episode 2 before Castaway has seen it (as the gpodder server
     // stores it: unmatched).
     let at = ts(120).timestamp();
     exec(

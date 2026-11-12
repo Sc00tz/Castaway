@@ -412,7 +412,7 @@ class PinepodsAudioPlayer: NSObject {
             // Set HTTP headers for podcast URLs
             // Some servers require a User-Agent header
             assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = [
-                "User-Agent": "PinePods/1.0 (iOS; Podcast Client)",
+                "User-Agent": "Castaway/1.0 (iOS; Podcast Client)",
                 "Accept": "audio/*,*/*;q=0.9"
             ]
         }

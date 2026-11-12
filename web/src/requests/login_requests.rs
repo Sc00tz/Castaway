@@ -58,10 +58,10 @@ pub async fn verify_pinepods_instance(
         if check_data.pinepods_instance {
             Ok(check_data)
         } else {
-            Err(anyhow::Error::msg("Pinepods instance not found"))
+            Err(anyhow::Error::msg("Castaway instance not found"))
         }
     } else {
-        Err(anyhow::Error::msg("Failed to verify Pinepods instance"))
+        Err(anyhow::Error::msg("Failed to verify Castaway instance"))
     }
 }
 
@@ -201,7 +201,7 @@ pub async fn login_new_server_secure(
         Ok(check_data) => {
             if !check_data.pinepods_instance {
                 return Err(anyhow::Error::msg(
-                    "Pinepods instance not found at specified server",
+                    "Castaway instance not found at specified server",
                 ));
             }
 
@@ -337,7 +337,7 @@ pub async fn login_new_server(
         Ok(check_data) => {
             if !check_data.pinepods_instance {
                 return Err(anyhow::Error::msg(
-                    "Pinepods instance not found at specified server",
+                    "Castaway instance not found at specified server",
                 ));
             }
             // Step 2: Get API key

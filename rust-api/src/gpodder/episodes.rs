@@ -88,7 +88,7 @@ fn check_range(action: &Value) -> GResult<()> {
     Ok(())
 }
 
-/// The actions in an upload body (a list, or `{"actions": [...]}`). Actions Pinepods doesn't
+/// The actions in an upload body (a list, or `{"actions": [...]}`). Actions Castaway doesn't
 /// track (e.g. `flattr`) are skipped; anything malformed rejects the whole batch.
 fn parse_upload(body: &[u8]) -> GResult<Vec<EpisodeAction>> {
     let value: Value = serde_json::from_slice(body).map_err(|_| GpodderError::bad_request("invalid JSON"))?;
@@ -118,7 +118,7 @@ fn parse_upload(body: &[u8]) -> GResult<Vec<EpisodeAction>> {
 }
 
 /// POST /api/2/episodes/{user}.json. The batch is logged in one transaction with the client's
-/// action times, then applied to Pinepods. The response timestamp is the cursor this session
+/// action times, then applied to Castaway. The response timestamp is the cursor this session
 /// last downloaded with (the request time without a session or download).
 pub(crate) async fn upload(State(state): State<AppState>, Path(user): Path<String>, headers: HeaderMap, body: Bytes) -> GResult<Json<Value>> {
     let user = NameExt::json_only(&user)?;

@@ -34,7 +34,7 @@ pub struct PulledActions {
 pub trait SyncTarget: Send + Sync {
     /// Once per run, before anything else.
     async fn login(&mut self) -> AppResult<()>;
-    /// Make sure Pinepods' device exists on the server. Returns the device name if it had to be
+    /// Make sure Castaway's device exists on the server. Returns the device name if it had to be
     /// chosen or changed, so the caller can store it. `full` = a full sync (always configure it).
     async fn prepare_device(&mut self, _full: bool) -> AppResult<Option<String>> {
         Ok(None)
@@ -44,7 +44,7 @@ pub trait SyncTarget: Send + Sync {
     async fn pull_actions(&self, since: i64) -> AppResult<PulledActions>;
     async fn push_actions(&self, batch: &[OutboundAction]) -> AppResult<()>;
     fn push_batch_size(&self) -> usize;
-    /// Pinepods' own device on the server, if the server tracks devices.
+    /// Castaway's own device on the server, if the server tracks devices.
     fn own_device(&self) -> Option<&str> {
         None
     }

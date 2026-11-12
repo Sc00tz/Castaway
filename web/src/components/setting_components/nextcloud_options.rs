@@ -1,4 +1,4 @@
-// Podcast sync settings: the PinePods gpodder server (on/off, the URL and login for apps, app
+// Podcast sync settings: the Castaway gpodder server (on/off, the URL and login for apps, app
 // passwords, devices) and the external sync server (gpodder or Nextcloud) with its status.
 
 use crate::components::context::{AppState, NotificationState};
@@ -185,7 +185,7 @@ pub fn sync_notice_banner() -> Html {
     }
 }
 
-// ---- the PinePods gpodder server -----------------------------------------------------------------
+// ---- the Castaway gpodder server -----------------------------------------------------------------
 
 #[derive(Properties, PartialEq)]
 struct ServerProps {
@@ -216,7 +216,7 @@ fn server_section(props: &ServerProps) -> Html {
         })
     };
 
-    // Without a configured public URL, the address this browser reached Pinepods at is the best guess.
+    // Without a configured public URL, the address this browser reached Castaway at is the best guess.
     let url = if server.server_url_configured {
         server.server_url.clone()
     } else {
@@ -627,7 +627,7 @@ fn external_section(props: &ExternalProps) -> Html {
         })
     };
 
-    // Nextcloud login flow: approve Pinepods in a new tab; the server polls Nextcloud and saves
+    // Nextcloud login flow: approve Castaway in a new tab; the server polls Nextcloud and saves
     // the target, which this page waits for.
     let on_nextcloud_login = {
         let (auth, busy, url, on_change) = (auth.clone(), busy.clone(), url.clone(), props.on_change.clone());
@@ -879,7 +879,7 @@ fn stats_panel(props: &StatsProps) -> Html {
     let never = i18n.t("sync_settings.never").to_string();
     let origin_label = |origin: &str, device: Option<&String>| -> String {
         match origin {
-            "pinepods" => "PinePods".to_string(),
+            "pinepods" => "Castaway".to_string(),
             "target" => i18n.t("sync_settings.origin_external").to_string(),
             _ => device.cloned().unwrap_or_else(|| i18n.t("sync_settings.origin_app").to_string()),
         }

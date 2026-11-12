@@ -7,7 +7,7 @@ permissions:
 
 on:
   workflow_run:
-    workflows: ["Publish Pinepods Multi-Architecture Image to DockerHub"]
+    workflows: ["Publish Castaway Multi-Architecture Image to DockerHub"]
     types:
       - completed
   workflow_dispatch:
@@ -54,7 +54,7 @@ jobs:
           else
             version="${{ steps.fetch_release.outputs.version }}"
             release_url="${{ steps.fetch_release.outputs.release_url }}"
-            message="Pinepods Version $version Released! Check out the release [here]($release_url)"
+            message="Castaway Version $version Released! Check out the release [here]($release_url)"
             echo "::set-output name=message::$message"
           fi
 

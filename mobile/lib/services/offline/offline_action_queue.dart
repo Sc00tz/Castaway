@@ -11,7 +11,7 @@ import 'package:pinepods_mobile/services/settings/settings_service.dart';
 
 /// Durable "outbox" for episode interactions (progress, completion, save,
 /// queue, history). Every interaction for a locally-playable episode is written
-/// here and flushed to the PinePods server when the device is online — on
+/// here and flushed to the Castaway server when the device is online — on
 /// app start, on reconnect, and opportunistically after each enqueue.
 ///
 /// This is what lets users listen to downloaded episodes offline and have their

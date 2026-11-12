@@ -836,7 +836,7 @@ class _FollowButtonState extends State<FollowButton> {
                             // Show loading indicator for a minimum time to be visible
                             await Future.delayed(const Duration(milliseconds: 300));
                             
-                            // After successful subscription, check if we should switch to PinePods context
+                            // After successful subscription, check if we should switch to Castaway context
                             await _handlePostSubscriptionContextSwitch(context, bloc);
                           }
                         : null,
@@ -855,7 +855,7 @@ class _FollowButtonState extends State<FollowButton> {
       return;
     }
     
-    // Check if we're in PinePods environment and should switch contexts
+    // Check if we're in Castaway environment and should switch contexts
     final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     final settings = settingsBloc.currentSettings;
     
@@ -863,7 +863,7 @@ class _FollowButtonState extends State<FollowButton> {
         settings.pinepodsApiKey != null && 
         settings.pinepodsUserId != null) {
       
-      // Check if the podcast is now subscribed to PinePods
+      // Check if the podcast is now subscribed to Castaway
       final pinepodsService = PinepodsService();
       pinepodsService.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
       
@@ -875,16 +875,16 @@ class _FollowButtonState extends State<FollowButton> {
         );
         
         if (isSubscribed && mounted) {
-          print('Follow button: Podcast is subscribed, switching to PinePods context');
+          print('Follow button: Podcast is subscribed, switching to Castaway context');
           
           // Reset loading state before context switch
           setState(() {
             _isLoading = false;
           });
           
-          // Create unified podcast object for PinePods context
+          // Create unified podcast object for Castaway context
           final unifiedPodcast = UnifiedPinepodsPodcast(
-            id: 0, // Will be fetched by PinePods component
+            id: 0, // Will be fetched by Castaway component
             indexId: 0, // Default for subscribed podcasts
             title: widget.podcast.title,
             url: widget.podcast.url ?? '',
@@ -900,7 +900,7 @@ class _FollowButtonState extends State<FollowButton> {
             episodeCount: 0, // Will be loaded
           );
           
-          // Replace current route with PinePods podcast details
+          // Replace current route with Castaway podcast details
           Navigator.pushReplacement(
             context,
             MaterialPageRoute<void>(
@@ -930,8 +930,8 @@ class _FollowButtonState extends State<FollowButton> {
         }
       }
     } else {
-      print('Follow button: Not in PinePods environment, staying in RSS context');
-      // Reset loading state if not in PinePods environment
+      print('Follow button: Not in Castaway environment, staying in RSS context');
+      // Reset loading state if not in Castaway environment
       if (mounted) {
         setState(() {
           _isLoading = false;

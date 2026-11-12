@@ -26,7 +26,7 @@ PinepodsEpisode _episode({
 
 void main() {
   group('fromJson', () {
-    test('reads capitalized keys (as returned by the PinePods API)', () {
+    test('reads capitalized keys (as returned by the Castaway API)', () {
       final episode = PinepodsEpisode.fromJson({
         'Podcastname': 'Some Podcast',
         'Episodetitle': 'Some Episode',

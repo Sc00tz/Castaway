@@ -22,16 +22,14 @@ const userAgentAppString = String.fromEnvironment(
 /// Link to a feedback form. This will be shown in the main overflow menu if set
 const feedbackUrl = String.fromEnvironment('FEEDBACK_URL', defaultValue: '');
 
-/// This class stores version information for PinePods, including project version and
+/// This class stores version information for Castaway, including project version and
 /// build number. This is then used for user agent strings when interacting with
 /// APIs and RSS feeds.
 ///
 /// The user agent string can be overridden by passing in the USER_AGENT variable
 /// using dart-define.
 class Environment {
-  static const _applicationName = 'Pinepods'; // i18n-ignore
-  static const _applicationUrl =
-      'https://github.com/madeofpendletonwool/pinepods';
+  static const _applicationName = 'Castaway'; // i18n-ignore
   static const _projectVersion = '0.9.2';
   static const _build = '20252816';
 
@@ -44,7 +42,7 @@ class Environment {
               .trim();
 
       _agentString =
-          '$_applicationName/$_projectVersion b$_build (phone;$platform) $_applicationUrl';
+          '$_applicationName/$_projectVersion b$_build (phone;$platform)';
     }
 
     return _agentString;

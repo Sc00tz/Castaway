@@ -39,7 +39,7 @@ class MobileDownloaderManager implements DownloadManager {
     var tasks = await FlutterDownloader.loadTasks();
 
     // Update the status of any tasks that may have been updated whilst
-    // Pinepods was close or in the background.
+    // Castaway was close or in the background.
     if (tasks != null && tasks.isNotEmpty) {
       for (var t in tasks) {
         _updateDownloadState(id: t.taskId, progress: t.progress, status: t.status);

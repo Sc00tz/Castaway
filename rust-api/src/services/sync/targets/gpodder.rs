@@ -1,4 +1,4 @@
-// A gpodder.net-compatible server (gpodder.net, oPodSync, another Pinepods, ...). Pinepods is
+// A gpodder.net-compatible server (gpodder.net, oPodSync, another Castaway, ...). Castaway is
 // one device there, named by SyncTargets.DeviceName. Logs in once per run and rides the session
 // cookie; servers without the login endpoint, or that set no cookie, get Basic on every request.
 
@@ -11,7 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::services::sync::model::OutboundAction;
 
 pub const PUSH_BATCH: usize = 200;
-const DEVICE_CAPTION: &str = "PinePods";
+const DEVICE_CAPTION: &str = "Castaway";
 const DEVICE_TYPE: &str = "server";
 const DEFAULT_DEVICE: &str = "pinepods";
 
@@ -75,13 +75,13 @@ pub struct RemoteDevice {
     pub subscriptions: i64,
 }
 
-/// The device Pinepods would sync as, given the devices already on the server.
+/// The device Castaway would sync as, given the devices already on the server.
 pub fn device_to_use(current: Option<&str>, remote: &[RemoteDevice]) -> String {
     let remote: Vec<(String, String)> = remote.iter().map(|d| (d.id.clone(), d.kind.clone())).collect();
     choose_device(current, &remote)
 }
 
-/// The device Pinepods should use: `current` unless another client owns it (a device of a type
+/// The device Castaway should use: `current` unless another client owns it (a device of a type
 /// other than "server" with that id), then the first free `pinepods`, `pinepods-2`, ...
 fn choose_device(current: Option<&str>, remote: &[(String, String)]) -> String {
     let taken = |name: &str| remote.iter().any(|(id, kind)| id == name && kind != DEVICE_TYPE);
@@ -127,7 +127,7 @@ impl SyncTarget for GpodderTarget {
         }
         let chosen = device_to_use(self.device.as_deref(), &self.devices().await?);
         if let Some(old) = self.device.as_deref().filter(|old| *old != chosen) {
-            tracing::warn!("Device {:?} on the gpodder server belongs to another client; Pinepods now syncs as {:?}", old, chosen);
+            tracing::warn!("Device {:?} on the gpodder server belongs to another client; Castaway now syncs as {:?}", old, chosen);
         }
         self.configure_device(&chosen, DEVICE_CAPTION, DEVICE_TYPE).await?;
         let changed = self.device.as_deref() != Some(chosen.as_str());

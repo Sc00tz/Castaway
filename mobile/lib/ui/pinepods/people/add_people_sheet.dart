@@ -1,7 +1,7 @@
 // lib/ui/pinepods/people/add_people_sheet.dart
 //
 // Bottom sheet for adding people to a podcast or episode. Contributions go
-// through the PinePods server to PodPeopleDB, where they're live right away
+// through the Castaway server to PodPeopleDB, where they're live right away
 // (marked unverified) for everyone.
 
 import 'dart:async';

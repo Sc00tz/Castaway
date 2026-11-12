@@ -7,7 +7,7 @@ const WELL_KNOWN_PATH: &str = "/.well-known/openid-configuration";
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
 pub const CALLBACK_PATH: &str = "/api/auth/callback";
 
-/// The parts of an OpenID Provider configuration document that PinePods uses.
+/// The parts of an OpenID Provider configuration document that Castaway uses.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OidcDiscovery {
     pub issuer: Option<String>,
@@ -58,7 +58,7 @@ pub async fn discover(input: &str) -> Result<OidcDiscovery, String> {
 }
 
 /// Checks a client-supplied redirect URI before it is sent to the provider's token endpoint.
-/// It must be an http(s) URL pointing at PinePods' callback.
+/// It must be an http(s) URL pointing at Castaway's callback.
 pub fn validate_redirect_uri(uri: &str) -> Option<String> {
     let parsed = url::Url::parse(uri).ok()?;
     if !matches!(parsed.scheme(), "http" | "https")
@@ -102,7 +102,7 @@ mod tests {
             Some("https://example.com/pinepods/api/auth/callback")
         );
         assert!(validate_redirect_uri("https://evil.example.com/steal").is_none());
-        assert!(validate_redirect_uri("pinepods://auth/callback").is_none());
+        assert!(validate_redirect_uri("castaway://auth/callback").is_none());
         assert!(validate_redirect_uri("https://x.example.com/api/auth/callback?next=/").is_none());
     }
 

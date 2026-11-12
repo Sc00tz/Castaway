@@ -1,6 +1,6 @@
 # Throwaway databases for the rust-api integration suite (tests/integration).
 # Started by scripts/integration-tests.sh; ports are deliberately off the defaults so they
-# never collide with a real PinePods (or anything else) running on the dev machine.
+# never collide with a real Castaway (or anything else) running on the dev machine.
 # Data lives on tmpfs: every `up` starts clean, and nothing here is worth keeping.
 name: pinepods-api-tests
 

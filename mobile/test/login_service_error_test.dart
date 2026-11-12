@@ -25,14 +25,14 @@ void main() {
     expect(r.isPinepods, isFalse);
     expect(r.errorMessage, isNotNull);
     // Must NOT be the old misleading generic message.
-    expect(r.errorMessage, isNot(equals('Not a valid PinePods server')));
+    expect(r.errorMessage, isNot(equals('Not a valid Castaway server')));
     expect(
       r.errorMessage!.toLowerCase(),
       anyOf(contains('reach'), contains('dns'), contains('connection')),
     );
   });
 
-  test('maps a reachable-but-not-PinePods host to a distinct message', () async {
+  test('maps a reachable-but-not-Castaway host to a distinct message', () async {
     final client = MockClient((_) async => http.Response('{"something_else": true}', 200));
 
     final r = await PinepodsLoginService.checkServer(
@@ -42,10 +42,10 @@ void main() {
 
     expect(r.isPinepods, isFalse);
     expect(r.errorMessage, isNotNull);
-    expect(r.errorMessage!.toLowerCase(), contains('does not look like a pinepods'));
+    expect(r.errorMessage!.toLowerCase(), contains('does not look like a castaway'));
   });
 
-  test('a genuine PinePods response checks out', () async {
+  test('a genuine Castaway response checks out', () async {
     final client = MockClient((_) async => http.Response('{"pinepods_instance": true}', 200));
 
     final r = await PinepodsLoginService.checkServer(

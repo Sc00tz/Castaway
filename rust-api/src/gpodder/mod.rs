@@ -161,7 +161,7 @@ impl IntoResponse for GpodderError {
     fn into_response(self) -> Response {
         let mut resp = (self.status, Json(json!({ "error": self.message }))).into_response();
         if self.status == StatusCode::UNAUTHORIZED {
-            resp.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Basic realm=\"PinePods\""));
+            resp.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Basic realm=\"Castaway\""));
         }
         resp
     }

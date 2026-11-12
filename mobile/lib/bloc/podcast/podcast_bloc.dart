@@ -313,7 +313,7 @@ class PodcastBloc extends Bloc {
             // First, subscribe locally
             _podcast = await podcastService.subscribe(_podcast!);
             
-            // Check if we're in a PinePods environment and also add to server
+            // Check if we're in a Castaway environment and also add to server
             if (_podcast != null) {
               try {
                 final settings = settingsService.settings;
@@ -322,7 +322,7 @@ class PodcastBloc extends Bloc {
                     settings.pinepodsApiKey != null && 
                     settings.pinepodsUserId != null) {
                   
-                  // Also add to PinePods server
+                  // Also add to Castaway server
                   final pinepodsService = PinepodsService();
                   pinepodsService.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
                   
@@ -344,10 +344,10 @@ class PodcastBloc extends Bloc {
                   );
                   
                   await pinepodsService.addPodcast(unifiedPodcast, settings.pinepodsUserId!);
-                  log.fine('Added podcast to PinePods server');
+                  log.fine('Added podcast to Castaway server');
                 }
               } catch (e) {
-                log.warning('Failed to add podcast to PinePods server: $e');
+                log.warning('Failed to add podcast to Castaway server: $e');
                 // Continue with local subscription even if server add fails
               }
               

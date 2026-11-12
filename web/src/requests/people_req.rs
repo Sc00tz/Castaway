@@ -10,7 +10,7 @@ use crate::requests::episode::Episode;
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug, Default)]
 #[serde(default)]
 pub struct CreditedPerson {
-    /// PinePods person id; use it for the person page and follows.
+    /// Castaway person id; use it for the person page and follows.
     pub id: i32,
     pub podpeople_id: Option<i32>,
     pub name: String,
@@ -204,7 +204,7 @@ struct LookupResponse {
     person_id: i32,
 }
 
-/// Resolve a PodPeopleDB id or a name to a PinePods person id.
+/// Resolve a PodPeopleDB id or a name to a Castaway person id.
 pub async fn call_lookup_person(
     server_name: &str,
     api_key: &str,
@@ -259,7 +259,7 @@ pub async fn call_contribute_people(
     Ok(response.json::<Vec<CreditedPerson>>().await?)
 }
 
-// --- Discovery (PodPeopleDB, proxied through the PinePods backend) ---
+// --- Discovery (PodPeopleDB, proxied through the Castaway backend) ---
 
 #[derive(Deserialize, Clone, PartialEq, Debug, Default)]
 pub struct DiscoverHost {

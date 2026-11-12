@@ -50,7 +50,7 @@ impl DatabasePool {
     }
 
     // Save an external gpodder server as the user's sync target (replacing any other). The caller
-    // starts the first (full) sync. Pinepods' device on that server is chosen by the sync engine,
+    // starts the first (full) sync. Castaway's device on that server is chosen by the sync engine,
     // never another client's.
     pub async fn add_gpodder_server(&self, user_id: i32, gpodder_url: &str, username: &str, password: &str) -> AppResult<bool> {
         self.sync_target_save(user_id, crate::services::sync::engine_db::TargetKind::Gpodder, gpodder_url, username, password).await?;
@@ -327,7 +327,7 @@ impl DatabasePool {
         Ok(deleted)
     }
 
-    // Turn on the PinePods gpodder server for a user. Clients log in with the user's password or
+    // Turn on the Castaway gpodder server for a user. Clients log in with the user's password or
     // an app password, so no token is generated. An external server the user already syncs with
     // keeps its settings ("both"). The user's current listening state is published to the sync
     // log so clients get it on their first sync.
@@ -364,7 +364,7 @@ impl DatabasePool {
         }))
     }
 
-    // Turn off the PinePods gpodder server. An external target keeps syncing.
+    // Turn off the Castaway gpodder server. An external target keeps syncing.
     pub async fn disable_gpodder_internal_sync(&self, user_id: i32) -> AppResult<bool> {
         dialect_match!(self, {
             pg(pool) => {

@@ -65,7 +65,7 @@ impl Scene {
         }
     }
 
-    /// Episode actions Pinepods uploaded successfully, in order.
+    /// Episode actions Castaway uploaded successfully, in order.
     fn pushed_actions(&self) -> Vec<Value> {
         pushed(&self.mock, self.push_actions_path())
             .into_iter()
@@ -76,7 +76,7 @@ impl Scene {
             .collect()
     }
 
-    /// `(add, remove)` URLs Pinepods uploaded successfully.
+    /// `(add, remove)` URLs Castaway uploaded successfully.
     fn pushed_subscriptions(&self) -> (Vec<String>, Vec<String>) {
         let mut out = (Vec::new(), Vec::new());
         for b in pushed(&self.mock, self.push_subscriptions_path()) {
@@ -147,7 +147,7 @@ fn strings(v: &Value) -> Vec<String> {
     v.as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect()
 }
 
-/// Bodies of Pinepods' successful POSTs to paths starting with `prefix`.
+/// Bodies of Castaway's successful POSTs to paths starting with `prefix`.
 fn pushed(mock: &MockGpodder, prefix: &str) -> Vec<Value> {
     mock.requests()
         .into_iter()
@@ -192,7 +192,7 @@ fn play_of<'a>(actions: &'a [Value], episode: &str) -> Vec<&'a Value> {
     actions.iter().filter(|a| a["episode"] == episode && a["action"] == "play").collect()
 }
 
-/// Insert `n` unpushed Pinepods progress rows straight into the log; returns their ids.
+/// Insert `n` unpushed Castaway progress rows straight into the log; returns their ids.
 async fn seed_progress_rows(app: &TestApp, user: &TestUser, n: u32) -> Vec<i64> {
     let ts = Utc::now().timestamp();
     let values: Vec<String> = (0..n)
@@ -411,7 +411,7 @@ async fn a_row_rewritten_during_a_push_is_sent_again() {
 // Echoes, conflicts
 // ---------------------------------------------------------------------------------------------
 
-/// "both": AntennaPod on the Pinepods server and a phone on Nextcloud. Each side's changes
+/// "both": AntennaPod on the Castaway server and a phone on Nextcloud. Each side's changes
 /// reach the other; nothing is sent back to where it came from.
 #[tokio::test(flavor = "multi_thread")]
 async fn changes_cross_between_the_internal_server_and_nextcloud_without_echoes() {
@@ -440,14 +440,14 @@ async fn changes_cross_between_the_internal_server_and_nextcloud_without_echoes(
     assert!(sent.contains(&feed_client) && sent.contains(&ep_url(1)), "AntennaPod's changes go to Nextcloud: {sent}");
     assert!(!sent.contains(&feed_phone) && !sent.contains(&ep_url(2)), "the phone's changes aren't sent back: {sent}");
 
-    // ...but they reach AntennaPod through the Pinepods server.
+    // ...but they reach AntennaPod through the Castaway server.
     let actions = antennapod.episode_actions(0).await.ok_json();
     assert!(play_of(actions["actions"].as_array().unwrap(), &ep_url(2)).iter().any(|a| a["position"] == 500), "{actions}");
     eventually("the phone's feed imported", || async { s.subscribed(&feed_phone).await.then_some(()) }).await;
     let library = antennapod.subscription_changes(0).await.ok_json();
     assert!(strings(&library["add"]).contains(&feed_phone), "{library}");
 
-    // Next run: Nextcloud hands back what Pinepods sent; none of it is logged or sent again.
+    // Next run: Nextcloud hands back what Castaway sent; none of it is logged or sent again.
     eventually("AntennaPod's feed imported", || async { s.subscribed(&feed_client).await.then_some(()) }).await;
     let logged = s.log_counts().await;
     let before = s.mock.requests().len();
@@ -466,7 +466,7 @@ async fn a_local_change_not_pushed_yet_wins_over_the_remote_one() {
     s.run(RunMode::Incremental).await.unwrap();
     assert!(s.mock.subscriptions(REMOTE_USER).contains(&feed_a));
 
-    // Locally: unsubscribe A, subscribe B. Remotely, before Pinepods pushes: the phone re-adds
+    // Locally: unsubscribe A, subscribe B. Remotely, before Castaway pushes: the phone re-adds
     // A and removes B.
     unsubscribe(&s.app, &s.user, pod_a).await;
     let feed_b = s.app.feed("keep-b.xml", &Feed::with_episodes("Show B", 1));

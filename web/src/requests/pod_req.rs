@@ -4430,7 +4430,7 @@ pub async fn call_get_pinepods_version(
             .await
             .unwrap_or_else(|_| "Failed to read error message".to_string());
         Err(Error::msg(format!(
-            "Failed to get Pinepods Version: {}",
+            "Failed to get Castaway Version: {}",
             error_text
         )))
     }

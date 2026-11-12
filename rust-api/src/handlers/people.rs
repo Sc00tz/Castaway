@@ -82,7 +82,7 @@ pub struct ProfileQuery {
     path = "/people/{person_id}",
     tag = "people",
     summary = "Person profile",
-    params(("person_id" = i32, Path, description = "PinePods person id"), ProfileQuery),
+    params(("person_id" = i32, Path, description = "Castaway person id"), ProfileQuery),
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Profile", body = PersonProfile),
@@ -125,7 +125,7 @@ pub struct LookupQuery {
     pub name: Option<String>,
 }
 
-/// Resolve a PodPeopleDB id or a name to a PinePods person id, so it can be opened or followed.
+/// Resolve a PodPeopleDB id or a name to a Castaway person id, so it can be opened or followed.
 #[utoipa::path(
     get,
     path = "/people/lookup",
@@ -188,7 +188,7 @@ pub async fn search_people(
     path = "/people/{person_id}/follow",
     tag = "people",
     summary = "Follow a person",
-    params(("person_id" = i32, Path, description = "PinePods person id")),
+    params(("person_id" = i32, Path, description = "Castaway person id")),
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Following", body = serde_json::Value),
@@ -214,7 +214,7 @@ pub async fn follow_person(
     path = "/people/{person_id}/follow",
     tag = "people",
     summary = "Unfollow a person",
-    params(("person_id" = i32, Path, description = "PinePods person id")),
+    params(("person_id" = i32, Path, description = "Castaway person id")),
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Not following", body = serde_json::Value),

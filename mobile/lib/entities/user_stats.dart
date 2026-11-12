@@ -98,7 +98,7 @@ class UserStats {
     return podSyncType.toLowerCase() != 'none' && podSyncType.isNotEmpty;
   }
 
-  /// URLs to show under the sync status. The PinePods server's URL is [serverUrl] (the address
+  /// URLs to show under the sync status. The Castaway server's URL is [serverUrl] (the address
   /// this app uses) unless the server has a public URL configured.
   List<String> syncUrls(String? serverUrl) {
     if (syncServerEnabled == null) {

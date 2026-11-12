@@ -1,7 +1,7 @@
 // Remote → local: the one path that applies gpodder episode actions and subscription
-// changes, whether they came from a client of the Pinepods server or an external target.
+// changes, whether they came from a client of the Castaway server or an external target.
 // State changes go through the same DB functions as the UI, passing the origin, so they aren't
-// logged as Pinepods' own changes and never echo back.
+// logged as Castaway's own changes and never echo back.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};

@@ -236,7 +236,7 @@ pub fn app_drawer() -> Html {
             <div class={classes!("fixed", "drawer-background", "top-0", "left-0", "z-20", "h-full", "transition-all", "duration-300", "transform", "shadow-lg", "md:w-64", "w-less-full", (*is_drawer_open).then(|| "translate-x-0").unwrap_or("-translate-x-full"))}>
                 // Brand header
                 <div class="sb-brand" style="margin-top: 60px;">
-                    <img src="/static/assets/favicon.png" alt="Pinepods" />
+                    <img src="/static/assets/favicon.png" alt="Castaway" />
                     <span>{&i18n_pinepods}</span>
                 </div>
 

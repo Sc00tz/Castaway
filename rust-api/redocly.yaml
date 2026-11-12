@@ -1,4 +1,4 @@
-# Lint config for the generated PinePods OpenAPI spec (rust-api/openapi.json).
+# Lint config for the generated Castaway OpenAPI spec (rust-api/openapi.json).
 # Extends Redocly's recommended ruleset but relaxes rules that conflict with
 # intentional API design, so CI fails only on genuinely broken specs.
 extends:

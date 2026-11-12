@@ -36,7 +36,7 @@
   "@search_for_podcasts_hint": {
     "description": "Hint displayed on search bar when the user clicks the search icon."
   },
-  "no_subscriptions_message": "Head to Settings to Connect a Pinepods Server if you haven't yet!",
+  "no_subscriptions_message": "Head to Settings to Connect a Castaway Server if you haven't yet!",
   "@no_subscriptions_message": {
     "description": "Displayed on the library tab when the user has no subscriptions"
   },
@@ -176,7 +176,7 @@
   "@continue_button_label": {
     "description": "Continue button label"
   },
-  "consent_message": "This funding link will take you to an external site where you will be able to directly support the show. Links are provided by the podcast authors and is not controlled by PinePods.",
+  "consent_message": "This funding link will take you to an external site where you will be able to directly support the show. Links are provided by the podcast authors and is not controlled by Castaway.",
   "@consent_message": {
     "description": "Display when first accessing external funding link"
   },
@@ -569,7 +569,7 @@
   "removed_from_favorites": "Removed from favorites",
   "failed_to_load_podcast_feed": "Failed to load podcast feed",
   "failed_to_load_episodes": "Failed to load episodes",
-  "not_logged_in_to_server": "Not logged in to PinePods server",
+  "not_logged_in_to_server": "Not logged in to Castaway server",
   "unsubscribe": "Unsubscribe",
   "unfollow_podcast": "Unfollow Podcast",
   "unfollow": "Unfollow",
@@ -621,7 +621,7 @@
   "episodes_available_after_following": "Episodes available after following",
   "channel_videos_still_adding": "Your server is still adding this channel's videos, or none match its video settings",
   "subscribe_channel_prompt": "Subscribe to add this channel to your library and play its videos",
-  "library_episodes_appear_here": "Episodes from your PinePods library will appear here",
+  "library_episodes_appear_here": "Episodes from your Castaway library will appear here",
   "follow_podcast_prompt": "Follow this podcast to add it to your library and view episodes",
   "no_episodes_match_filter": "No episodes match this filter",
   "search_episodes": "Search episodes",
@@ -674,7 +674,7 @@
       }
     }
   },
-  "server_downloads_description": "Downloads kept on your Pinepods server (separate from downloads on this device).",
+  "server_downloads_description": "Downloads kept on your Castaway server (separate from downloads on this device).",
   "delete_server_when_finished_description": "Remove the server download about an hour after you finish the episode.",
   "device_downloads_description": "Downloads kept on this device (separate from downloads on your server).",
   "delete_device_when_finished_description": "Remove the download about an hour after you finish the episode.",
@@ -776,7 +776,7 @@
     }
   },
   "ad_skip_server_copy_ok": "Episodes download to the server, so ads are found on the copy you'll play and skips line up exactly.",
-  "ad_skip_server_copy_off": "Server auto-download is off. Many podcasts insert different ads every time an episode is fetched, so ads found on one copy can land at the wrong times in the copy you stream. Pinepods holds off skipping when the stream doesn't match, so some ads won't be skipped. Turn on server auto-download for exact skips; \"Delete when finished\" keeps it from filling the disk.",
+  "ad_skip_server_copy_off": "Server auto-download is off. Many podcasts insert different ads every time an episode is fetched, so ads found on one copy can land at the wrong times in the copy you stream. Castaway holds off skipping when the stream doesn't match, so some ads won't be skipped. Turn on server auto-download for exact skips; \"Delete when finished\" keeps it from filling the disk.",
   "filter_all": "All",
   "filter_in_progress": "In progress",
   "days_count": "{count, plural, =1{1 day} other{{count} days}}",
@@ -876,7 +876,7 @@
   "remove": "Remove",
   "remove_server_download": "Remove server download",
   "download_to_server": "Download to server",
-  "stored_on_server": "Stored on your PinePods server",
+  "stored_on_server": "Stored on your Castaway server",
   "go_to_podcast": "Go to podcast",
   "share_episode": "Share episode",
   "error_loading_home": "Error loading home content: {error}",
@@ -903,7 +903,7 @@
       }
     }
   },
-  "server_unreachable_offline_body": "Your PinePods server is unreachable. You can still browse and play episodes downloaded to this device.",
+  "server_unreachable_offline_body": "Your Castaway server is unreachable. You can still browse and play episodes downloaded to this device.",
   "on_this_device_count": "On this device ({count})",
   "@on_this_device_count": {
     "placeholders": {
@@ -912,7 +912,7 @@
       }
     }
   },
-  "not_connected_connect_in_settings": "Not connected to PinePods server. Please connect in Settings.",
+  "not_connected_connect_in_settings": "Not connected to Castaway server. Please connect in Settings.",
   "failed_to_queue_download": "Failed to queue download",
   "offline_mode": "Offline mode",
   "no_downloaded_episodes_on_device": "No downloaded episodes on this device yet.",
@@ -930,7 +930,7 @@
   "completed": "Completed",
   "smart_playlists": "Smart Playlists",
   "recent_episodes": "Recent Episodes",
-  "welcome_to_pinepods": "Welcome to PinePods",
+  "welcome_to_pinepods": "Welcome to Castaway",
   "home_empty_body": "Search for podcasts to follow and they'll show up here.",
   "no_completed_episodes_match_query": "No completed episodes match \"{query}\"",
   "@no_completed_episodes_match_query": {
@@ -986,8 +986,8 @@
       }
     }
   },
-  "not_connected_please_login": "Not connected to PinePods server. Please login first.",
-  "unable_to_connect_server": "Unable to connect to the PinePods server",
+  "not_connected_please_login": "Not connected to Castaway server. Please login first.",
+  "unable_to_connect_server": "Unable to connect to the Castaway server",
   "refresh": "Refresh",
   "favorites": "Favorites",
   "clear_filters": "Clear filters",
@@ -1173,7 +1173,7 @@
   "titles_and_show_notes": "Titles and show notes",
   "no_api_key_returned": "no API key returned",
   "unknown": "unknown",
-  "web_app_settings_description": "Many more server side and user settings available from the PinePods web app. Please head to {url} to adjust much more",
+  "web_app_settings_description": "Many more server side and user settings available from the Castaway web app. Please head to {url} to adjust much more",
   "@web_app_settings_description": {
     "placeholders": {
       "url": {
@@ -1222,7 +1222,7 @@
       }
     }
   },
-  "not_connected_to_pinepods": "Not connected to PinePods server",
+  "not_connected_to_pinepods": "Not connected to Castaway server",
   "playlist_created": "Playlist created successfully!",
   "failed_to_create_playlist": "Failed to create playlist",
   "create_playlist_title": "Create Playlist",
@@ -1249,7 +1249,7 @@
   "not_downloaded_ads_explainer": "Many podcasts insert different ads each time an episode is fetched, so ads found on a one-off copy can land at the wrong times when you play it. For exact skips, download it to the server first; ads are then detected on the copy you'll play.",
   "ads_match_server_download": "Ads were found on your server download, so skips line up exactly.",
   "ads_mismatch_server_download": "Your server download is a different copy from the one these ads were found on, so their times may be off. Detect ads again to match your download.",
-  "ads_streaming_explainer": "You're streaming this episode. If the podcast inserts ads dynamically, they can sit at different times than detected; Pinepods only skips them when the stream's length matches the analyzed copy. Download it to the server for exact skips.",
+  "ads_streaming_explainer": "You're streaming this episode. If the podcast inserts ads dynamically, they can sit at different times than detected; Castaway only skips them when the stream's length matches the analyzed copy. Download it to the server for exact skips.",
   "could_not_export_transcript": "Could not export the transcript: {error}",
   "@could_not_export_transcript": {
     "placeholders": {
@@ -1311,7 +1311,7 @@
   "mfa_verification_failed": "MFA verification failed",
   "enter_mfa_code": "Please enter your MFA code",
   "login_failed": "Login failed",
-  "connect_to_get_started": "Connect to your PinePods server to get started",
+  "connect_to_get_started": "Connect to your Castaway server to get started",
   "server_url": "Server URL",
   "enter_server_url": "Please enter a server URL",
   "url_must_start_with_http": "URL must start with http:// or https://",
@@ -1326,9 +1326,9 @@
   "advanced_certificates": "Advanced: Certificates",
   "advanced_certificates_description": "Custom server CA / client certificate (mTLS)",
   "verify_mfa_code": "Verify MFA Code",
-  "connect_to_pinepods": "Connect to PinePods",
+  "connect_to_pinepods": "Connect to Castaway",
   "or_continue_with": "Or continue with",
-  "no_server_learn_more": "Don't have a PinePods server? Visit pinepods.online to learn more.",
+  "no_server_learn_more": "Don't have a Castaway server? Visit pinepods.online to learn more.",
   "failed_to_load_stats": "Failed to load stats: {error}",
   "@failed_to_load_stats": {
     "placeholders": {
@@ -1357,10 +1357,7 @@
     }
   },
   "sync_status": "Sync Status",
-  "about_thanks": "Thanks for using PinePods! This app was born from a love for podcasts, of homelabs, and a desire to have a secure and central location to manage personal data.",
-  "pinepods_documentation": "PinePods documentation",
-  "pinepods_on_github": "PinePods on GitHub",
-  "buy_me_a_coffee": "Buy me a coffee",
+  "about_thanks": "Thanks for using Castaway, a self-hosted podcast app that keeps your subscriptions, listening progress and downloads on your own server.",
   "open_source_licenses": "Open source licenses",
   "view_original_project": "View original project on GitHub",
   "user_statistics": "User Statistics",
@@ -1579,8 +1576,8 @@
   "client_certificate_removed": "Client certificate removed (restart to fully apply).",
   "replace": "Replace",
   "fill_in_all_fields": "Please fill in all fields",
-  "pinepods_server": "PinePods Server",
-  "pinepods_connection": "PinePods Connection",
+  "pinepods_server": "Castaway Server",
+  "pinepods_connection": "Castaway Connection",
   "log_out": "Log Out",
   "connect": "Connect",
   "failed_to_load_server_download_activity": "Failed to load server download activity.",
@@ -1702,7 +1699,7 @@
       }
     }
   },
-  "not_connected_to_a_pinepods_server": "Not connected to a PinePods server",
+  "not_connected_to_a_pinepods_server": "Not connected to a Castaway server",
   "find_hosts_and_guests": "Find hosts and guests",
   "nobody_found": "Nobody found. People are added from podcast and episode pages.",
   "not_following_anyone": "Not following anyone yet",
@@ -2062,7 +2059,7 @@
   },
   "tip_check_internet": "Check your internet connection",
   "tip_verify_settings_in_app": "Verify server settings in the app",
-  "tip_server_running": "Ensure the PinePods server is running",
+  "tip_server_running": "Ensure the Castaway server is running",
   "tip_contact_admin_persists": "Contact your administrator if the issue persists",
   "days_ago": "{count, plural, =1{1 day ago} other{{count} days ago}}",
   "@days_ago": {
@@ -2100,7 +2097,7 @@
   "sync_external_gpodder": "External gpodder",
   "not_syncing": "Not Syncing",
   "unknown_sync_type": "Unknown sync type",
-  "server_http_not_pinepods": "Server responded with HTTP {status}. This does not look like a PinePods server.",
+  "server_http_not_pinepods": "Server responded with HTTP {status}. This does not look like a Castaway server.",
   "@server_http_not_pinepods": {
     "placeholders": {
       "status": {
@@ -2133,11 +2130,11 @@
     }
   },
   "tls_not_trusted": "The server's TLS certificate isn't trusted. If it uses a private or self-signed certificate, import its CA under Advanced → Certificates. If the server requires a client certificate (mTLS), import that too.",
-  "not_a_pinepods_server": "Reachable, but this does not look like a PinePods server.",
+  "not_a_pinepods_server": "Reachable, but this does not look like a Castaway server.",
   "server_too_slow": "The server took too long to respond. Check the address and your connection.",
   "invalid_server_address": "That doesn't look like a valid server address.",
   "authentication_failed_plain": "Authentication failed",
-  "not_a_valid_pinepods_server": "Not a valid PinePods server",
+  "not_a_valid_pinepods_server": "Not a valid Castaway server",
   "invalid_mfa_code": "Invalid MFA code",
   "api_key_verification_failed": "API key verification failed",
   "failed_to_get_user_id": "Failed to get user ID",
@@ -2160,9 +2157,9 @@
     }
   },
   "error_unknown": "An unknown error occurred",
-  "error_cannot_connect_long": "Unable to connect to the PinePods server. Please check your internet connection and server settings.",
+  "error_cannot_connect_long": "Unable to connect to the Castaway server. Please check your internet connection and server settings.",
   "error_auth_long": "Authentication failed. Please check your login credentials.",
-  "error_server_long": "The PinePods server is experiencing issues. Please try again later.",
+  "error_server_long": "The Castaway server is experiencing issues. Please try again later.",
   "error_title": "Error",
   "authentication_error": "Authentication Error",
   "server_error": "Server Error",

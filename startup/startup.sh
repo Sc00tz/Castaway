@@ -81,41 +81,31 @@ export OIDC_ROLES_CLAIM=${OIDC_ROLES_CLAIM}
 export OIDC_USER_ROLE=${OIDC_USER_ROLE}
 export OIDC_ADMIN_ROLE=${OIDC_ADMIN_ROLE}
 
-# Print admin info if default admin is used
-if [[ $FULLNAME == 'Pinepods Admin' ]]; then
+# Print admin info if the example admin from the compose files is used. The password is never
+# printed: container logs are often shared or shipped elsewhere.
+if [[ $FULLNAME == 'Castaway Admin' ]]; then
   echo "Admin User Information:"
   echo "FULLNAME: $FULLNAME"
   echo "USERNAME: $USERNAME"
   echo "EMAIL: $EMAIL"
-  echo "PASSWORD: $PASSWORD"
 fi
 
-# Print PinePods logo
+# Print the Castaway banner
 cat << "EOF"
-         A
-        d$b
-      .d\$$b.
-    .d$i$$\$$b.      _______   **                                                **
-       d$$@b        /       \ /  |                                              /  |
-      d\$$$ib       $$$$$$$  |$$/  _______    ______    ______    ______    ____$$ |  _______
-    .d$$$\$$$b      $$ |__$$ |/  |/       \  /      \  /      \  /      \  /    $$ | /       |
-  .d$$@$$$$\$$ib.   $$    $$/ $$ |$$$$$$$  |/$$$$$$  |/$$$$$$  |/$$$$$$  |/$$$$$$$ |/$$$$$$$/
-      d$$i$$b       $$$$$$$/  $$ |$$ |  $$ |$$    $$ |$$ |  $$ |$$ |  $$ |$$ |  $$ |$$      \
-     d\$$$$@$b.     $$ |      $$ |$$ |  $$ |$$$$$$$$/ $$ |__$$ |$$ \__$$ |$$ \__$$ | $$$$$$  |
-  .d$@$$\$$$$$@b.   $$ |      $$ |$$ |  $$ |$$       |$$    $$/ $$    $$/ $$    $$ |/     $$/
-.d$$$$i$$$\$$$$$$b. $$/       $$/ $$/   $$/  $$$$$$$/ $$$$$$$/   $$$$$$/   $$$$$$$/ $$$$$$$/
-        ###                                           $$ |
-        ###                                           $$ |
-        ###                                           $$/
-A project created and written by Collin Pendleton
-collinp@gooseberrydevelopment.com
+
+   ____          _
+  / ___|__ _ ___| |_ __ ___      ____ _ _   _
+ | |   / _` / __| __/ _` \ \ /\ / / _` | | | |
+ | |__| (_| \__ \ || (_| |\ V  V / (_| | |_| |
+  \____\__,_|___/\__\__,_| \_/\_/ \__,_|\__, |
+                                        |___/
+  Self-hosted podcasts. Based on PinePods (GPL-3.0).
 EOF
 
-# Print version + project links beneath the logo
+# Print version beneath the banner
 PINEPODS_VERSION_DISPLAY="$(cat /pinepods/current_version 2>/dev/null || echo 'dev')"
 echo ""
-echo "  PinePods ${PINEPODS_VERSION_DISPLAY}"
-echo "  https://pinepods.online"
+echo "  Castaway ${PINEPODS_VERSION_DISPLAY}"
 echo ""
 
 # Configure timezone based on TZ environment variable
@@ -281,12 +271,12 @@ if [[ -n "$PUID" && -n "$PGID" ]]; then
     fi
 
     echo "Starting services as ${PUID}:${PGID} with Horust..."
-    echo "PinePods startup complete, running Horust in foreground..."
+    echo "Castaway startup complete, running Horust in foreground..."
     exec su-exec "${PUID}:${PGID}" horust --services-path /etc/horust/services/
 else
     echo "PUID/PGID not set — running as root (legacy mode)."
     echo "Starting services with Horust..."
-    echo "PinePods startup complete, running Horust in foreground..."
+    echo "Castaway startup complete, running Horust in foreground..."
     exec horust --services-path /etc/horust/services/
 fi
 

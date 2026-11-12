@@ -86,7 +86,7 @@ class Podcast {
   bool updatedEpisodes = false;
 
   /// Whether the podcast is marked as a favorite by the user. Server-derived
-  /// (from the PinePods `isfavorite` column); not persisted to local disk.
+  /// (from the Castaway `isfavorite` column); not persisted to local disk.
   bool isFavorite;
 
   Podcast({

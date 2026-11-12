@@ -392,7 +392,7 @@ class SettingsBloc extends Bloc {
 
   Future<void> _syncThemeToServer(String theme) async {
     try {
-      // Only sync if we have PinePods credentials
+      // Only sync if we have Castaway credentials
       if (_currentSettings.pinepodsServer != null &&
           _currentSettings.pinepodsApiKey != null &&
           _currentSettings.pinepodsUserId != null) {
@@ -414,7 +414,7 @@ class SettingsBloc extends Bloc {
 
   Future<void> fetchThemeFromServer() async {
     try {
-      // Only fetch if we have PinePods credentials
+      // Only fetch if we have Castaway credentials
       if (_currentSettings.pinepodsServer != null &&
           _currentSettings.pinepodsApiKey != null &&
           _currentSettings.pinepodsUserId != null) {

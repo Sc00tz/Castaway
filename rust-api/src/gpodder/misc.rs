@@ -1,4 +1,4 @@
-// Settings, device sync groups, and the parts of the API Pinepods doesn't implement
+// Settings, device sync groups, and the parts of the API Castaway doesn't implement
 // (directory, lists, favorites, suggestions), which answer with valid empty lists.
 
 use std::collections::HashMap;

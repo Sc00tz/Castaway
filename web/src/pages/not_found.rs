@@ -48,7 +48,7 @@ pub fn not_found() -> Html {
 
                 <img
                     src="static/assets/favicon.png"
-                    alt="Pinepods Logo"
+                    alt="Castaway Logo"
                     class="w-16 h-16 mt-8 opacity-60"
                 />
             </div>

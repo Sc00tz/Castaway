@@ -3,7 +3,7 @@
 // through one path (apply), with episodes matched by one resolver. The logs double as the outbox
 // for external sync targets.
 //
-// Origins: every write that can reach the logs says where it came from. Only `Pinepods` writes
+// Origins: every write that can reach the logs says where it came from. Only `Castaway` writes
 // event rows; `Client` changes were already logged by the gpodder server, and apply logs a
 // target's changes itself as `target:<id>`. So nothing is echoed back to where it came from.
 
@@ -33,9 +33,9 @@ pub use resolver::{resolve, ResolveKey};
 /// Where a change came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncOrigin {
-    /// Made in Pinepods itself (web/mobile UI, API, auto-complete). Logged as `pinepods`.
+    /// Made in Castaway itself (web/mobile UI, API, auto-complete). Logged as `pinepods`.
     Pinepods,
-    /// Uploaded by a gpodder client of the Pinepods server; already in the log.
+    /// Uploaded by a gpodder client of the Castaway server; already in the log.
     Client,
     /// Pulled from an external sync target (`SyncTargets.TargetID`). Logged by apply.
     Target(i32),
@@ -59,7 +59,7 @@ impl SyncOrigin {
 /// The pinepods device: `GpodderDevices.SystemRole` value and preferred name/caption/type.
 pub const PINEPODS_ROLE: &str = "pinepods";
 pub const PINEPODS_DEVICE_NAME: &str = "pinepods";
-pub const PINEPODS_DEVICE_CAPTION: &str = "PinePods";
+pub const PINEPODS_DEVICE_CAPTION: &str = "Castaway";
 pub const PINEPODS_DEVICE_TYPE: &str = "server";
 
 /// Feeds that can be shared with other devices: http(s), no stored credentials. YouTube
@@ -77,7 +77,7 @@ pub fn shareable_feed(feed_url: &str, username: Option<&str>, password: Option<&
 const SYNC_ENABLED_TTL: Duration = Duration::from_secs(60);
 static SYNC_ENABLED: LazyLock<Mutex<HashMap<i32, (bool, Instant)>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// True if the user uses the Pinepods gpodder server or has an enabled external target.
+/// True if the user uses the Castaway gpodder server or has an enabled external target.
 /// A lookup failure counts as "no" (and is logged): events are best effort.
 pub async fn sync_enabled(db: &DatabasePool, user_id: i32) -> bool {
     if let Some((enabled, at)) = SYNC_ENABLED.lock().unwrap().get(&user_id).copied() {

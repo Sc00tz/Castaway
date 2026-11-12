@@ -76,7 +76,7 @@ pub struct PendingSubscription {
 #[derive(Debug, Clone)]
 pub struct PendingAction {
     pub id: i64,
-    /// None for a kind Pinepods doesn't send (it still moves the cursor).
+    /// None for a kind Castaway doesn't send (it still moves the cursor).
     pub action: Option<EpisodeAction>,
     pub duration: Option<i32>,
     pub fingerprint: String,
@@ -594,7 +594,7 @@ impl DatabasePool {
 
     /// For each action, whether the user's log already holds the same action (episode URL,
     /// kind, action time, position). Pulls use it to drop what they already know: actions this
-    /// Pinepods pushed, and the ones a `>=` cursor sends again.
+    /// Castaway pushed, and the ones a `>=` cursor sends again.
     pub async fn sync_known_actions(&self, user_id: i32, actions: &[EpisodeAction]) -> AppResult<Vec<bool>> {
         type Key = (String, String, i64, Option<i32>);
         let mut stamps: Vec<i64> = actions.iter().map(|a| a.timestamp.timestamp()).collect();
