@@ -20,7 +20,7 @@ async fn sqlite_backup_restores_the_data() {
     let res = app.post("/api/data/backup_server").key(admin).json(&json!({ "database_pass": "" })).send().await;
     res.assert_ok();
     let dump = res.text();
-    assert!(dump.starts_with("-- Castaway SQLite backup\n"), "{}", &dump[..dump.len().min(200)]);
+    assert!(dump.starts_with("-- Pinepods SQLite backup\n"), "{}", &dump[..dump.len().min(200)]);
     let path = std::env::temp_dir().join(format!("pinepods-test-backup-{}-{}.sql", std::process::id(), kept.id));
     std::fs::write(&path, &dump).unwrap();
 

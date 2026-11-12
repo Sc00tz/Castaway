@@ -14,7 +14,9 @@ use super::dialect::lite::lock_writer;
 use crate::error::{AppError, AppResult};
 
 /// First line of every SQLite backup.
-pub const HEADER: &str = "-- Castaway SQLite backup";
+/// File-format marker, also written by database_functions/sqlite_export.py. Keep it unchanged:
+/// it identifies SQLite backups, including ones made by PinePods.
+pub const HEADER: &str = "-- Pinepods SQLite backup";
 
 /// Login-token tables: their rows are never backed up or restored.
 const SKIP_DATA: &[&str] = &["Sessions", "GpodderSessions"];
