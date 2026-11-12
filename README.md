@@ -47,13 +47,9 @@ Castaway is based on [PinePods](https://github.com/madeofpendletonwool/PinePods)
 Castaway needs a database (PostgreSQL) and a Valkey or Redis server. The easiest way to run
 it is Docker Compose.
 
-**1. Build the image.** There's no published image yet, so build it from this repo:
-
-```bash
-git clone https://github.com/Sc00tz/Castaway.git
-cd Castaway
-docker build -t castaway .
-```
+**1. Get the image.** GitHub builds it on every push to `main` and publishes it as
+`ghcr.io/sc00tz/castaway` for x86_64 and ARM64. Docker pulls it automatically in step 3, or
+build it yourself with `docker build -t castaway .` from a clone of this repo.
 
 **2. Create a `docker-compose.yml`:**
 
@@ -75,7 +71,7 @@ services:
     restart: always
 
   castaway:
-    image: castaway:latest
+    image: ghcr.io/sc00tz/castaway:latest
     ports:
       - "8040:8040"
     environment:

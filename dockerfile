@@ -103,8 +103,9 @@ RUN ARCH=$(uname -m) && \
     wget -O /usr/local/bin/yt-dlp "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${YTDLP}" && \
     chmod +x /usr/local/bin/yt-dlp
 
-# Download and install Horust (x86_64)
-RUN wget -O /tmp/horust.tar.gz "https://github.com/FedericoPonzi/Horust/releases/download/v0.1.14/horust-x86_64-unknown-linux-musl.tar.gz" && \
+# Download and install Horust for the architecture being built (x86_64 or aarch64), so this
+# one Dockerfile builds both images.
+RUN wget -O /tmp/horust.tar.gz "https://github.com/FedericoPonzi/Horust/releases/download/v0.1.14/horust-$(uname -m)-unknown-linux-musl.tar.gz" && \
     cd /tmp && tar -xzf horust.tar.gz && \
     mv horust /usr/local/bin/ && \
     chmod +x /usr/local/bin/horust && \

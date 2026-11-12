@@ -2,7 +2,7 @@
 # many users or a busy instance, use the PostgreSQL compose file instead.
 services:
   castaway:
-    image: castaway:latest  # build it from the repo root: docker build -t castaway .
+    image: ghcr.io/sc00tz/castaway:latest  # built by GitHub Actions on every push to main
     ports:
       - "8040:8040"
     environment:

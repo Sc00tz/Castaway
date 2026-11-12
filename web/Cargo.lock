@@ -1086,7 +1086,7 @@ dependencies = [
 [[package]]
 name = "i18nrs"
 version = "0.1.10"
-source = "git+https://github.com/madeofpendletonwool/i18n-rs#2884414b1b103e43e827b7b92a764a7e1889274b"
+source = "git+https://github.com/Sc00tz/i18n-rs?rev=2884414b1b103e43e827b7b92a764a7e1889274b#2884414b1b103e43e827b7b92a764a7e1889274b"
 dependencies = [
  "serde_json",
  "web-sys",

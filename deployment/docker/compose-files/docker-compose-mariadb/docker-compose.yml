@@ -20,7 +20,7 @@ services:
     image: valkey/valkey:8-alpine
 
   castaway:
-    image: castaway:latest  # build it from the repo root: docker build -t castaway .
+    image: ghcr.io/sc00tz/castaway:latest  # built by GitHub Actions on every push to main
     ports:
       - "8040:8040"
     environment:
