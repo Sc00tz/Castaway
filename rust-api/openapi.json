@@ -17896,6 +17896,14 @@
             ],
             "format": "double",
             "description": "The player's duration for the episode in seconds, if it knows it. Stored when the feed\ngave none (new episodes beyond the newest few are inserted with duration 0)."
+          },
+          "recorded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the player took this position (RFC 3339). The most recently recorded position\nwins, so an upload that arrives late (an offline device catching up, a retry) can't\noverwrite a newer one. Omitted means \"now\"."
           }
         }
       },
