@@ -4,7 +4,7 @@ pydantic==2.14.2
 faster-whisper==1.2.1
 # faster-whisper 1.2.1 calls av.open(..., metadata_errors=...), which PyAV 19 removed
 # (TypeError on every transcription). Hold PyAV at 18.x until faster-whisper catches up.
-av==18.1.0
+av==19.0.2
 # faster-whisper imports `requests` (in utils.py) but doesn't always declare it — pin it explicitly.
 requests==2.34.2
 # Local LLM (GGUF) backend for ad detection (#790). Built from source at image time.
