@@ -40,6 +40,8 @@ RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 # Copy Rust API files
 COPY ./rust-api/Cargo.toml ./rust-api/Cargo.lock ./
 COPY ./rust-api/src ./src
+# Schema migrations, compiled into the server binary
+COPY ./rust-api/migrations ./migrations
 
 # Set environment for static linking
 ENV OPENSSL_STATIC=1
