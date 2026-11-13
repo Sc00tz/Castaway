@@ -961,9 +961,6 @@
               "application/octet-stream": {}
             }
           },
-          "400": {
-            "description": "Incorrect database password"
-          },
           "401": {
             "description": "Invalid or missing API key"
           },
@@ -13842,12 +13839,13 @@
       },
       "BackupServerRequest": {
         "type": "object",
-        "required": [
-          "database_pass"
-        ],
         "properties": {
           "database_pass": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ignored, and optional: the server signs in to its database with its own credentials."
           }
         }
       },

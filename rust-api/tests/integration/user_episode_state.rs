@@ -40,24 +40,3 @@ async fn completion_is_recorded_per_user() {
     assert_eq!(completed(&app, &bob, mine).await, None);
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn upgrading_carries_completed_episodes_over() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let (alice, bob) = (app.user("alice").await, app.user("bob").await);
-    let a = app.subscribe(&alice, &app.feed("a.xml", &Feed::with_episodes("A", 2)), 2).await;
-    let b = app.subscribe(&bob, &app.feed("b.xml", &Feed::with_episodes("B", 2)), 2).await;
-    let a1 = app.episode_id(&alice, a, "Episode 1").await;
-    let b2 = app.episode_id(&bob, b, "Episode 2").await;
-
-    // As before the upgrade: only the episode rows know.
-    exec(&app, r#"DROP TABLE "UserEpisodeState""#).await;
-    exec(&app, &format!(r#"UPDATE "Episodes" SET Completed = TRUE WHERE EpisodeID IN ({a1}, {b2})"#)).await;
-    rerun_migrations(&app, &["081"]).await;
-
-    assert_eq!(completed(&app, &alice, a1).await, Some(1));
-    assert_eq!(completed(&app, &bob, b2).await, Some(1));
-    assert_eq!(int(&app, r#"SELECT COUNT(*) FROM "UserEpisodeState""#).await, Some(2));
-}

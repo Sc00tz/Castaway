@@ -48,12 +48,14 @@ async fn main() -> AppResult<()> {
     // Load configuration
     let config = Config::new()?;
     info!("Configuration loaded");
-    info!("Database config: host={}, port={}, user={}, db={}, type={}", 
-          config.database.host, config.database.port, config.database.username, 
-          config.database.name, config.database.db_type);
+    info!("Database config: host={}, port={}, user={}, db={}",
+          config.database.host, config.database.port, config.database.username,
+          config.database.name);
 
     // Initialize database pool
     let db_pool = DatabasePool::new(&config).await?;
+    db_pool.migrate().await?;
+    info!("Database schema is up to date");
     info!("Database pool initialized");
 
     // Initialize Redis client

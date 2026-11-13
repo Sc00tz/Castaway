@@ -96,18 +96,6 @@ impl DatabasePool {
                     Err(AppError::internal("App settings not found"))
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT EncryptionKey FROM AppSettings LIMIT 1")
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let key: Option<String> = row.try_get("EncryptionKey")?;
-                    key.ok_or_else(|| AppError::internal("Encryption key not found"))
-                } else {
-                    Err(AppError::internal("App settings not found"))
-                }
-            },
         })
     }
 
@@ -124,30 +112,6 @@ impl DatabasePool {
                     let url: Option<String> = row.try_get("gpodderurl")?;
                     let username: Option<String> = row.try_get("gpodderloginname")?;
                     let sync_type: Option<String> = row.try_get("pod_sync_type")?;
-                    
-                    if url.is_some() && username.is_some() {
-                        Ok(Some(serde_json::json!({
-                            "gpodderurl": url.unwrap_or_default(),
-                            "gpoddertoken": "", // Frontend expects this field but it's not used for display
-                            "sync_type": sync_type.unwrap_or_default()
-                        })))
-                    } else {
-                        Ok(None)
-                    }
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT GpodderUrl, GpodderLoginName, Pod_Sync_Type FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let url: Option<String> = row.try_get("GpodderUrl")?;
-                    let username: Option<String> = row.try_get("GpodderLoginName")?;
-                    let sync_type: Option<String> = row.try_get("Pod_Sync_Type")?;
                     
                     if url.is_some() && username.is_some() {
                         Ok(Some(serde_json::json!({
@@ -182,20 +146,6 @@ impl DatabasePool {
                     Ok(false)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT GpodderUrl, GpodderLoginName FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let url: Option<String> = row.try_get("GpodderUrl")?;
-                    let username: Option<String> = row.try_get("GpodderLoginName")?;
-                    Ok(url.is_some() && username.is_some())
-                } else {
-                    Ok(false)
-                }
-            },
         })
     }
 
@@ -220,24 +170,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("
-                    SELECT e.EpisodeID 
-                    FROM Episodes e 
-                    JOIN Podcasts p ON e.FeedID = p.FeedID 
-                    WHERE e.EpisodeURL = ? AND p.UserID = ?
-                ")
-                    .bind(episode_url)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    Ok(Some(row.try_get("EpisodeID")?))
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -253,29 +185,6 @@ impl DatabasePool {
                 if let Some(row) = row {
                     let sync_type: Option<String> = row.try_get("pod_sync_type")?;
                     let gpodder_url: Option<String> = row.try_get("gpodderurl")?;
-                    
-                    let sync_type = sync_type.unwrap_or_else(|| "None".to_string());
-                    
-                    Ok(GpodderStatus {
-                        sync_type: sync_type.clone(),
-                        gpodder_url,
-                    })
-                } else {
-                    Ok(GpodderStatus {
-                        sync_type: "None".to_string(),
-                        gpodder_url: None,
-                    })
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Pod_Sync_Type, GpodderUrl FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let sync_type: Option<String> = row.try_get("Pod_Sync_Type")?;
-                    let gpodder_url: Option<String> = row.try_get("GpodderUrl")?;
                     
                     let sync_type = sync_type.unwrap_or_else(|| "None".to_string());
                     
@@ -318,10 +227,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?
                 .rows_affected(),
-            mysql(pool) => sqlx::query("DELETE FROM GpodderSessions WHERE ExpiresAt < NOW() - INTERVAL 1 DAY")
-                .execute(pool)
-                .await?
-                .rows_affected(),
         });
         tracing::debug!("Cleaned up {} expired gpodder sessions", deleted);
         Ok(deleted)
@@ -336,13 +241,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET gpodderserverenabled = TRUE, defaultgpodderdevice = $1 WHERE userid = $2"#)
-                    .bind(&device_name)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET GpodderServerEnabled = TRUE, DefaultGpodderDevice = ? WHERE UserID = ?")
                     .bind(&device_name)
                     .bind(user_id)
                     .execute(pool)
@@ -369,12 +267,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET gpodderserverenabled = FALSE WHERE userid = $1"#)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET GpodderServerEnabled = FALSE WHERE UserID = ?")
                     .bind(user_id)
                     .execute(pool)
                     .await?;
@@ -412,39 +304,6 @@ impl DatabasePool {
                     UPDATE "Users"
                     SET gpodderurl = '', gpodderloginname = '', gpoddertoken = '', pod_sync_type = 'None', gpodderserverenabled = FALSE
                     WHERE userid = $1
-                "#)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await?;
-                
-                tx.commit().await?;
-                crate::services::sync::invalidate_sync_enabled(user_id); // GpodderServerEnabled changed
-                Ok(true)
-            },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                
-                // First delete any device records
-                sqlx::query("DELETE FROM GpodderDevices WHERE UserID = ?")
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await?;
-                
-                sqlx::query("DELETE FROM GpodderSyncState WHERE UserID = ?")
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await?;
-
-                sqlx::query("DELETE FROM SyncTargets WHERE UserID = ?")
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await?;
-                
-                // Then clear GPodder settings from user record
-                sqlx::query(r#"
-                    UPDATE Users
-                    SET GpodderUrl = '', GpodderLoginName = '', GpodderToken = '', Pod_Sync_Type = 'None', GpodderServerEnabled = FALSE
-                    WHERE UserID = ?
                 "#)
                     .bind(user_id)
                     .execute(&mut *tx)

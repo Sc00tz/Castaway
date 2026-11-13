@@ -35,24 +35,6 @@ impl DatabasePool {
 
                 Ok(new_status)
             },
-            mysql(pool) => {
-                // Get current status
-                let current_status: Option<i32> = sqlx::query_scalar("SELECT EnableRSSFeeds FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                let new_status = current_status.unwrap_or(0) == 0;
-
-                // Update status
-                sqlx::query("UPDATE Users SET EnableRSSFeeds = ? WHERE UserID = ?")
-                    .bind(new_status as i32)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-
-                Ok(new_status)
-            },
         })
     }
 
@@ -89,28 +71,6 @@ impl DatabasePool {
                 }
                 tx.commit().await?;
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                let result = sqlx::query("INSERT INTO RssKeys (UserID, RssKey) VALUES (?, ?)")
-                    .bind(user_id)
-                    .bind(&rss_key)
-                    .execute(&mut *tx)
-                    .await?;
-
-                let key_id = result.last_insert_id() as i32;
-
-                // Handle podcast IDs if provided
-                if let Some(podcast_ids) = podcast_ids {
-                    for podcast_id in podcast_ids {
-                        sqlx::query("INSERT INTO RssKeyMap (RssKeyID, PodcastID) VALUES (?, ?)")
-                            .bind(key_id)
-                            .bind(podcast_id)
-                            .execute(&mut *tx)
-                            .await?;
-                    }
-                }
-                tx.commit().await?;
-            },
         });
 
         Ok(rss_key)
@@ -128,18 +88,6 @@ impl DatabasePool {
                    ORDER BY k.rsskeyid LIMIT 1"#,
             )
             .bind(user_id)
-            .bind(podcast_id)
-            .fetch_optional(pool)
-            .await?,
-            mysql(pool) => sqlx::query_scalar(
-                "SELECT k.RssKey FROM RssKeys k
-                 WHERE k.UserID = ?
-                   AND EXISTS (SELECT 1 FROM RssKeyMap m WHERE m.RssKeyID = k.RssKeyID AND m.PodcastID = ?)
-                   AND NOT EXISTS (SELECT 1 FROM RssKeyMap m WHERE m.RssKeyID = k.RssKeyID AND m.PodcastID <> ?)
-                 ORDER BY k.RssKeyID LIMIT 1",
-            )
-            .bind(user_id)
-            .bind(podcast_id)
             .bind(podcast_id)
             .fetch_optional(pool)
             .await?,
@@ -203,52 +151,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT fk.UserID, GROUP_CONCAT(fkm.PodcastID) as podcastids
-                    FROM RssKeys fk
-                    LEFT JOIN RssKeyMap fkm ON fk.RssKeyID = fkm.RssKeyID
-                    WHERE fk.RssKey = ?
-                    GROUP BY fk.UserID
-                "#)
-                    .bind(api_key)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let user_id: i32 = row.try_get("UserID")?;
-                    let podcast_ids_str: Option<String> = row.try_get("podcastids").ok();
-                    
-                    let key_podcast_ids = if let Some(ids_str) = podcast_ids_str {
-                        ids_str.split(',')
-                            .filter_map(|s| s.parse::<i32>().ok())
-                            .collect::<Vec<i32>>()
-                    } else {
-                        vec![-1] // Universal access if no specific podcasts
-                    };
-                    
-                    // Check if access is allowed
-                    if filter_podcast_ids {
-                        if let Some(requested_ids) = podcast_ids {
-                            let has_universal = key_podcast_ids.contains(&-1);
-                            let has_specific_access = requested_ids.iter()
-                                .all(|id| key_podcast_ids.contains(id));
-                            
-                            if !has_universal && !has_specific_access {
-                                return Ok(None);
-                            }
-                        }
-                    }
-                    
-                    Ok(Some(RssKeyInfo {
-                        podcast_ids: key_podcast_ids,
-                        user_id,
-                        key: api_key.to_string(),
-                    }))
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -263,19 +165,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     let enabled: Option<bool> = row.try_get("enablerssfeeds").ok();
-                    Ok(enabled.unwrap_or(false))
-                } else {
-                    Ok(false)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT EnableRSSFeeds FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let enabled: Option<bool> = row.try_get("EnableRSSFeeds").ok();
                     Ok(enabled.unwrap_or(false))
                 } else {
                     Ok(false)
@@ -327,18 +216,6 @@ impl DatabasePool {
                     return Err(AppError::not_found("User not found"));
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Username FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    row.try_get::<String, _>("Username").unwrap_or_else(|_| "Unknown User".to_string())
-                } else {
-                    return Err(AppError::not_found("User not found"));
-                }
-            },
         });
         
         // Get podcast details for feed metadata - exact Python logic
@@ -359,44 +236,6 @@ impl DatabasePool {
                         )
                     } else {
                         ("Unknown Podcast".to_string(), format!("{}/static/assets/favicon.png", domain), "No description available".to_string())
-                    }
-                },
-                mysql(pool) => {
-                    if effective_podcast_ids.len() == 1 {
-                        let row = sqlx::query("SELECT PodcastName, ArtworkURL, Description FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                            .bind(effective_podcast_ids[0])
-                            .bind(user_id)
-                            .fetch_optional(pool)
-                            .await?;
-                        
-                        if let Some(row) = row {
-                            (
-                                row.try_get::<String, _>("PodcastName").unwrap_or_else(|_| "Unknown Podcast".to_string()),
-                                row.try_get::<Option<String>, _>("ArtworkURL").unwrap_or_default().unwrap_or_else(|| format!("{}/static/assets/favicon.png", domain)),
-                                row.try_get::<String, _>("Description").unwrap_or_else(|_| "No description available".to_string()),
-                            )
-                        } else {
-                            ("Unknown Podcast".to_string(), format!("{}/static/assets/favicon.png", domain), "No description available".to_string())
-                        }
-                    } else {
-                        let placeholders = vec!["?"; effective_podcast_ids.len()].join(",");
-                        let query_str = format!("SELECT PodcastName, ArtworkURL, Description FROM Podcasts WHERE PodcastID IN ({}) AND UserID = ?", placeholders);
-                        let mut query = sqlx::query(sqlx::AssertSqlSafe(query_str.as_str()));
-                        for &id in &effective_podcast_ids {
-                            query = query.bind(id);
-                        }
-                        query = query.bind(user_id);
-                        let row = query.fetch_optional(pool).await?;
-                        
-                        if let Some(row) = row {
-                            (
-                                row.try_get::<String, _>("PodcastName").unwrap_or_else(|_| "Unknown Podcast".to_string()),
-                                row.try_get::<Option<String>, _>("ArtworkURL").unwrap_or_default().unwrap_or_else(|| format!("{}/static/assets/favicon.png", domain)),
-                                row.try_get::<String, _>("Description").unwrap_or_else(|_| "No description available".to_string()),
-                            )
-                        } else {
-                            ("Unknown Podcast".to_string(), format!("{}/static/assets/favicon.png", domain), "No description available".to_string())
-                        }
                     }
                 },
             })
@@ -690,16 +529,6 @@ impl DatabasePool {
                     None => return Err(AppError::not_found("User not found")),
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Username FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                match row {
-                    Some(row) => row.try_get::<String, _>("Username").unwrap_or_else(|_| "Unknown User".to_string()),
-                    None => return Err(AppError::not_found("User not found")),
-                }
-            },
         });
 
         // User RSS key for authenticated stream URLs on downloaded episodes
@@ -818,20 +647,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT k.RssKey FROM RssKeys k
-                    WHERE k.UserID = ? AND NOT EXISTS (SELECT 1 FROM RssKeyMap m WHERE m.RssKeyID = k.RssKeyID)
-                    ORDER BY k.RssKeyID LIMIT 1")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    Ok(row.try_get("RssKey").ok())
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -855,29 +670,6 @@ impl DatabasePool {
                     // Create new RSS key
                     let new_key = uuid::Uuid::new_v4().to_string();
                     q::query(r#"INSERT INTO "RssKeys" (userid, rsskey) VALUES ($1, $2)"#)
-                        .bind(user_id)
-                        .bind(&new_key)
-                        .execute(pool)
-                        .await?;
-                    Ok(new_key)
-                }
-            },
-            mysql(pool) => {
-                // Try to get existing RSS key
-                let existing_key = sqlx::query("SELECT k.RssKey FROM RssKeys k
-                    WHERE k.UserID = ? AND NOT EXISTS (SELECT 1 FROM RssKeyMap m WHERE m.RssKeyID = k.RssKeyID)
-                    ORDER BY k.RssKeyID LIMIT 1")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = existing_key {
-                    let key: String = row.try_get("RssKey")?;
-                    Ok(key)
-                } else {
-                    // Create new RSS key
-                    let new_key = uuid::Uuid::new_v4().to_string();
-                    sqlx::query("INSERT INTO RssKeys (UserID, RssKey) VALUES (?, ?)")
                         .bind(user_id)
                         .bind(&new_key)
                         .execute(pool)
@@ -990,124 +782,6 @@ impl DatabasePool {
                     let artwork_url = episode_artwork.filter(|url| !url.is_empty()).or(podcast_artwork);
                     
                     let pub_date = match row.try_get::<chrono::NaiveDateTime, _>("episodepubdate") {
-                        Ok(naive) => DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)
-                            .format("%a, %d %b %Y %H:%M:%S %z")
-                            .to_string(),
-                        Err(_) => Utc::now().format("%a, %d %b %Y %H:%M:%S %z").to_string(),
-                    };
-
-                    episodes.push(RssEpisode {
-                        title,
-                        description,
-                        url,
-                        pub_date,
-                        duration,
-                        author,
-                        artwork_url,
-                    });
-                }
-                
-                Ok(episodes)
-            },
-            mysql(pool) => {
-                let mut base_query = r#"
-                    SELECT
-                        e.EpisodeID,
-                        pp.PodcastID,
-                        e.EpisodeTitle COLLATE utf8mb4_unicode_ci as EpisodeTitle,
-                        e.EpisodeDescription COLLATE utf8mb4_unicode_ci as EpisodeDescription,
-                        CASE WHEN de.EpisodeID IS NULL
-                                THEN e.EpisodeURL COLLATE utf8mb4_unicode_ci
-                                ELSE CONCAT(CAST(? AS CHAR), '/api/data/stream/', CAST(e.EpisodeID AS CHAR), '?api_key=', CAST(? AS CHAR), '&user_id=', pp.UserID)
-                        END COLLATE utf8mb4_unicode_ci as EpisodeURL,
-                        e.EpisodeArtwork COLLATE utf8mb4_unicode_ci as EpisodeArtwork,
-                        e.EpisodePubDate,
-                        e.EpisodeDuration,
-                        pp.PodcastName COLLATE utf8mb4_unicode_ci as PodcastName,
-                        pp.Author COLLATE utf8mb4_unicode_ci as Author,
-                        pp.ArtworkURL COLLATE utf8mb4_unicode_ci as ArtworkURL,
-                        pp.Description COLLATE utf8mb4_unicode_ci as PodcastDescription
-                    FROM Episodes e
-                    JOIN Podcasts pp ON e.FeedID = pp.FeedID
-                    LEFT JOIN DownloadedEpisodes de ON e.EpisodeID = de.EpisodeID
-                    WHERE pp.UserID = ?
-                "#.to_string();
-
-                if podcast_filter && !podcast_ids.is_empty() {
-                    let placeholders = vec!["?"; podcast_ids.len()].join(",");
-                    base_query.push_str(&format!(" AND pp.PodcastID IN ({})", placeholders));
-                }
-
-                // Add YouTube union if needed
-                let add_youtube_union = source_type.is_none() || source_type == Some("youtube");
-                if add_youtube_union {
-                    base_query.push_str(r#"
-                        UNION ALL
-                        SELECT
-                            y.VideoID as EpisodeID,
-                            y.PodcastID as PodcastID,
-                            y.VideoTitle COLLATE utf8mb4_unicode_ci as EpisodeTitle,
-                            y.VideoDescription COLLATE utf8mb4_unicode_ci as EpisodeDescription,
-                            CONCAT(CAST(? AS CHAR), '/api/data/stream/', CAST(y.VideoID AS CHAR), '?api_key=', CAST(? AS CHAR), '&type=youtube&user_id=', pv.UserID) COLLATE utf8mb4_unicode_ci as EpisodeURL,
-                            y.ThumbnailURL COLLATE utf8mb4_unicode_ci as EpisodeArtwork,
-                            y.PublishedAt as EpisodePubDate,
-                            y.Duration as EpisodeDuration,
-                            pv.PodcastName COLLATE utf8mb4_unicode_ci as PodcastName,
-                            pv.Author COLLATE utf8mb4_unicode_ci as Author,
-                            pv.ArtworkURL COLLATE utf8mb4_unicode_ci as ArtworkURL,
-                            pv.Description COLLATE utf8mb4_unicode_ci as PodcastDescription
-                        FROM YouTubeVideos y
-                        JOIN Podcasts pv on y.PodcastID = pv.PodcastID
-                        WHERE pv.UserID = ?
-                    "#);
-
-                    if podcast_filter && !podcast_ids.is_empty() {
-                        let placeholders = vec!["?"; podcast_ids.len()].join(",");
-                        base_query.push_str(&format!(" AND pv.PodcastID IN ({})", placeholders));
-                    }
-                }
-
-                base_query.push_str(" ORDER BY EpisodePubDate DESC");
-                if limit > 0 {
-                    base_query.push_str(&format!(" LIMIT {}", limit));
-                }
-
-                // Build query with parameters
-                let mut query = sqlx::query(sqlx::AssertSqlSafe(base_query.as_str()))
-                    .bind(domain)
-                    .bind(api_key)
-                    .bind(user_id);
-
-                if podcast_filter && !podcast_ids.is_empty() {
-                    for &id in podcast_ids {
-                        query = query.bind(id);
-                    }
-                }
-
-                if add_youtube_union {
-                    query = query.bind(domain).bind(api_key).bind(user_id);
-                    if podcast_filter && !podcast_ids.is_empty() {
-                        for &id in podcast_ids {
-                            query = query.bind(id);
-                        }
-                    }
-                }
-
-                let rows = query.fetch_all(pool).await?;
-                
-                let mut episodes = Vec::new();
-                for row in rows {
-                    let title: String = row.try_get("EpisodeTitle").unwrap_or_else(|_| "Untitled Episode".to_string());
-                    let description: String = row.try_get("EpisodeDescription").unwrap_or_else(|_| String::new());
-                    let url: String = row.try_get("EpisodeURL").unwrap_or_else(|_| String::new());
-                    let duration: Option<i32> = row.try_get("EpisodeDuration").ok();
-                    let author: Option<String> = row.try_get("Author").ok();
-                    // Use episode-specific artwork if available, otherwise fall back to podcast artwork
-                    let episode_artwork: Option<String> = row.try_get("EpisodeArtwork").ok();
-                    let podcast_artwork: Option<String> = row.try_get("ArtworkURL").ok();
-                    let artwork_url = episode_artwork.filter(|url| !url.is_empty()).or(podcast_artwork);
-                    
-                    let pub_date = match row.try_get::<chrono::NaiveDateTime, _>("EpisodePubDate") {
                         Ok(naive) => DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc)
                             .format("%a, %d %b %Y %H:%M:%S %z")
                             .to_string(),

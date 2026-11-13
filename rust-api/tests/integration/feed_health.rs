@@ -182,30 +182,3 @@ async fn removing_a_failed_import_unsubscribes_the_apps_and_dismissing_only_hide
     assert!(strings(&all, "add").contains(&kept) && !strings(&all, "add").contains(&gone), "{all}");
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn feeds_already_failing_count_from_their_last_attempt_after_the_upgrade() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let user = app.user("upgrade-health").await;
-    let url = app.feed("old-fail.xml", &Feed::with_episodes("Old", 1));
-    let pod = app.subscribe(&user, &url, 1).await;
-    exec(&app, &format!(
-        r#"UPDATE "Podcasts" SET ConsecutiveFailures = 4, LastRefreshAttempt = '2026-01-02 03:04:05', LastErrorMessage = 'Feed gone: HTTP 404' WHERE PodcastID = {pod}"#
-    ))
-    .await;
-    exec(&app, r#"DROP TABLE "SyncImportFailures""#).await;
-    for column in ["FailingSince", "LastErrorKind", "ProblemNotified"] {
-        exec(&app, &format!(r#"ALTER TABLE "Podcasts" DROP COLUMN {column}"#)).await;
-    }
-
-    rerun_migrations(&app, &["071"]).await;
-    rerun_migrations(&app, &["071"]).await;
-
-    let since = int(&app, &format!(r#"SELECT COUNT(*) FROM "Podcasts" WHERE PodcastID = {pod} AND FailingSince = LastRefreshAttempt"#)).await;
-    assert_eq!(since, Some(1));
-    let p = problems(&app, &user).await;
-    assert_eq!((p["feeds"][0]["failures"].as_i64(), p["feeds"][0]["kind"].as_str()), (Some(4), Some("other")), "{p}");
-    assert_eq!(p["imports"], json!([]));
-}

@@ -531,7 +531,7 @@ async fn outbound_plays_are_antennapod_safe() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn pinepods_never_syncs_as_another_clients_device() {
+async fn castaway_never_syncs_as_another_clients_device() {
     let s = with_target(setup().await, TargetKind::Gpodder).await;
     s.phone().await; // creates the phone's device
     // Older setups stored a device picked from the server's list, often the phone's.
@@ -541,7 +541,7 @@ async fn pinepods_never_syncs_as_another_clients_device() {
     s.run(RunMode::Incremental).await.unwrap();
     assert_eq!(s.target().await.device_name.as_deref(), Some("castaway"));
     let paths: Vec<String> = s.mock.requests().into_iter().skip(before).map(|r| r.path).collect();
-    assert!(paths.iter().any(|p| p == "/api/2/subscriptions/remote/pinepods.json"), "{paths:?}");
+    assert!(paths.iter().any(|p| p == "/api/2/subscriptions/remote/castaway.json"), "{paths:?}");
     assert!(!paths.iter().any(|p| p.contains("/phone")), "{paths:?}");
     let devices = GpodderClient::new(&s.mock.base_url, REMOTE_USER, REMOTE_PASS, "x");
     devices.login().await.assert_ok();

@@ -62,35 +62,6 @@ impl DatabasePool {
                     });
                 }
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT p.PodcastName, uns.Platform, uns.NtfyTopic, uns.NtfyServerUrl,
-                            uns.NtfyUsername, uns.NtfyPassword, uns.NtfyAccessToken,
-                            uns.GotifyUrl, uns.GotifyToken, uns.HttpUrl, uns.HttpToken, uns.HttpMethod
-                     FROM Podcasts p
-                     JOIN UserNotificationSettings uns ON p.UserID = uns.UserID
-                     WHERE p.PodcastID = ? AND p.NotificationsEnabled = true AND uns.Enabled = true"
-                )
-                .bind(podcast_id)
-                .fetch_all(pool)
-                .await?;
-                for row in rows {
-                    targets.push(NotificationTarget {
-                        podcast_name: row.try_get("PodcastName")?,
-                        platform: row.try_get("Platform")?,
-                        ntfy_topic: row.try_get("NtfyTopic").ok(),
-                        ntfy_server_url: row.try_get("NtfyServerUrl").ok(),
-                        ntfy_username: row.try_get("NtfyUsername").ok(),
-                        ntfy_password: row.try_get("NtfyPassword").ok(),
-                        ntfy_access_token: row.try_get("NtfyAccessToken").ok(),
-                        gotify_url: row.try_get("GotifyUrl").ok(),
-                        gotify_token: row.try_get("GotifyToken").ok(),
-                        http_url: row.try_get("HttpUrl").ok(),
-                        http_token: row.try_get("HttpToken").ok(),
-                        http_method: row.try_get("HttpMethod").ok(),
-                    });
-                }
-            },
         });
         Ok(targets)
     }
@@ -284,129 +255,6 @@ impl DatabasePool {
         }
     }
 
-    // // Get podcast details - matches Python get_podcast_details function exactly
-    // pub async fn get_podcast_details(&self, user_id: i32, podcast_id: i32) -> AppResult<Option<serde_json::Value>> {
-    //     info!("Getting podcast details for podcast {} and user {}", podcast_id, user_id);
-        
-    //     let details = match self {
-    //         DatabasePool::Postgres(pool) => {
-    //             // Try to get podcast for user first, then fall back to UserID=1
-    //             let mut row = sqlx::query(r#"SELECT * FROM "Podcasts" WHERE podcastid = $1 AND userid = $2"#)
-    //                 .bind(podcast_id)
-    //                 .bind(user_id)
-    //                 .fetch_optional(pool)
-    //                 .await?;
-                
-    //             if row.is_none() {
-    //                 row = sqlx::query(r#"SELECT * FROM "Podcasts" WHERE podcastid = $1 AND userid = 1"#)
-    //                     .bind(podcast_id)
-    //                     .fetch_optional(pool)
-    //                     .await?;
-    //             }
-                
-    //             if let Some(row) = row {
-    //                 // Get episode count from YouTubeVideos table if this is a YouTube channel
-    //                 let mut episode_count = row.try_get::<i32, _>("episodecount")?;
-    //                 let is_youtube_channel = row.try_get::<bool, _>("isyoutubechannel").unwrap_or(false);
-                    
-    //                 if is_youtube_channel {
-    //                     let count_result = sqlx::query(r#"SELECT COUNT(*) as count FROM "YouTubeVideos" WHERE podcastid = $1"#)
-    //                         .bind(podcast_id)
-    //                         .fetch_one(pool)
-    //                         .await?;
-    //                     episode_count = count_result.try_get::<i64, _>("count")? as i32;
-    //                 }
-
-    //                 Some(serde_json::json!({
-    //                     "podcastid": row.try_get::<i32, _>("podcastid")?,
-    //                     "podcastindexid": row.try_get::<Option<i32>, _>("podcastindexid")?,
-    //                     "podcastname": row.try_get::<String, _>("podcastname")?,
-    //                     "artworkurl": row.try_get::<Option<String>, _>("artworkurl").unwrap_or_default().unwrap_or_default(),
-    //                     "author": row.try_get::<String, _>("author")?,
-    //                     "categories": row.try_get::<Option<String>, _>("categories")?,
-    //                     "description": row.try_get::<Option<String>, _>("description")?.unwrap_or_default(),
-    //                     "episodecount": episode_count,
-    //                     "feedurl": row.try_get::<String, _>("feedurl")?,
-    //                     "websiteurl": row.try_get::<String, _>("websiteurl")?,
-    //                     "explicit": row.try_get::<bool, _>("explicit")?,
-    //                     "userid": row.try_get::<i32, _>("userid")?,
-    //                     "autodownload": row.try_get::<bool, _>("autodownload").unwrap_or(false),
-    //                     "startskip": row.try_get::<i32, _>("startskip").unwrap_or(0),
-    //                     "endskip": row.try_get::<i32, _>("endskip").unwrap_or(0),
-    //                     "username": row.try_get::<Option<String>, _>("username")?,
-    //                     "password": row.try_get::<Option<String>, _>("password")?,
-    //                     "isyoutubechannel": is_youtube_channel,
-    //                     "notificationsenabled": row.try_get::<bool, _>("notificationsenabled").unwrap_or(false),
-    //                     "feedcutoffdays": row.try_get::<i32, _>("feedcutoffdays").unwrap_or(0),
-    //                 }))
-    //             } else {
-    //                 None
-    //             }
-    //         }
-    //         DatabasePool::MySQL(pool) => {
-    //             // Try to get podcast for user first, then fall back to UserID=1
-    //             let mut row = sqlx::query("SELECT * FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-    //                 .bind(podcast_id)
-    //                 .bind(user_id)
-    //                 .fetch_optional(pool)
-    //                 .await?;
-                
-    //             if row.is_none() {
-    //                 row = sqlx::query("SELECT * FROM Podcasts WHERE PodcastID = ? AND UserID = 1")
-    //                     .bind(podcast_id)
-    //                     .fetch_optional(pool)
-    //                     .await?;
-    //             }
-                
-    //             if let Some(row) = row {
-    //                 // Get episode count from YouTubeVideos table if this is a YouTube channel
-    //                 let mut episode_count = row.try_get::<i32, _>("EpisodeCount")?;
-    //                 let is_youtube_channel = row.try_get::<i8, _>("IsYouTubeChannel").unwrap_or(0) != 0;
-                    
-    //                 if is_youtube_channel {
-    //                     let count_result = sqlx::query("SELECT COUNT(*) as count FROM YouTubeVideos WHERE PodcastID = ?")
-    //                         .bind(podcast_id)
-    //                         .fetch_one(pool)
-    //                         .await?;
-    //                     episode_count = count_result.try_get::<i64, _>("count")? as i32;
-    //                 }
-
-    //                 Some(serde_json::json!({
-    //                     "podcastid": row.try_get::<i32, _>("PodcastID")?,
-    //                     "podcastindexid": row.try_get::<Option<i32>, _>("PodcastIndexID")?,
-    //                     "podcastname": row.try_get::<String, _>("PodcastName")?,
-    //                     "artworkurl": row.try_get::<Option<String>, _>("ArtworkURL").unwrap_or_default().unwrap_or_default(),
-    //                     "author": row.try_get::<String, _>("Author")?,
-    //                     "categories": row.try_get::<Option<String>, _>("Categories")?,
-    //                     "description": row.try_get::<String, _>("Description")?,
-    //                     "episodecount": episode_count,
-    //                     "feedurl": row.try_get::<String, _>("FeedURL")?,
-    //                     "websiteurl": row.try_get::<String, _>("WebsiteURL")?,
-    //                     "explicit": row.try_get::<i8, _>("Explicit").unwrap_or(0) != 0,
-    //                     "userid": row.try_get::<i32, _>("UserID")?,
-    //                     "autodownload": row.try_get::<i8, _>("AutoDownload").unwrap_or(0) != 0,
-    //                     "startskip": row.try_get::<i32, _>("StartSkip").unwrap_or(0),
-    //                     "endskip": row.try_get::<i32, _>("EndSkip").unwrap_or(0),
-    //                     "username": row.try_get::<Option<String>, _>("Username")?,
-    //                     "password": row.try_get::<Option<String>, _>("Password")?,
-    //                     "isyoutubechannel": is_youtube_channel,
-    //                     "notificationsenabled": row.try_get::<i8, _>("NotificationsEnabled").unwrap_or(0) != 0,
-    //                     "feedcutoffdays": row.try_get::<i32, _>("FeedCutoffDays").unwrap_or(0),
-    //                 }))
-    //             } else {
-    //                 None
-    //             }
-    //         }
-    //     };
-        
-    //     if let Some(ref result) = details {
-    //         debug!("Found podcast details for: {}", result["podcast_name"]);
-    //     } else {
-    //         debug!("No podcast found with ID {} for user {}", podcast_id, user_id);
-    //     }
-        
-    //     Ok(details)
-    // }
     
     // Get notification settings - matches Python get_notification_settings function exactly
     pub async fn get_notification_settings(&self, user_id: i32) -> AppResult<Vec<serde_json::Value>> {
@@ -438,37 +286,6 @@ impl DatabasePool {
                         "http_url": row.try_get::<Option<String>, _>("httpurl")?,
                         "http_token": row.try_get::<Option<String>, _>("httptoken")?,
                         "http_method": row.try_get::<Option<String>, _>("httpmethod")?
-                    });
-                    settings.push(setting);
-                }
-                settings
-            },
-            mysql(pool) => {
-                let rows = sqlx::query("
-                    SELECT Platform, Enabled, NtfyTopic, NtfyServerURL, NtfyUsername, NtfyPassword, NtfyAccessToken, GotifyURL, GotifyToken, HttpUrl, HttpToken, HttpMethod
-                    FROM UserNotificationSettings 
-                    WHERE UserID = ?
-                    ORDER BY Platform
-                ")
-                    .bind(user_id)
-                    .fetch_all(pool)
-                    .await?;
-                
-                let mut settings = Vec::new();
-                for row in rows {
-                    let setting = serde_json::json!({
-                        "platform": row.try_get::<String, _>("Platform")?,
-                        "enabled": row.try_get::<bool, _>("Enabled")?,
-                        "ntfy_topic": row.try_get::<Option<String>, _>("NtfyTopic")?,
-                        "ntfy_server_url": row.try_get::<Option<String>, _>("NtfyServerURL")?,
-                        "ntfy_username": row.try_get::<Option<String>, _>("NtfyUsername")?,
-                        "ntfy_password": row.try_get::<Option<String>, _>("NtfyPassword")?,
-                        "ntfy_access_token": row.try_get::<Option<String>, _>("NtfyAccessToken")?,
-                        "gotify_url": row.try_get::<Option<String>, _>("GotifyURL")?,
-                        "gotify_token": row.try_get::<Option<String>, _>("GotifyToken")?,
-                        "http_url": row.try_get::<Option<String>, _>("HttpUrl")?,
-                        "http_token": row.try_get::<Option<String>, _>("HttpToken")?,
-                        "http_method": row.try_get::<Option<String>, _>("HttpMethod")?
                     });
                     settings.push(setting);
                 }
@@ -525,63 +342,6 @@ impl DatabasePool {
                         (userid, platform, enabled, ntfytopic, ntfyserverurl, ntfyusername, ntfypassword, ntfyaccesstoken, gotifyurl, gotifytoken, httpurl, httptoken, httpmethod)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                     "#)
-                        .bind(user_id)
-                        .bind(platform)
-                        .bind(enabled)
-                        .bind(ntfy_topic)
-                        .bind(ntfy_server_url)
-                        .bind(ntfy_username)
-                        .bind(ntfy_password)
-                        .bind(ntfy_access_token)
-                        .bind(gotify_url)
-                        .bind(gotify_token)
-                        .bind(http_url)
-                        .bind(http_token)
-                        .bind(http_method)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                }
-            },
-            mysql(pool) => {
-                let existing = sqlx::query("SELECT COUNT(*) as count FROM UserNotificationSettings WHERE UserID = ? AND Platform = ?")
-                    .bind(user_id)
-                    .bind(platform)
-                    .fetch_one(pool)
-                    .await?;
-                
-                let count: i64 = existing.try_get("count")?;
-                
-                if count > 0 {
-                    // Update existing record
-                    let result = sqlx::query("
-                        UPDATE UserNotificationSettings 
-                        SET Enabled = ?, NtfyTopic = ?, NtfyServerURL = ?, NtfyUsername = ?, NtfyPassword = ?, NtfyAccessToken = ?, GotifyURL = ?, GotifyToken = ?, HttpUrl = ?, HttpToken = ?, HttpMethod = ?
-                        WHERE UserID = ? AND Platform = ?
-                    ")
-                        .bind(enabled)
-                        .bind(ntfy_topic)
-                        .bind(ntfy_server_url)
-                        .bind(ntfy_username)
-                        .bind(ntfy_password)
-                        .bind(ntfy_access_token)
-                        .bind(gotify_url)
-                        .bind(gotify_token)
-                        .bind(http_url)
-                        .bind(http_token)
-                        .bind(http_method)
-                        .bind(user_id)
-                        .bind(platform)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                } else {
-                    // Insert new record
-                    let result = sqlx::query("
-                        INSERT INTO UserNotificationSettings 
-                        (UserID, Platform, Enabled, NtfyTopic, NtfyServerURL, NtfyUsername, NtfyPassword, NtfyAccessToken, GotifyURL, GotifyToken, HttpUrl, HttpToken, HttpMethod)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ")
                         .bind(user_id)
                         .bind(platform)
                         .bind(enabled)

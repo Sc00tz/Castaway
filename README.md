@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="240" src="./images/pinepods-logo.jpeg" alt="Castaway logo">
+  <img width="240" src="./images/castaway-logo.jpeg" alt="Castaway logo">
 </p>
 
 <h1 align="center">Castaway</h1>

@@ -234,12 +234,6 @@ impl DatabasePool {
                     .await?
                     .unwrap_or(false)
             },
-            mysql(pool) => {
-                sqlx::query_scalar::<_, i8>("SELECT PodpingEnabled FROM AppSettings ORDER BY AppSettingsID LIMIT 1")
-                    .fetch_optional(pool)
-                    .await?
-                    .is_some_and(|v| v != 0)
-            },
         }))
     }
 
@@ -247,9 +241,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "AppSettings" SET podpingenabled = $1"#).bind(enabled).execute(pool).await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE AppSettings SET PodpingEnabled = ?").bind(enabled).execute(pool).await?;
             },
         });
         Ok(())
@@ -266,14 +257,6 @@ impl DatabasePool {
                     .bind(chunk)
                     .fetch_all(pool)
                     .await?,
-                mysql(pool) => {
-                    let sql = format!("SELECT DISTINCT FeedURL FROM Podcasts WHERE FeedURL IN ({})", vec!["?"; chunk.len()].join(", "));
-                    let mut q = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()));
-                    for u in chunk {
-                        q = q.bind(u);
-                    }
-                    q.fetch_all(pool).await?
-                },
             });
             found.extend(rows);
         }

@@ -18,17 +18,6 @@ impl DatabasePool {
                 .await?;
                 Ok(row.map(|r| r.try_get::<String, _>("resultsjson").unwrap_or_default()))
             },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT ResultsJSON FROM RecommendationCache
-                    WHERE UserID = ? AND GeneratedAt > (NOW() - INTERVAL ? HOUR)
-                "#)
-                .bind(user_id)
-                .bind(max_age_hours)
-                .fetch_optional(pool)
-                .await?;
-                Ok(row.map(|r| r.try_get::<String, _>("ResultsJSON").unwrap_or_default()))
-            },
         })
     }
 
@@ -40,17 +29,6 @@ impl DatabasePool {
                     INSERT INTO "RecommendationCache" (userid, generatedat, resultsjson)
                     VALUES ($1, CURRENT_TIMESTAMP, $2)
                     ON CONFLICT (userid) DO UPDATE SET generatedat = CURRENT_TIMESTAMP, resultsjson = EXCLUDED.resultsjson
-                "#)
-                .bind(user_id)
-                .bind(results_json)
-                .execute(pool)
-                .await?;
-            },
-            mysql(pool) => {
-                sqlx::query(r#"
-                    INSERT INTO RecommendationCache (UserID, GeneratedAt, ResultsJSON)
-                    VALUES (?, NOW(), ?)
-                    ON DUPLICATE KEY UPDATE GeneratedAt = NOW(), ResultsJSON = VALUES(ResultsJSON)
                 "#)
                 .bind(user_id)
                 .bind(results_json)
@@ -71,12 +49,6 @@ impl DatabasePool {
                     .fetch_all(pool)
                     .await?;
                 Ok(rows.iter().filter_map(|r| r.try_get::<i32, _>("userid").ok()).collect())
-            },
-            mysql(pool) => {
-                let rows = sqlx::query("SELECT UserID FROM RecommendationCache")
-                    .fetch_all(pool)
-                    .await?;
-                Ok(rows.iter().filter_map(|r| r.try_get::<i32, _>("UserID").ok()).collect())
             },
         })
     }
@@ -114,37 +86,6 @@ impl DatabasePool {
                         categories: cats.and_then(|c| self.parse_categories_json(&c)),
                         podcastindexid: row.try_get::<Option<i32>, _>("podcastindexid").ok().flatten().map(|v| v as i64),
                         feedurl: row.try_get::<Option<String>, _>("feedurl").ok().flatten().unwrap_or_default(),
-                        is_favorite: row.try_get::<bool, _>("isfavorite").unwrap_or(false),
-                        play_count: row.try_get::<i64, _>("play_count").unwrap_or(0),
-                    }
-                }).collect())
-            },
-            mysql(pool) => {
-                let rows = sqlx::query(r#"
-                    SELECT p.PodcastName, p.Author, p.Description, p.Categories,
-                           p.PodcastIndexID, p.FeedURL,
-                           COALESCE(p.IsFavorite, false) AS isfavorite,
-                           COUNT(ueh.UserEpisodeHistoryID) AS play_count
-                    FROM Podcasts p
-                    LEFT JOIN Episodes e ON p.FeedID = e.FeedID
-                    LEFT JOIN UserEpisodeHistory ueh ON e.EpisodeID = ueh.EpisodeID AND ueh.UserID = ?
-                    WHERE p.UserID = ? AND COALESCE(p.DisplayPodcast, TRUE) = TRUE
-                    GROUP BY p.PodcastID, p.PodcastName, p.Author, p.Description, p.Categories,
-                             p.PodcastIndexID, p.FeedURL, p.IsFavorite
-                "#)
-                .bind(user_id)
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-                Ok(rows.iter().map(|row| {
-                    let cats: Option<String> = row.try_get("Categories").ok();
-                    crate::models::RecommendationTasteInput {
-                        podcastname: row.try_get::<Option<String>, _>("PodcastName").ok().flatten().unwrap_or_default(),
-                        author: row.try_get::<Option<String>, _>("Author").ok().flatten(),
-                        description: row.try_get::<Option<String>, _>("Description").ok().flatten(),
-                        categories: cats.and_then(|c| self.parse_categories_json(&c)),
-                        podcastindexid: row.try_get::<Option<i32>, _>("PodcastIndexID").ok().flatten().map(|v| v as i64),
-                        feedurl: row.try_get::<Option<String>, _>("FeedURL").ok().flatten().unwrap_or_default(),
                         is_favorite: row.try_get::<bool, _>("isfavorite").unwrap_or(false),
                         play_count: row.try_get::<i64, _>("play_count").unwrap_or(0),
                     }

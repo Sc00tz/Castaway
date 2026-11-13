@@ -310,44 +310,6 @@ async fn rows_referencing_user(db: &DatabasePool, user_id: i32) -> Vec<(String, 
                 }
             }
         }
-        DatabasePool::Sqlite(pool) => {
-            let tables: Vec<String> = sqlx::query_scalar(
-                "SELECT m.name FROM sqlite_master m JOIN pragma_table_info(m.name) p \
-                 WHERE m.type = 'table' AND p.name = 'userid'",
-            )
-            .fetch_all(pool)
-            .await
-            .unwrap();
-            for t in tables {
-                let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(r#"SELECT COUNT(*) FROM "{t}" WHERE userid = $1"#)))
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await
-                    .unwrap();
-                if n > 0 {
-                    found.push((t, n));
-                }
-            }
-        }
-        DatabasePool::MySQL(pool) => {
-            let tables: Vec<String> = sqlx::query_scalar(
-                "SELECT CAST(TABLE_NAME AS CHAR) FROM INFORMATION_SCHEMA.COLUMNS \
-                 WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'UserID'",
-            )
-            .fetch_all(pool)
-            .await
-            .unwrap();
-            for t in tables {
-                let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM `{t}` WHERE UserID = ?")))
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await
-                    .unwrap();
-                if n > 0 {
-                    found.push((t, n));
-                }
-            }
-        }
     }
     found.sort();
     found

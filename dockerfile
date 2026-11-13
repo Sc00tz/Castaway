@@ -23,43 +23,12 @@ RUN WASM_BINDGEN_VERSION=$(grep -A2 'name = "wasm-bindgen"' /app/Cargo.lock | gr
     chmod +x /root/.cache/trunk/wasm-bindgen-${WASM_BINDGEN_VERSION}/wasm-bindgen && \
     rm -rf /tmp/wb-dl
 # Add application files to the builder stage
-COPY ./web/Cargo.toml ./web/dev-info.md ./web/index.html ./web/tailwind.config.js ./web/Trunk.toml /app/
+COPY ./web/Cargo.toml ./web/index.html ./web/tailwind.config.js ./web/Trunk.toml /app/
 COPY ./web/src /app/src
 COPY ./web/static /app/static
 WORKDIR /app
 # Build the Yew application in release mode
 RUN RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg getrandom_backend=\"wasm_js\"" trunk build --features server_build --release
-
-# Python builder stage for database setup
-FROM python:3.14-alpine AS python-builder
-WORKDIR /build
-
-# Install build dependencies for PyInstaller and MariaDB connector
-RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev mariadb-connector-c-dev
-
-# Copy Python source files
-COPY ./database_functions ./database_functions
-COPY ./startup/setup_database_new.py ./startup/setup_database_new.py
-COPY ./requirements.txt ./requirements.txt
-
-# Install Python dependencies including PyInstaller
-RUN pip install --no-cache-dir -r requirements.txt pyinstaller
-
-# Build standalone database setup binary
-RUN pyinstaller --onefile \
-    --name pinepods-db-setup \
-    --hidden-import psycopg \
-    --hidden-import mysql.connector \
-    --hidden-import sqlite3 \
-    --hidden-import cryptography \
-    --hidden-import cryptography.fernet \
-    --hidden-import argon2 \
-    --hidden-import argon2.exceptions \
-    --hidden-import argon2.profiles \
-    --hidden-import argon2._password_hasher \
-    --add-data "database_functions:database_functions" \
-    --console \
-    startup/setup_database_new.py
 
 # Rust API builder stage
 FROM rust:alpine AS rust-api-builder
@@ -85,7 +54,7 @@ FROM alpine
 # Metadata
 # Install runtime dependencies
 # su-exec: drop privileges to PUID:PGID at startup. shadow: usermod/groupmod to remap the runtime user's IDs.
-RUN apk add --no-cache tzdata nginx openssl bash mariadb-client postgresql18 postgresql18-client curl ffmpeg wget jq mariadb-connector-c-dev su-exec shadow
+RUN apk add --no-cache tzdata nginx openssl bash postgresql18 postgresql18-client curl ffmpeg wget jq su-exec shadow
 
 # Create a fixed runtime user/group (default 911); startup.sh remaps these to PUID/PGID at runtime
 RUN addgroup -g 911 pinepods && \
@@ -112,8 +81,6 @@ RUN wget -O /tmp/horust.tar.gz "https://github.com/FedericoPonzi/Horust/releases
     rm -f /tmp/horust.tar.gz
 
 ENV TZ=UTC
-# Copy compiled database setup binary (replaces Python dependency)
-COPY --from=python-builder /build/dist/pinepods-db-setup /usr/local/bin/
 # Copy built files from the builder stage to the Nginx serving directory
 COPY --from=builder /app/dist /var/www/html/
 # Copy translation files for the Rust API to access
@@ -131,7 +98,6 @@ RUN mkdir -p /var/log/pinepods/ && mkdir -p /etc/horust/services/
 COPY startup/ /pinepods/startup/
 # Legacy cron scripts removed - background tasks now handled by internal Rust scheduler
 COPY clients/ /pinepods/clients/
-COPY database_functions/ /pinepods/database_functions/
 RUN chmod +x /pinepods/startup/startup.sh
 ENV APP_ROOT=/pinepods
 # Database, downloads and backups all live here; mount it as a volume.

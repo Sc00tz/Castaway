@@ -107,14 +107,6 @@ pub async fn downloaded_location(db_pool: &DatabasePool, episode_id: i32) -> Res
                 .map_err(|e| e.to_string())?
                 .and_then(|row| row.try_get::<String, _>("downloadedlocation").ok())
         },
-        mysql(pool) => {
-            sqlx::query("SELECT DownloadedLocation FROM DownloadedEpisodes WHERE EpisodeID = ? LIMIT 1")
-                .bind(episode_id)
-                .fetch_optional(pool)
-                .await
-                .map_err(|e| e.to_string())?
-                .and_then(|row| row.try_get::<String, _>("DownloadedLocation").ok())
-        },
     });
     Ok(loc)
 }
@@ -204,20 +196,6 @@ pub async fn episode_downloads(db_pool: &DatabasePool, episode_id: i32) -> Resul
             fingerprint: r.try_get("audiofingerprint").ok().flatten(),
         }))
         .collect(),
-        mysql(pool) => sqlx::query(
-            "SELECT UserID, DownloadedLocation, AudioFingerprint FROM DownloadedEpisodes WHERE EpisodeID = ?",
-        )
-        .bind(episode_id)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .filter_map(|r| Some(EpisodeDownload {
-            user_id: r.try_get("UserID").ok()?,
-            path: r.try_get("DownloadedLocation").ok()?,
-            fingerprint: r.try_get("AudioFingerprint").ok().flatten(),
-        }))
-        .collect(),
     });
     Ok(rows.into_iter().filter(|d| std::path::Path::new(&d.path).exists()).collect())
 }
@@ -232,15 +210,6 @@ pub async fn set_download_fingerprint(
     dialect_match!(db_pool, {
         pg(pool) => {
             q::query(r#"UPDATE "DownloadedEpisodes" SET audiofingerprint = $1 WHERE episodeid = $2 AND userid = $3"#)
-                .bind(fingerprint)
-                .bind(episode_id)
-                .bind(user_id)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
-        mysql(pool) => {
-            sqlx::query("UPDATE DownloadedEpisodes SET AudioFingerprint = ? WHERE EpisodeID = ? AND UserID = ?")
                 .bind(fingerprint)
                 .bind(episode_id)
                 .bind(user_id)
@@ -341,22 +310,6 @@ async fn podcast_silence_settings(db_pool: &DatabasePool, episode_id: i32) -> Re
                 r.try_get::<i32, _>("thr").unwrap_or(2),
             ))
         },
-        mysql(pool) => {
-            sqlx::query("
-                SELECT COALESCE(p.TrimSilence, 0) AS trim, COALESCE(p.SilenceThreshold, 2) AS thr
-                FROM Episodes e JOIN Podcasts p ON e.FeedID = p.FeedID
-                WHERE e.EpisodeID = ?
-                ORDER BY COALESCE(p.TrimSilence, 0) DESC LIMIT 1
-            ")
-            .bind(episode_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.to_string())?
-            .map(|r| (
-                r.try_get::<i8, _>("trim").unwrap_or(0) != 0,
-                r.try_get::<i32, _>("thr").unwrap_or(2),
-            ))
-        },
     });
     Ok(row.unwrap_or((false, 2)))
 }
@@ -396,33 +349,6 @@ async fn store_silence_segments(
                 .await
                 .map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query("DELETE FROM EpisodeSkipSegments WHERE EpisodeID = ? AND Source = ?")
-                .bind(episode_id)
-                .bind(SOURCE_SILENCE)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            for (start, end) in segments {
-                sqlx::query("
-                    INSERT INTO EpisodeSkipSegments (EpisodeID, Kind, StartTime, EndTime, Source)
-                    VALUES (?, ?, ?, ?, ?)
-                ")
-                .bind(episode_id)
-                .bind(KIND_SILENCE)
-                .bind(*start)
-                .bind(*end)
-                .bind(SOURCE_SILENCE)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            }
-            sqlx::query("UPDATE Episodes SET SilenceDetected = TRUE WHERE EpisodeID = ?")
-                .bind(episode_id)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
     });
     Ok(segments.len())
 }
@@ -439,17 +365,6 @@ async fn already_detected(db_pool: &DatabasePool, episode_id: i32) -> bool {
         .ok()
         .flatten()
         .and_then(|r| r.try_get::<bool, _>("d").ok())
-        .unwrap_or(false),
-        mysql(pool) => sqlx::query(
-            "SELECT COALESCE(SilenceDetected, 0) AS d FROM Episodes WHERE EpisodeID = ?",
-        )
-        .bind(episode_id)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|r| r.try_get::<i8, _>("d").ok())
-        .map(|d| d != 0)
         .unwrap_or(false),
     })
 }
@@ -505,17 +420,6 @@ pub async fn get_trim_silence(
             r.try_get::<bool, _>("trim").unwrap_or(false),
             r.try_get::<i32, _>("thr").unwrap_or(2),
         )),
-        mysql(pool) => sqlx::query(
-            "SELECT COALESCE(TrimSilence, 0) AS trim, COALESCE(SilenceThreshold, 2) AS thr FROM Podcasts WHERE PodcastID = ?",
-        )
-        .bind(podcast_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .map(|r| (
-            r.try_get::<i8, _>("trim").unwrap_or(0) != 0,
-            r.try_get::<i32, _>("thr").unwrap_or(2),
-        )),
     });
     Ok(row.unwrap_or((false, 2)))
 }
@@ -532,16 +436,6 @@ pub async fn set_trim_silence(
     dialect_match!(db_pool, {
         pg(pool) => {
             q::query(r#"UPDATE "Podcasts" SET trimsilence = $1, silencethreshold = $2 WHERE podcastid = $3 AND userid = $4"#)
-                .bind(enabled)
-                .bind(threshold)
-                .bind(podcast_id)
-                .bind(user_id)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
-        mysql(pool) => {
-            sqlx::query("UPDATE Podcasts SET TrimSilence = ?, SilenceThreshold = ? WHERE PodcastID = ? AND UserID = ?")
                 .bind(enabled)
                 .bind(threshold)
                 .bind(podcast_id)

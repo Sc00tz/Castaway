@@ -23,17 +23,6 @@ impl DatabasePool {
                     None => Ok("Nordic".to_string()),
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Theme FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                match row {
-                    Some(row) => Ok(row.try_get("Theme").unwrap_or_else(|_| "Nordic".to_string())),
-                    None => Ok("Nordic".to_string()),
-                }
-            },
         })
     }
 
@@ -52,18 +41,6 @@ impl DatabasePool {
                 
                 Ok(result.rows_affected() > 0)
             },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET Timezone = ?, TimeFormat = ?, DateFormat = ?, FirstLogin = ? WHERE UserID = ?")
-                    .bind(timezone)
-                    .bind(hour_pref)
-                    .bind(date_format)
-                    .bind(1)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
         })
     }
 
@@ -72,15 +49,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"UPDATE "Users" SET timezone = $1 WHERE userid = $2"#)
-                    .bind(timezone)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET Timezone = ? WHERE UserID = ?")
                     .bind(timezone)
                     .bind(user_id)
                     .execute(pool)
@@ -103,15 +71,6 @@ impl DatabasePool {
                 
                 Ok(result.rows_affected() > 0)
             },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET DateFormat = ? WHERE UserID = ?")
-                    .bind(date_format)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
         })
     }
 
@@ -120,15 +79,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"UPDATE "Users" SET timeformat = $1 WHERE userid = $2"#)
-                    .bind(hour_pref)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET TimeFormat = ? WHERE UserID = ?")
                     .bind(hour_pref)
                     .bind(user_id)
                     .execute(pool)
@@ -164,13 +114,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE UserSettings SET Theme = ? WHERE UserID = ?")
-                    .bind(theme)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -184,52 +127,6 @@ impl DatabasePool {
                        prog_bar_color, error_color, bonus_color, secondary_background, container_background,
                        standout_color, hover_color, link_color, thumb_color, unfilled_color, check_box_color
                        FROM "CustomThemes" WHERE userid = $1 ORDER BY name"#
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-
-                let mut themes = Vec::new();
-                for row in rows {
-                    themes.push(crate::models::CustomTheme {
-                        themeid: row.try_get("themeid")?,
-                        name: row.try_get("name")?,
-                        background_color: row.try_get("background_color")?,
-                        button_color: row.try_get("button_color")?,
-                        container_button_color: row.try_get("container_button_color")?,
-                        button_text_color: row.try_get("button_text_color")?,
-                        text_color: row.try_get("text_color")?,
-                        text_secondary_color: row.try_get("text_secondary_color")?,
-                        border_color: row.try_get("border_color")?,
-                        accent_color: row.try_get("accent_color")?,
-                        prog_bar_color: row.try_get("prog_bar_color")?,
-                        error_color: row.try_get("error_color")?,
-                        bonus_color: row.try_get("bonus_color")?,
-                        secondary_background: row.try_get("secondary_background")?,
-                        container_background: row.try_get("container_background")?,
-                        standout_color: row.try_get("standout_color")?,
-                        hover_color: row.try_get("hover_color")?,
-                        link_color: row.try_get("link_color")?,
-                        thumb_color: row.try_get("thumb_color")?,
-                        unfilled_color: row.try_get("unfilled_color")?,
-                        check_box_color: row.try_get("check_box_color")?,
-                    });
-                }
-                Ok(themes)
-            },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    r#"SELECT ThemeID as themeid, Name as name, BackgroundColor as background_color,
-                       ButtonColor as button_color, ContainerButtonColor as container_button_color,
-                       ButtonTextColor as button_text_color, TextColor as text_color,
-                       TextSecondaryColor as text_secondary_color, BorderColor as border_color,
-                       AccentColor as accent_color, ProgBarColor as prog_bar_color,
-                       ErrorColor as error_color, BonusColor as bonus_color,
-                       SecondaryBackground as secondary_background, ContainerBackground as container_background,
-                       StandoutColor as standout_color, HoverColor as hover_color,
-                       LinkColor as link_color, ThumbColor as thumb_color,
-                       UnfilledColor as unfilled_color, CheckBoxColor as check_box_color
-                       FROM CustomThemes WHERE UserID = ? ORDER BY Name"#
                 )
                 .bind(user_id)
                 .fetch_all(pool)
@@ -329,81 +226,6 @@ impl DatabasePool {
                     check_box_color: row.try_get("check_box_color")?,
                 })
             },
-            mysql(pool) => {
-                sqlx::query(
-                    r#"INSERT INTO CustomThemes
-                       (UserID, Name, BackgroundColor, ButtonColor, ContainerButtonColor,
-                        ButtonTextColor, TextColor, TextSecondaryColor, BorderColor, AccentColor,
-                        ProgBarColor, ErrorColor, BonusColor, SecondaryBackground, ContainerBackground,
-                        StandoutColor, HoverColor, LinkColor, ThumbColor, UnfilledColor, CheckBoxColor)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"#
-                )
-                .bind(user_id)
-                .bind(&req.name)
-                .bind(&req.background_color)
-                .bind(&req.button_color)
-                .bind(&req.container_button_color)
-                .bind(&req.button_text_color)
-                .bind(&req.text_color)
-                .bind(&req.text_secondary_color)
-                .bind(&req.border_color)
-                .bind(&req.accent_color)
-                .bind(&req.prog_bar_color)
-                .bind(&req.error_color)
-                .bind(&req.bonus_color)
-                .bind(&req.secondary_background)
-                .bind(&req.container_background)
-                .bind(&req.standout_color)
-                .bind(&req.hover_color)
-                .bind(&req.link_color)
-                .bind(&req.thumb_color)
-                .bind(&req.unfilled_color)
-                .bind(&req.check_box_color)
-                .execute(pool)
-                .await?;
-
-                let row = sqlx::query(
-                    r#"SELECT ThemeID as themeid, Name as name, BackgroundColor as background_color,
-                       ButtonColor as button_color, ContainerButtonColor as container_button_color,
-                       ButtonTextColor as button_text_color, TextColor as text_color,
-                       TextSecondaryColor as text_secondary_color, BorderColor as border_color,
-                       AccentColor as accent_color, ProgBarColor as prog_bar_color,
-                       ErrorColor as error_color, BonusColor as bonus_color,
-                       SecondaryBackground as secondary_background, ContainerBackground as container_background,
-                       StandoutColor as standout_color, HoverColor as hover_color,
-                       LinkColor as link_color, ThumbColor as thumb_color,
-                       UnfilledColor as unfilled_color, CheckBoxColor as check_box_color
-                       FROM CustomThemes WHERE UserID = ? AND Name = ? ORDER BY ThemeID DESC LIMIT 1"#
-                )
-                .bind(user_id)
-                .bind(&req.name)
-                .fetch_one(pool)
-                .await?;
-
-                Ok(crate::models::CustomTheme {
-                    themeid: row.try_get("themeid")?,
-                    name: row.try_get("name")?,
-                    background_color: row.try_get("background_color")?,
-                    button_color: row.try_get("button_color")?,
-                    container_button_color: row.try_get("container_button_color")?,
-                    button_text_color: row.try_get("button_text_color")?,
-                    text_color: row.try_get("text_color")?,
-                    text_secondary_color: row.try_get("text_secondary_color")?,
-                    border_color: row.try_get("border_color")?,
-                    accent_color: row.try_get("accent_color")?,
-                    prog_bar_color: row.try_get("prog_bar_color")?,
-                    error_color: row.try_get("error_color")?,
-                    bonus_color: row.try_get("bonus_color")?,
-                    secondary_background: row.try_get("secondary_background")?,
-                    container_background: row.try_get("container_background")?,
-                    standout_color: row.try_get("standout_color")?,
-                    hover_color: row.try_get("hover_color")?,
-                    link_color: row.try_get("link_color")?,
-                    thumb_color: row.try_get("thumb_color")?,
-                    unfilled_color: row.try_get("unfilled_color")?,
-                    check_box_color: row.try_get("check_box_color")?,
-                })
-            },
         })
     }
 
@@ -411,13 +233,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"DELETE FROM "CustomThemes" WHERE themeid = $1 AND userid = $2"#)
-                    .bind(theme_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM CustomThemes WHERE ThemeID = ? AND UserID = ?")
                     .bind(theme_id)
                     .bind(user_id)
                     .execute(pool)
@@ -440,18 +255,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     row.try_get::<Option<String>, _>("startpage")?.unwrap_or_else(|| "home".to_string())
-                } else {
-                    "home".to_string()
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT StartPage FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    row.try_get::<Option<String>, _>("StartPage")?.unwrap_or_else(|| "home".to_string())
                 } else {
                     "home".to_string()
                 }
@@ -493,32 +296,6 @@ impl DatabasePool {
                     result.rows_affected() > 0
                 }
             },
-            mysql(pool) => {
-                let existing = sqlx::query("SELECT COUNT(*) as count FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-                
-                let count: i64 = existing.try_get("count")?;
-                
-                if count > 0 {
-                    // Update existing record
-                    let result = sqlx::query("UPDATE UserSettings SET StartPage = ? WHERE UserID = ?")
-                        .bind(startpage)
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                } else {
-                    // Insert new record
-                    let result = sqlx::query("INSERT INTO UserSettings (UserID, StartPage) VALUES (?, ?)")
-                        .bind(user_id)
-                        .bind(startpage)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                }
-            },
         });
         
         info!("Successfully set start page for user {} to {}: {}", user_id, startpage, success);
@@ -548,18 +325,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     row.try_get::<Option<i32>, _>("autocompleteseconds")?.unwrap_or(0)
-                } else {
-                    0
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT AutoCompleteSeconds FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    row.try_get::<Option<i32>, _>("AutoCompleteSeconds")?.unwrap_or(0)
                 } else {
                     0
                 }
@@ -601,32 +366,6 @@ impl DatabasePool {
                     result.rows_affected() > 0
                 }
             },
-            mysql(pool) => {
-                let existing = sqlx::query("SELECT COUNT(*) as count FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-                
-                let count: i64 = existing.try_get("count")?;
-                
-                if count > 0 {
-                    // Update existing record
-                    let result = sqlx::query("UPDATE UserSettings SET AutoCompleteSeconds = ? WHERE UserID = ?")
-                        .bind(seconds)
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                } else {
-                    // Insert new record with default theme
-                    let result = sqlx::query("INSERT INTO UserSettings (UserID, AutoCompleteSeconds, Theme) VALUES (?, ?, 'Nordic')")
-                        .bind(user_id)
-                        .bind(seconds)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                }
-            },
         });
         
         info!("Successfully set auto complete seconds for user {} to {}: {}", user_id, seconds, success);
@@ -645,15 +384,6 @@ impl DatabasePool {
                     .transpose()?
                     .flatten()
             },
-            mysql(pool) => {
-                sqlx::query("SELECT QueueAddPosition FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?
-                    .map(|row| row.try_get::<Option<String>, _>("QueueAddPosition"))
-                    .transpose()?
-                    .flatten()
-            },
         });
         Ok(crate::models::QueueAddPosition::from_setting(value.as_deref()))
     }
@@ -664,14 +394,6 @@ impl DatabasePool {
             pg(pool) => {
                 q::query(r#"INSERT INTO "UserSettings" (userid, queueaddposition, theme) VALUES ($1, $2, 'Nordic')
                             ON CONFLICT (userid) DO UPDATE SET queueaddposition = EXCLUDED.queueaddposition"#)
-                    .bind(user_id)
-                    .bind(value)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("INSERT INTO UserSettings (UserID, QueueAddPosition, Theme) VALUES (?, ?, 'Nordic')
-                             ON DUPLICATE KEY UPDATE QueueAddPosition = VALUES(QueueAddPosition)")
                     .bind(user_id)
                     .bind(value)
                     .execute(pool)
@@ -706,25 +428,6 @@ impl DatabasePool {
                     Ok(1.0)
                 }
             },
-            mysql(pool) => {
-                let query = if let Some(_pod_id) = podcast_id {
-                    "SELECT PlaybackSpeed FROM Podcasts WHERE PodcastID = ?"
-                } else {
-                    "SELECT PlaybackSpeed FROM Users WHERE UserID = ?"
-                };
-                
-                let param = podcast_id.unwrap_or(user_id);
-                let row = sqlx::query(query)
-                    .bind(param)
-                    .fetch_one(pool)
-                    .await?;
-
-                if let Ok(speed) = row.try_get::<bigdecimal::BigDecimal, _>("PlaybackSpeed") {
-                    Ok(speed.to_f64().unwrap_or(1.0))
-                } else {
-                    Ok(1.0)
-                }
-            },
         })
     }
 
@@ -751,22 +454,6 @@ impl DatabasePool {
                     Ok((row.try_get::<i32, _>("autodownloaddeletedays").unwrap_or(0), false))
                 }
             },
-            mysql(pool) => {
-                if let Some(pod_id) = podcast_id {
-                    let row = sqlx::query("SELECT AutoDownloadDeleteDays, AutoDownloadDeleteCustomized FROM Podcasts WHERE PodcastID = ?")
-                        .bind(pod_id)
-                        .fetch_one(pool)
-                        .await?;
-                    let customized = row.try_get::<i8, _>("AutoDownloadDeleteCustomized").map(|v| v != 0).unwrap_or(false);
-                    Ok((row.try_get::<i32, _>("AutoDownloadDeleteDays").unwrap_or(0), customized))
-                } else {
-                    let row = sqlx::query("SELECT AutoDownloadDeleteDays FROM Users WHERE UserID = ?")
-                        .bind(user_id)
-                        .fetch_one(pool)
-                        .await?;
-                    Ok((row.try_get::<i32, _>("AutoDownloadDeleteDays").unwrap_or(0), false))
-                }
-            },
         })
     }
 
@@ -779,13 +466,6 @@ impl DatabasePool {
                     .fetch_one(pool)
                     .await?;
                 Ok(row.try_get::<i32, _>("defaultvolume").unwrap_or(100))
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT DefaultVolume FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-                Ok(row.try_get::<i32, _>("DefaultVolume").unwrap_or(100))
             },
         })
     }
@@ -812,26 +492,6 @@ impl DatabasePool {
                 };
                 (default, podcast)
             },
-            mysql(pool) => {
-                let default = sqlx::query("SELECT COALESCE(AutoDeleteOnComplete, 0) AS d FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?
-                    .and_then(|r| r.try_get::<i8, _>("d").ok())
-                    .map(|v| v != 0)
-                    .unwrap_or(false);
-                let podcast = match podcast_id {
-                    Some(pid) => sqlx::query("SELECT AutoDeleteOnComplete FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                        .bind(pid)
-                        .bind(user_id)
-                        .fetch_optional(pool)
-                        .await?
-                        .and_then(|r| r.try_get::<Option<i8>, _>("AutoDeleteOnComplete").ok().flatten())
-                        .map(|v| v != 0),
-                    None => None,
-                };
-                (default, podcast)
-            },
         });
         Ok((podcast.unwrap_or(default), podcast.is_some()))
     }
@@ -845,13 +505,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET AutoDeleteOnComplete = ? WHERE UserID = ?")
-                    .bind(enabled)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -860,13 +513,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET usegravatar = $1 WHERE userid = $2"#)
-                    .bind(enabled)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET UseGravatar = ? WHERE UserID = ?")
                     .bind(enabled)
                     .bind(user_id)
                     .execute(pool)
@@ -886,13 +532,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET PlaybackSpeed = ? WHERE UserID = ?")
-                    .bind(playback_speed)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -902,13 +541,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET defaultvolume = $1 WHERE userid = $2"#)
-                    .bind(volume)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET DefaultVolume = ? WHERE UserID = ?")
                     .bind(volume)
                     .bind(user_id)
                     .execute(pool)
@@ -928,13 +560,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET AutoDownloadDeleteDays = ? WHERE UserID = ?")
-                    .bind(days)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -945,13 +570,6 @@ impl DatabasePool {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET usepodcastcovers = $1 WHERE userid = $2"#)
                     .bind(use_podcast_covers)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET UsePodcastCovers = ? WHERE UserID = ?")
-                    .bind(use_podcast_covers as i32)
                     .bind(user_id)
                     .execute(pool)
                     .await?;
@@ -969,13 +587,6 @@ impl DatabasePool {
                     .fetch_one(pool)
                     .await?;
                 Ok(result.unwrap_or(false))
-            },
-            mysql(pool) => {
-                let result = sqlx::query_scalar::<_, Option<i32>>("SELECT UsePodcastCovers FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-                Ok(result.unwrap_or(0) != 0)
             },
         })
     }
@@ -995,18 +606,6 @@ impl DatabasePool {
                     Ok("en".to_string())
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Language FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    Ok(row.get::<Option<String>, _>("Language").unwrap_or_else(|| "en".to_string()))
-                } else {
-                    Ok("en".to_string())
-                }
-            },
         })
     }
 
@@ -1015,15 +614,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"UPDATE "Users" SET language = $1 WHERE userid = $2"#)
-                    .bind(language)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET Language = ? WHERE UserID = ?")
                     .bind(language)
                     .bind(user_id)
                     .execute(pool)

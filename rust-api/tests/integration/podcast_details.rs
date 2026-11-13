@@ -133,28 +133,6 @@ async fn a_feed_dropping_a_field_does_not_blank_it() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_upgrade_reads_every_feed_in_full_once() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let user = app.user("listener").await;
-    let feed = Feed::with_episodes("Current Name", 1);
-    let url = app.fixtures().serve("upgrade.xml", Fixture::new("application/rss+xml", feed.to_xml()).etag("\"v1\""));
-    let pod = app.subscribe(&user, &url, 1).await;
-    app.refresh().await; // learns the ETag
-
-    // Details stored by an older release that never updated them.
-    exec(&app, &format!(r#"UPDATE "Podcasts" SET PodcastName = 'Stale Name' WHERE PodcastID = {pod}"#)).await;
-    app.refresh().await;
-    assert_eq!(column(&app, pod, "PodcastName").await.as_deref(), Some("Stale Name"), "a 304 doesn't reapply");
-
-    rerun_migrations(&app, &["085"]).await;
-    app.refresh().await;
-    assert_eq!(column(&app, pod, "PodcastName").await.as_deref(), Some("Current Name"));
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn an_episodes_own_itunes_image_is_kept() {
     let app = TestApp::new().await;
     let user = app.user("listener").await;

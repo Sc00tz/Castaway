@@ -3,7 +3,6 @@
 //! that arrived before their episode.
 
 use chrono::{DateTime, Utc};
-use pinepods_api::database::dialect::translate;
 use pinepods_api::database::DatabasePool;
 use pinepods_api::services::sync::{self, EpisodeAction, ResolveKey, SyncOrigin};
 use sqlx::Row;
@@ -63,20 +62,6 @@ async fn action_log(app: &TestApp, user: &TestUser) -> Vec<ActionRow> {
         DatabasePool::Postgres(pool) => {
             sqlx::query(sqlx::AssertSqlSafe(sql)).fetch_all(pool).await.unwrap().iter().map(row).collect()
         }
-        DatabasePool::Sqlite(pool) => sqlx::query(sqlx::AssertSqlSafe(translate(&sql)))
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .map(row)
-            .collect(),
-        DatabasePool::MySQL(pool) => sqlx::query(sqlx::AssertSqlSafe(sql.replace('"', "")))
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .map(row)
-            .collect(),
     }
 }
 
@@ -89,20 +74,6 @@ async fn subscription_log(app: &TestApp, user: &TestUser) -> Vec<(String, String
     let get = |a: String, o: String, u: String| (a, o, u);
     match app.db() {
         DatabasePool::Postgres(pool) => sqlx::query(sqlx::AssertSqlSafe(sql))
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .map(|r| get(r.get("action"), r.get("origin"), r.get("url")))
-            .collect(),
-        DatabasePool::Sqlite(pool) => sqlx::query(sqlx::AssertSqlSafe(translate(&sql)))
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .map(|r| get(r.get("action"), r.get("origin"), r.get("url")))
-            .collect(),
-        DatabasePool::MySQL(pool) => sqlx::query(sqlx::AssertSqlSafe(sql.replace('"', "")))
             .fetch_all(pool)
             .await
             .unwrap()
@@ -140,16 +111,10 @@ async fn completed(app: &TestApp, ep: i32) -> bool {
 }
 
 async fn listen_date(app: &TestApp, user: &TestUser, ep: i32) -> Option<i64> {
-    let sql = match app.backend() {
-        Backend::Postgres | Backend::Sqlite => format!(
+    let sql = format!(
             r#"SELECT FLOOR(EXTRACT(EPOCH FROM ListenDate))::BIGINT FROM "UserEpisodeHistory" WHERE UserID = {} AND EpisodeID = {ep}"#,
             user.id
-        ),
-        Backend::MariaDb => format!(
-            "SELECT TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', ListenDate) FROM UserEpisodeHistory WHERE UserID = {} AND EpisodeID = {ep}",
-            user.id
-        ),
-    };
+        );
     int(app, &sql).await
 }
 

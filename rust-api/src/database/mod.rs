@@ -1,19 +1,19 @@
 //! Database access. Every query is a method on `DatabasePool`; the methods are split by area
 //! into the submodules below, with shared types and helpers kept here.
 
-use sqlx::{MySql, Pool, Postgres, Row, Sqlite};
+use sqlx::{Pool, Postgres, Row};
 use std::time::Duration;
 use crate::{config::{Config, OIDCConfig}, error::{AppError, AppResult}};
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use std::collections::HashMap;
-use bigdecimal::ToPrimitive;
 use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use base64;
 use tracing::{debug, info, warn};
 
 pub mod dialect;
+pub mod migrate;
 use dialect::{dialect_fn, dialect_match, dialect_method};
 
 mod auth;
@@ -44,7 +44,6 @@ mod youtube;
 mod rss;
 mod gpodder;
 mod backup;
-mod sqlite_backup;
 mod shared_episodes;
 mod recommendations;
 mod local_podcasts;
@@ -64,20 +63,58 @@ pub use backup::*;
 #[derive(Clone)]
 pub enum DatabasePool {
     Postgres(Pool<Postgres>),
-    MySQL(Pool<MySql>),
-    /// Runs the PostgreSQL query code through [`dialect`].
-    Sqlite(Pool<Sqlite>),
 }
 
 /// A transaction rolled back because it collided with a concurrent one: a deadlock or
-/// serialization failure, or MariaDB's "record has changed since last read" (1020, snapshot
-/// isolation). Running it again is safe.
+/// serialization failure. Running it again is safe.
 fn is_write_conflict(e: &AppError) -> bool {
     let AppError::Database(sqlx::Error::Database(db)) = e else { return false };
-    if matches!(db.code().as_deref(), Some("40001") | Some("40P01")) {
-        return true;
+    matches!(db.code().as_deref(), Some("40001") | Some("40P01"))
+}
+
+/// Connects to the configured database, waiting up to `DB_WAIT_TIMEOUT` seconds (default 120)
+/// for the server to come up, and creating the database if it doesn't exist yet.
+async fn connect_creating_database(
+    options: sqlx::postgres::PgConnectOptions,
+    max_connections: u32,
+    min_connections: u32,
+) -> AppResult<Pool<Postgres>> {
+    let wait = std::env::var("DB_WAIT_TIMEOUT").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(120u64);
+    let deadline = std::time::Instant::now() + Duration::from_secs(wait);
+    let connect = |options: sqlx::postgres::PgConnectOptions| {
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(max_connections)
+            .min_connections(min_connections)
+            .acquire_timeout(Duration::from_secs(30))
+            .connect_with(options)
+    };
+    let mut created = false;
+    loop {
+        match connect(options.clone()).await {
+            Ok(pool) => return Ok(pool),
+            // 3D000: database doesn't exist. Create it from the maintenance database.
+            Err(sqlx::Error::Database(e)) if e.code().as_deref() == Some("3D000") && !created => {
+                let name = options.get_database().unwrap_or_default().to_string();
+                tracing::info!("Creating database {name}");
+                let admin = connect(options.clone().database("postgres")).await?;
+                let quoted = format!("\"{}\"", name.replace('"', "\"\""));
+                sqlx::raw_sql(sqlx::AssertSqlSafe(format!("CREATE DATABASE {quoted}"))).execute(&admin).await?;
+                admin.close().await;
+                created = true;
+            }
+            Err(e @ (sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut | sqlx::Error::Tls(_)))
+                if std::time::Instant::now() < deadline =>
+            {
+                tracing::info!("Waiting for the database: {e}");
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+            // 57P03: the server is starting up.
+            Err(sqlx::Error::Database(e)) if e.code().as_deref() == Some("57P03") && std::time::Instant::now() < deadline => {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+            Err(e) => return Err(e.into()),
+        }
     }
-    db.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>().is_some_and(|m| matches!(m.number(), 1020 | 1213))
 }
 
 /// `Users.GpodderUrl` of users on the Castaway gpodder server. Not a real address any more;
@@ -92,11 +129,6 @@ impl DatabasePool {
                 let o = pool.connect_options();
                 format!("pg:{}:{}/{}", o.get_host(), o.get_port(), o.get_database().unwrap_or_default())
             },
-            sqlite(pool) => format!("sqlite:{}", pool.connect_options().get_filename().display()),
-            mysql(pool) => {
-                let o = pool.connect_options();
-                format!("mysql:{}:{}/{}", o.get_host(), o.get_port(), o.get_database().unwrap_or_default())
-            },
         })
     }
 
@@ -106,86 +138,34 @@ impl DatabasePool {
         // directory rather than a TCP hostname (e.g. /var/run/postgresql).
         let host_is_socket = db.host.starts_with('/');
 
-        match db.db_type.as_str() {
-            "sqlite" => {
-                // The migration runner creates the file; WAL lets readers run beside the one
-                // writer, and the busy timeout queues writers instead of failing them.
-                let options = sqlx::sqlite::SqliteConnectOptions::new()
-                    .filename(&db.name)
-                    .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-                    .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
-                    .busy_timeout(Duration::from_secs(30))
-                    .foreign_keys(true);
-                let pool = sqlx::sqlite::SqlitePoolOptions::new()
-                    .max_connections(db.max_connections)
-                    .min_connections(db.min_connections)
-                    .acquire_timeout(Duration::from_secs(30))
-                    .connect_with(options)
-                    .await?;
-                Ok(DatabasePool::Sqlite(pool))
-            }
-            "postgresql" => {
-                let mut options = sqlx::postgres::PgConnectOptions::new()
-                    .username(&db.username)
-                    .password(&db.password)
-                    .database(&db.name)
-                    // Port is still relevant for sockets: PG names the socket
-                    // file `.s.PGSQL.<port>`.
-                    .port(db.port);
-                options = if host_is_socket {
-                    options.socket(&db.host)
-                } else {
-                    options.host(&db.host)
-                };
+        let mut options = sqlx::postgres::PgConnectOptions::new()
+            .username(&db.username)
+            .password(&db.password)
+            .database(&db.name)
+            // Port is still relevant for sockets: PG names the socket
+            // file `.s.PGSQL.<port>`.
+            .port(db.port);
+        options = if host_is_socket {
+            options.socket(&db.host)
+        } else {
+            options.host(&db.host)
+        };
 
-                let pool = sqlx::postgres::PgPoolOptions::new()
-                    .max_connections(db.max_connections)
-                    .min_connections(db.min_connections)
-                    .acquire_timeout(Duration::from_secs(30))
-                    .connect_with(options)
-                    .await?;
+        let pool = connect_creating_database(options, db.max_connections, db.min_connections).await?;
+        Ok(DatabasePool::Postgres(pool))
+    }
 
-                // Skip migrations for now - database already exists
-
-                Ok(DatabasePool::Postgres(pool))
-            }
-            _ => {
-                let mut options = sqlx::mysql::MySqlConnectOptions::new()
-                    .username(&db.username)
-                    .password(&db.password)
-                    .database(&db.name)
-                    .port(db.port);
-                options = if host_is_socket {
-                    options.socket(&db.host)
-                } else {
-                    options.host(&db.host)
-                };
-
-                let pool = sqlx::mysql::MySqlPoolOptions::new()
-                    .max_connections(db.max_connections)
-                    .min_connections(db.min_connections)
-                    .acquire_timeout(Duration::from_secs(30))
-                    .connect_with(options)
-                    .await?;
-
-                // Skip migrations for now - database already exists
-
-                Ok(DatabasePool::MySQL(pool))
-            }
-        }
+    /// Brings the schema up to date (see [`migrate`]).
+    pub async fn migrate(&self) -> AppResult<()> {
+        dialect_match!(self, {
+            pg(pool) => migrate::run(pool).await,
+        })
     }
 
     pub async fn health_check(&self) -> AppResult<bool> {
         dialect_match!(self, {
             pg(pool) => {
                 let row = q::query("SELECT 1 as health")
-                    .fetch_one(pool)
-                    .await?;
-                let health: i32 = row.try_get("health")?;
-                Ok(health == 1)
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT 1 as health")
                     .fetch_one(pool)
                     .await?;
                 let health: i32 = row.try_get("health")?;

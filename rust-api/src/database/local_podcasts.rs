@@ -17,14 +17,6 @@ impl DatabasePool {
                     .await?;
                 Ok(row.is_some())
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT 1 FROM Podcasts WHERE FeedURL = ? AND UserID = ?")
-                    .bind(feed_url)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(row.is_some())
-            },
         })
     }
 
@@ -61,34 +53,6 @@ impl DatabasePool {
                 let podcast_id: i32 = row.try_get("podcastid")?;
 
                 q::query(r#"UPDATE "UserStats" SET podcastsadded = podcastsadded + 1 WHERE userid = $1"#)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-
-                self.link_feed_or_warn(podcast_id).await;
-                Ok(podcast_id)
-            },
-            mysql(pool) => {
-                let result = sqlx::query(
-                    "INSERT INTO Podcasts
-                     (PodcastName, ArtworkURL, Author, Categories, Description, EpisodeCount,
-                      FeedURL, WebsiteURL, Explicit, UserID, FeedCutoffDays, PodcastIndexID)
-                     VALUES (?, ?, ?, ?, ?, 0, ?, '', ?, ?, 0, 0)",
-                )
-                .bind(podcast_name)
-                .bind(artwork_url)
-                .bind(author)
-                .bind("{}") // empty categories JSON
-                .bind(description)
-                .bind(feed_url)
-                .bind(explicit)
-                .bind(user_id)
-                .execute(pool)
-                .await?;
-
-                let podcast_id = result.last_insert_id() as i32;
-
-                sqlx::query("UPDATE UserStats SET PodcastsAdded = PodcastsAdded + 1 WHERE UserID = ?")
                     .bind(user_id)
                     .execute(pool)
                     .await?;
@@ -144,36 +108,6 @@ impl DatabasePool {
                         id
                     }
                 },
-                mysql(pool) => {
-                    // Skip if already exists
-                    let existing = sqlx::query("SELECT EpisodeID FROM Episodes WHERE FeedID = ? AND EpisodeURL = ?")
-                        .bind(feed_id)
-                        .bind(&episode_url)
-                        .fetch_optional(pool)
-                        .await?;
-                    if let Some(row) = existing {
-                        row.try_get::<i32, _>("EpisodeID")?
-                    } else {
-                        let result = sqlx::query(
-                            "INSERT INTO Episodes
-                             (PodcastID, FeedID, EpisodeTitle, EpisodeDescription, EpisodeURL, EpisodeArtwork, EpisodePubDate, EpisodeDuration)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        )
-                        .bind(podcast_id)
-                        .bind(feed_id)
-                        .bind(&candidate.title)
-                        .bind(&candidate.description)
-                        .bind(&episode_url)
-                        .bind(artwork)
-                        .bind(candidate.pub_date)
-                        .bind(candidate.duration)
-                        .execute(pool)
-                        .await?;
-                        let id = result.last_insert_id() as i32;
-                        inserted.push((index, id));
-                        id
-                    }
-                },
             });
 
             // Get file size for DownloadedEpisodes
@@ -192,22 +126,6 @@ impl DatabasePool {
                         .await?;
                     if existing.is_none() {
                         q::query(r#"INSERT INTO "DownloadedEpisodes" (userid, episodeid, downloadedsize, downloadedlocation) VALUES ($1, $2, $3, $4)"#)
-                            .bind(user_id)
-                            .bind(episode_id)
-                            .bind(file_size)
-                            .bind(&candidate.file_path)
-                            .execute(pool)
-                            .await?;
-                    }
-                },
-                mysql(pool) => {
-                    let existing = sqlx::query("SELECT 1 FROM DownloadedEpisodes WHERE UserID = ? AND EpisodeID = ?")
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .fetch_optional(pool)
-                        .await?;
-                    if existing.is_none() {
-                        sqlx::query("INSERT INTO DownloadedEpisodes (UserID, EpisodeID, DownloadedSize, DownloadedLocation) VALUES (?, ?, ?, ?)")
                             .bind(user_id)
                             .bind(episode_id)
                             .bind(file_size)
@@ -237,14 +155,6 @@ impl DatabasePool {
                     .await?;
                 Ok(row.and_then(|r| r.try_get::<String, _>("feedurl").ok()))
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT FeedURL FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(row.and_then(|r| r.try_get::<String, _>("FeedURL").ok()))
-            },
         })
     }
 
@@ -263,17 +173,6 @@ impl DatabasePool {
                 .fetch_optional(pool)
                 .await?;
                 Ok(row.and_then(|r| r.try_get::<String, _>("feedurl").ok()))
-            },
-            mysql(pool) => {
-                let row = sqlx::query(
-                    "SELECT p.FeedURL FROM Episodes e
-                     JOIN Podcasts p ON e.FeedID = p.FeedID
-                     WHERE e.EpisodeID = ? LIMIT 1",
-                )
-                .bind(episode_id)
-                .fetch_optional(pool)
-                .await?;
-                Ok(row.and_then(|r| r.try_get::<String, _>("FeedURL").ok()))
             },
         })
     }
@@ -297,20 +196,6 @@ impl DatabasePool {
                     .filter_map(|r| r.try_get::<String, _>("downloadedlocation").ok())
                     .collect())
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT de.DownloadedLocation FROM DownloadedEpisodes de
-                     JOIN Episodes e ON de.EpisodeID = e.EpisodeID
-                     WHERE e.FeedID = (SELECT FeedID FROM Podcasts WHERE PodcastID = ?)",
-                )
-                .bind(podcast_id)
-                .fetch_all(pool)
-                .await?;
-                Ok(rows
-                    .iter()
-                    .filter_map(|r| r.try_get::<String, _>("DownloadedLocation").ok())
-                    .collect())
-            },
         })
     }
 
@@ -323,14 +208,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET artworkurl = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(artwork_url)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET ArtworkURL = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(artwork_url)
                     .bind(podcast_id)
                     .bind(user_id)

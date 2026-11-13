@@ -144,10 +144,6 @@ async fn from_index(http: &reqwest::Client, api: &Endpoints, name: &str) -> Vec<
         .collect()
 }
 
-fn url_hash(url: &str) -> String {
-    use sha2::Digest;
-    hex::encode(sha2::Sha256::digest(url.as_bytes()))
-}
 
 /// Fetch and store a person's external episodes now.
 pub async fn refresh(db: &DatabasePool, api: &Endpoints, person_id: i32) -> AppResult<usize> {
@@ -199,30 +195,6 @@ pub async fn refresh(db: &DatabasePool, api: &Endpoints, person_id: i32) -> AppR
             .bind(&f.title)
             .bind(&f.description)
             .bind(&f.url)
-            .bind(&f.artwork)
-            .bind(f.pub_date)
-            .bind(f.duration.and_then(|v| i32::try_from(v).ok()))
-            .bind(cut(&f.role, 64))
-            .bind(f.source)
-            .execute(pool)
-            .await
-            .map(|_| ()),
-            mysql(pool) => sqlx::query(
-                "INSERT IGNORE INTO PersonExternalEpisodes
-                 (PersonID, FeedURL, PodcastTitle, PodcastArtwork, PodcastIndexID, EpisodeGUID, EpisodeTitle,
-                  EpisodeDescription, EpisodeURL, EpisodeURLHash, EpisodeArtwork, EpisodePubDate, EpisodeDuration, Role, Source)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(person_id)
-            .bind(&f.feed_url)
-            .bind(&f.podcast_title)
-            .bind(&f.podcast_artwork)
-            .bind(f.podcastindex_id.and_then(|v| i32::try_from(v).ok()))
-            .bind(&f.guid)
-            .bind(&f.title)
-            .bind(&f.description)
-            .bind(&f.url)
-            .bind(url_hash(&f.url))
             .bind(&f.artwork)
             .bind(f.pub_date)
             .bind(f.duration.and_then(|v| i32::try_from(v).ok()))

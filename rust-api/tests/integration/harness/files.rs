@@ -102,7 +102,7 @@ impl BackupEnv {
         let guard = PROCESS_ENV.lock().await;
         let env = app.env;
         // SAFETY (edition 2021 API): only these tests read or write these variables.
-        std::env::set_var("DB_TYPE", env.backend.db_type());
+        std::env::set_var("DB_TYPE", "postgresql");
         std::env::set_var("DB_HOST", &env.db_host);
         std::env::set_var("DB_PORT", env.db_port.to_string());
         std::env::set_var("DB_USER", &env.db_user);

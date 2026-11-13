@@ -8,13 +8,7 @@ updates:
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "pip"
-    directory: "/"
+  - package-ecosystem: "cargo"
+    directory: "/rust-api"
     schedule:
       interval: "weekly"
-    ignore:
-      # faster-whisper 1.2.1 calls av.open(..., metadata_errors=...), which PyAV 19 removed, so
-      # every AI transcription would fail. Hold PyAV at 18.x until faster-whisper supports 19
-      # (see pinepods-ai/requirements.txt).
-      - dependency-name: "av"
-        versions: [">=19"]

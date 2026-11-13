@@ -1,9 +1,0 @@
-version: '3'
-services:
-    pinepods-backend:
-       image: madeofpendletonwool/pinepods_backend:latest
-       container_name: pinepods-backend
-       env_file: env_file
-       ports:
-            - 5000:5000
-       restart: unless-stopped

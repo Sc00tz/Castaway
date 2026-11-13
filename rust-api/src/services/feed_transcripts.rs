@@ -234,27 +234,6 @@ async fn due(db: &DatabasePool) -> AppResult<Vec<(i32, String)>> {
             }
             out
         },
-        mysql(pool) => {
-            let rows = sqlx::query("
-                SELECT e.EpisodeID, e.TranscriptsJSON FROM Episodes e
-                WHERE e.TranscriptsJSON IS NOT NULL AND e.FeedID IS NOT NULL
-                  AND EXISTS (SELECT 1 FROM Podcasts p WHERE p.FeedID = e.FeedID)
-                  AND NOT EXISTS (
-                      SELECT 1 FROM EpisodeTranscripts t
-                      WHERE t.EpisodeID = e.EpisodeID AND t.Source = 'feed'
-                        AND (t.Status = 'complete' OR t.CreatedAt > ?))
-                ORDER BY e.EpisodePubDate DESC LIMIT ?
-            ")
-            .bind(retry_before)
-            .bind(BATCH)
-            .fetch_all(pool)
-            .await?;
-            let mut out = Vec::with_capacity(rows.len());
-            for r in rows {
-                out.push((r.try_get::<i32, _>("EpisodeID")?, r.try_get::<String, _>("TranscriptsJSON")?));
-            }
-            out
-        },
     }))
 }
 
@@ -277,25 +256,6 @@ pub async fn store(db: &DatabasePool, episode_id: i32, language: Option<&str>, p
                 INSERT INTO "EpisodeTranscripts" (episodeid, source, language, transcripttext, segments, status)
                 VALUES ($1, 'feed', $2, $3, $4::jsonb, $5)
             "#)
-            .bind(episode_id)
-            .bind(language)
-            .bind(text)
-            .bind(segments)
-            .bind(status)
-            .execute(&mut *tx)
-            .await?;
-            tx.commit().await?;
-        },
-        mysql(pool) => {
-            let mut tx = pool.begin().await?;
-            sqlx::query("DELETE FROM EpisodeTranscripts WHERE EpisodeID = ? AND Source = 'feed'")
-                .bind(episode_id)
-                .execute(&mut *tx)
-                .await?;
-            sqlx::query("
-                INSERT INTO EpisodeTranscripts (EpisodeID, Source, Language, TranscriptText, Segments, Status)
-                VALUES (?, 'feed', ?, ?, ?, ?)
-            ")
             .bind(episode_id)
             .bind(language)
             .bind(text)
@@ -342,7 +302,7 @@ async fn fetch_transcript(episode_id: i32, transcripts_json: &str) -> (Option<St
 }
 
 /// The scheduled run: store the next batch of feed transcripts. Fetches run in parallel; the
-/// writes one at a time, so concurrent replace-by-episode deletes don't deadlock on MariaDB.
+/// writes one at a time, so concurrent replace-by-episode deletes don't deadlock.
 pub async fn run_due(db: &DatabasePool) -> AppResult<()> {
     let due = due(db).await?;
     if due.is_empty() {

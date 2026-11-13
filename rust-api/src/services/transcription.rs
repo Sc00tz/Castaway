@@ -41,16 +41,6 @@ async fn has_complete_transcript(db_pool: &DatabasePool, episode_id: i32) -> boo
         .await
         .map(|r| r.is_some())
         .unwrap_or(false),
-        mysql(pool) => sqlx::query(
-            "SELECT 1 FROM EpisodeTranscripts WHERE EpisodeID = ? AND Source = ?
-             AND (Status = 'complete' OR (Status IN ('running','pending') AND CreatedAt > NOW() - INTERVAL 12 HOUR)) LIMIT 1",
-        )
-        .bind(episode_id)
-        .bind(SOURCE_GENERATED)
-        .fetch_optional(pool)
-        .await
-        .map(|r| r.is_some())
-        .unwrap_or(false),
     })
 }
 
@@ -59,14 +49,6 @@ async fn clear_generated(db_pool: &DatabasePool, episode_id: i32) -> Result<(), 
     dialect_match!(db_pool, {
         pg(pool) => {
             q::query(r#"DELETE FROM "EpisodeTranscripts" WHERE episodeid = $1 AND source = $2"#)
-                .bind(episode_id)
-                .bind(SOURCE_GENERATED)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
-        mysql(pool) => {
-            sqlx::query("DELETE FROM EpisodeTranscripts WHERE EpisodeID = ? AND Source = ?")
                 .bind(episode_id)
                 .bind(SOURCE_GENERATED)
                 .execute(pool)
@@ -91,15 +73,6 @@ async fn insert_running(db_pool: &DatabasePool, episode_id: i32) -> Result<i64, 
             .await
             .map_err(|e| e.to_string())?;
             row.try_get::<i32, _>("transcriptid").map_err(|e| e.to_string())? as i64
-        },
-        mysql(pool) => {
-            let res = sqlx::query("INSERT INTO EpisodeTranscripts (EpisodeID, Source, Status) VALUES (?, ?, 'running')")
-                .bind(episode_id)
-                .bind(SOURCE_GENERATED)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            res.last_insert_id() as i64
         },
     });
     Ok(id)
@@ -135,25 +108,6 @@ async fn complete_row(
             .await
             .map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query(r#"
-                UPDATE EpisodeTranscripts
-                SET Language = ?, Model = ?, TranscriptText = ?, Segments = ?, Status = 'complete',
-                    AudioFingerprint = ?, AudioDuration = ?, AudioSource = ?
-                WHERE TranscriptID = ?
-            "#)
-            .bind(language)
-            .bind(model)
-            .bind(full_text)
-            .bind(segments_json)
-            .bind(&audio.fingerprint)
-            .bind(audio.duration)
-            .bind(&audio.source)
-            .bind(transcript_id)
-            .execute(pool)
-            .await
-            .map_err(|e| e.to_string())?;
-        },
     });
     Ok(())
 }
@@ -163,12 +117,6 @@ async fn fail_row(db_pool: &DatabasePool, transcript_id: i64) {
         pg(pool) => {
             let _ = q::query(r#"UPDATE "EpisodeTranscripts" SET status = 'failed' WHERE transcriptid = $1"#)
                 .bind(transcript_id as i32)
-                .execute(pool)
-                .await;
-        },
-        mysql(pool) => {
-            let _ = sqlx::query("UPDATE EpisodeTranscripts SET Status = 'failed' WHERE TranscriptID = ?")
-                .bind(transcript_id)
                 .execute(pool)
                 .await;
         },
@@ -197,22 +145,6 @@ async fn fetch_episode_audio_temp(db_pool: &DatabasePool, episode_id: i32) -> Re
                 row.try_get::<String, _>("episodeurl").map_err(|e| e.to_string())?,
                 row.try_get::<Option<String>, _>("username").ok().flatten(),
                 row.try_get::<Option<String>, _>("password").ok().flatten(),
-            )
-        },
-        mysql(pool) => {
-            let row = sqlx::query("
-                SELECT e.EpisodeURL, p.Username, p.Password
-                FROM Episodes e JOIN Podcasts p ON e.FeedID = p.FeedID
-                WHERE e.EpisodeID = ? LIMIT 1
-            ")
-            .bind(episode_id)
-            .fetch_one(pool)
-            .await
-            .map_err(|e| e.to_string())?;
-            (
-                row.try_get::<String, _>("EpisodeURL").map_err(|e| e.to_string())?,
-                row.try_get::<Option<String>, _>("Username").ok().flatten(),
-                row.try_get::<Option<String>, _>("Password").ok().flatten(),
             )
         },
     });
@@ -278,22 +210,6 @@ pub async fn analyzed_audio(db_pool: &DatabasePool, episode_id: i32) -> Option<A
             fingerprint: r.try_get("audiofingerprint").ok().flatten(),
             duration: r.try_get("audioduration").ok().flatten(),
             source: r.try_get("audiosource").ok().flatten(),
-        }),
-        mysql(pool) => sqlx::query(r#"
-            SELECT AudioFingerprint, AudioDuration, AudioSource FROM EpisodeTranscripts
-            WHERE EpisodeID = ? AND Source = ? AND Status = 'complete'
-            ORDER BY CreatedAt DESC LIMIT 1
-        "#)
-        .bind(episode_id)
-        .bind(SOURCE_GENERATED)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .map(|r| AudioCopy {
-            fingerprint: r.try_get("AudioFingerprint").ok().flatten(),
-            duration: r.try_get("AudioDuration").ok().flatten(),
-            source: r.try_get("AudioSource").ok().flatten(),
         }),
     })
 }
@@ -410,27 +326,6 @@ pub async fn get_episode_transcript(
             status: r.try_get("status").unwrap_or_default(),
             full_text: r.try_get("transcripttext").ok(),
             segments: r.try_get("segments_text").ok(),
-        }),
-        mysql(pool) => sqlx::query(r#"
-            SELECT Source, Language, Model, TranscriptText, Segments,
-                   CASE WHEN Status IN ('running','pending') AND CreatedAt < NOW() - INTERVAL 12 HOUR
-                        THEN 'failed' ELSE Status END AS Status
-            FROM EpisodeTranscripts
-            WHERE EpisodeID = ? AND Source = ?
-            ORDER BY CreatedAt DESC LIMIT 1
-        "#)
-        .bind(episode_id)
-        .bind(SOURCE_GENERATED)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .map(|r| StoredTranscript {
-            source: r.try_get("Source").unwrap_or_default(),
-            language: r.try_get("Language").ok(),
-            model: r.try_get("Model").ok(),
-            status: r.try_get("Status").unwrap_or_default(),
-            full_text: r.try_get("TranscriptText").ok(),
-            segments: r.try_get("Segments").ok(),
         }),
     });
     Ok(transcript)
@@ -549,15 +444,6 @@ pub async fn set_auto_transcribe(
                 .await
                 .map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query("UPDATE Podcasts SET AutoTranscribe = ? WHERE PodcastID = ? AND UserID = ?")
-                .bind(enabled)
-                .bind(podcast_id)
-                .bind(user_id)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
     });
     Ok(())
 }
@@ -573,16 +459,6 @@ pub async fn get_auto_transcribe(db_pool: &DatabasePool, podcast_id: i32) -> Res
         .await
         .map_err(|e| e.to_string())?
         .and_then(|r| r.try_get::<bool, _>("a").ok())
-        .unwrap_or(false),
-        mysql(pool) => sqlx::query(
-            "SELECT COALESCE(AutoTranscribe, 0) AS a FROM Podcasts WHERE PodcastID = ?",
-        )
-        .bind(podcast_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .and_then(|r| r.try_get::<i8, _>("a").ok())
-        .map(|a| a != 0)
         .unwrap_or(false),
     });
     Ok(enabled)
@@ -604,21 +480,6 @@ async fn auto_transcribe_opt_in(db_pool: &DatabasePool, episode_id: i32) -> (boo
         .ok()
         .flatten()
         .map(|r| (r.try_get::<bool, _>("t").unwrap_or(false), r.try_get::<bool, _>("d").unwrap_or(false))),
-        mysql(pool) => sqlx::query("
-            SELECT CAST(COALESCE(MAX(COALESCE(p.AutoTranscribe, 0)), 0) AS SIGNED) AS t,
-                   CAST(COALESCE(MAX(COALESCE(p.AutoTranscribe, 0) AND COALESCE(p.AutoDownload, 0)), 0) AS SIGNED) AS d
-            FROM Episodes e JOIN Podcasts p ON e.FeedID = p.FeedID
-            WHERE e.EpisodeID = ?
-        ")
-        .bind(episode_id)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .map(|r| (
-            r.try_get::<i64, _>("t").map(|v| v != 0).unwrap_or(false),
-            r.try_get::<i64, _>("d").map(|v| v != 0).unwrap_or(false),
-        )),
     });
     row.unwrap_or((false, false))
 }

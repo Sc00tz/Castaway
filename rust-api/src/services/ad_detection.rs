@@ -86,17 +86,6 @@ async fn already_detected(db_pool: &DatabasePool, episode_id: i32) -> bool {
         .flatten()
         .and_then(|r| r.try_get::<bool, _>("d").ok())
         .unwrap_or(false),
-        mysql(pool) => sqlx::query(
-            "SELECT COALESCE(AdsDetected, 0) AS d FROM Episodes WHERE EpisodeID = ?",
-        )
-        .bind(episode_id)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|r| r.try_get::<i8, _>("d").ok())
-        .map(|d| d != 0)
-        .unwrap_or(false),
     })
 }
 
@@ -135,33 +124,6 @@ async fn store_ad_segments(
                 .await
                 .map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query("DELETE FROM EpisodeSkipSegments WHERE EpisodeID = ? AND Source = ?")
-                .bind(episode_id)
-                .bind(SOURCE_AD)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            for (start, end) in segments {
-                sqlx::query("
-                    INSERT INTO EpisodeSkipSegments (EpisodeID, Kind, StartTime, EndTime, Source)
-                    VALUES (?, ?, ?, ?, ?)
-                ")
-                .bind(episode_id)
-                .bind(KIND_AD)
-                .bind(*start)
-                .bind(*end)
-                .bind(SOURCE_AD)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            }
-            sqlx::query("UPDATE Episodes SET AdsDetected = TRUE WHERE EpisodeID = ?")
-                .bind(episode_id)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
     });
     Ok(segments.len())
 }
@@ -187,19 +149,6 @@ pub async fn clear_ad_segments(db_pool: &DatabasePool, episode_id: i32) -> Resul
                 .await
                 .map_err(|e| e.to_string())?;
             q::query(r#"UPDATE "Episodes" SET adsdetected = FALSE WHERE episodeid = $1"#)
-                .bind(episode_id)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
-        mysql(pool) => {
-            sqlx::query("DELETE FROM EpisodeSkipSegments WHERE EpisodeID = ? AND Source = ?")
-                .bind(episode_id)
-                .bind(SOURCE_AD)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-            sqlx::query("UPDATE Episodes SET AdsDetected = FALSE WHERE EpisodeID = ?")
                 .bind(episode_id)
                 .execute(pool)
                 .await
@@ -329,20 +278,6 @@ pub fn maybe_detect_ads_after_transcript(db_pool: DatabasePool, episode_id: i32,
             .flatten()
             .and_then(|r| r.try_get::<bool, _>("any_on").ok())
             .unwrap_or(false),
-            mysql(ref pool) => sqlx::query("
-                SELECT EXISTS(
-                    SELECT 1 FROM Episodes e JOIN Podcasts p ON e.FeedID = p.FeedID
-                    WHERE e.EpisodeID = ? AND COALESCE(p.AutoAdDetect, 0) = 1
-                ) AS any_on
-            ")
-            .bind(episode_id)
-            .fetch_optional(pool)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|r| r.try_get::<i64, _>("any_on").ok())
-            .map(|v| v != 0)
-            .unwrap_or(false),
         });
 
         if any_opted_in || redetect {
@@ -366,11 +301,6 @@ pub async fn set_auto_ad_detect(
                 .bind(enabled).bind(podcast_id).bind(user_id)
                 .execute(pool).await.map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query("UPDATE Podcasts SET AutoAdDetect = ? WHERE PodcastID = ? AND UserID = ?")
-                .bind(enabled).bind(podcast_id).bind(user_id)
-                .execute(pool).await.map_err(|e| e.to_string())?;
-        },
     });
     Ok(())
 }
@@ -383,11 +313,6 @@ pub async fn get_auto_ad_detect(db_pool: &DatabasePool, podcast_id: i32) -> Resu
         )
         .bind(podcast_id).fetch_optional(pool).await.map_err(|e| e.to_string())?
         .and_then(|r| r.try_get::<bool, _>("a").ok()).unwrap_or(false),
-        mysql(pool) => sqlx::query(
-            "SELECT COALESCE(AutoAdDetect, 0) AS a FROM Podcasts WHERE PodcastID = ?",
-        )
-        .bind(podcast_id).fetch_optional(pool).await.map_err(|e| e.to_string())?
-        .and_then(|r| r.try_get::<i8, _>("a").ok()).map(|a| a != 0).unwrap_or(false),
     });
     Ok(enabled)
 }
@@ -405,11 +330,6 @@ pub async fn set_ad_skip_auto_activate(
                 .bind(enabled).bind(podcast_id).bind(user_id)
                 .execute(pool).await.map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query("UPDATE Podcasts SET AdSkipAutoActivate = ? WHERE PodcastID = ? AND UserID = ?")
-                .bind(enabled).bind(podcast_id).bind(user_id)
-                .execute(pool).await.map_err(|e| e.to_string())?;
-        },
     });
     Ok(())
 }
@@ -422,11 +342,6 @@ pub async fn get_ad_skip_auto_activate(db_pool: &DatabasePool, podcast_id: i32) 
         )
         .bind(podcast_id).fetch_optional(pool).await.map_err(|e| e.to_string())?
         .and_then(|r| r.try_get::<bool, _>("a").ok()).unwrap_or(true),
-        mysql(pool) => sqlx::query(
-            "SELECT COALESCE(AdSkipAutoActivate, 1) AS a FROM Podcasts WHERE PodcastID = ?",
-        )
-        .bind(podcast_id).fetch_optional(pool).await.map_err(|e| e.to_string())?
-        .and_then(|r| r.try_get::<i8, _>("a").ok()).map(|a| a != 0).unwrap_or(true),
     });
     Ok(enabled)
 }
@@ -448,15 +363,6 @@ pub async fn set_ad_segment_review(
                 VALUES ($1, $2, $3)
                 ON CONFLICT (userid, segmentid) DO UPDATE SET status = EXCLUDED.status, createdat = CURRENT_TIMESTAMP
             "#)
-            .bind(user_id).bind(segment_id).bind(status)
-            .execute(pool).await.map_err(|e| e.to_string())?;
-        },
-        mysql(pool) => {
-            sqlx::query("
-                INSERT INTO EpisodeAdSkipReview (UserID, SegmentID, Status)
-                VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE Status = VALUES(Status), CreatedAt = CURRENT_TIMESTAMP
-            ")
             .bind(user_id).bind(segment_id).bind(status)
             .execute(pool).await.map_err(|e| e.to_string())?;
         },
@@ -496,31 +402,6 @@ pub async fn get_episode_skip_segments_for_user(
             r.try_get::<String, _>("source").unwrap_or_default(),
             r.try_get::<Option<String>, _>("review_status").ok().flatten(),
             r.try_get::<bool, _>("auto_activate").unwrap_or(true),
-        ))
-        .collect(),
-        mysql(pool) => sqlx::query(r#"
-            SELECT s.SegmentID AS segmentid, s.Kind AS kind, s.StartTime AS starttime,
-                   s.EndTime AS endtime, s.Source AS source,
-                   r.Status AS review_status,
-                   COALESCE(p.AdSkipAutoActivate, 1) AS auto_activate
-            FROM EpisodeSkipSegments s
-            LEFT JOIN EpisodeAdSkipReview r ON r.SegmentID = s.SegmentID AND r.UserID = ?
-            LEFT JOIN Episodes e ON e.EpisodeID = s.EpisodeID
-            LEFT JOIN Podcasts p ON p.FeedID = e.FeedID AND p.UserID = ?
-            WHERE s.EpisodeID = ?
-            ORDER BY s.StartTime
-        "#)
-        .bind(user_id).bind(user_id).bind(episode_id)
-        .fetch_all(pool).await.map_err(|e| e.to_string())?
-        .into_iter()
-        .map(|r| (
-            r.try_get::<i32, _>("segmentid").unwrap_or(0),
-            r.try_get::<String, _>("kind").unwrap_or_default(),
-            r.try_get::<f64, _>("starttime").unwrap_or(0.0),
-            r.try_get::<f64, _>("endtime").unwrap_or(0.0),
-            r.try_get::<String, _>("source").unwrap_or_default(),
-            r.try_get::<Option<String>, _>("review_status").ok().flatten(),
-            r.try_get::<i8, _>("auto_activate").map(|v| v != 0).unwrap_or(true),
         ))
         .collect(),
     });

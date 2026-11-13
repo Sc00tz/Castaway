@@ -53,40 +53,6 @@ impl DatabasePool {
                 }
                 Ok(providers)
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT
-                        ProviderID as providerid,
-                        ProviderName as providername,
-                        ClientID as clientid,
-                        AuthorizationURL as authorizationurl,
-                        Scope as scope,
-                        ButtonColor as buttoncolor,
-                        ButtonText as buttontext,
-                        ButtonTextColor as buttontextcolor,
-                        IconSVG as iconsvg
-                    FROM OIDCProviders
-                    WHERE Enabled = true"
-                )
-                .fetch_all(pool)
-                .await?;
-                
-                let mut providers = Vec::new();
-                for row in rows {
-                    providers.push(PublicOidcProvider {
-                        provider_id: row.try_get("providerid")?,
-                        provider_name: row.try_get("providername")?,
-                        client_id: row.try_get("clientid")?,
-                        authorization_url: row.try_get("authorizationurl")?,
-                        scope: row.try_get("scope")?,
-                        button_color: row.try_get("buttoncolor")?,
-                        button_text: row.try_get("buttontext")?,
-                        button_text_color: row.try_get("buttontextcolor")?,
-                        icon_svg: row.try_get("iconsvg").ok(),
-                    });
-                }
-                Ok(providers)
-            },
         })
     }
 
@@ -127,38 +93,6 @@ impl DatabasePool {
                     .await?;
                 
                 row.try_get("providerid")?
-            },
-            mysql(pool) => {
-                let result = sqlx::query("
-                    INSERT INTO OIDCProviders (
-                        ProviderName, ClientID, ClientSecret, AuthorizationURL,
-                        TokenURL, UserInfoURL, ButtonText, Scope,
-                        ButtonColor, ButtonTextColor, IconSVG, NameClaim, EmailClaim,
-                        UsernameClaim, RolesClaim, UserRole, AdminRole, InitializedFromEnv
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ")
-                    .bind(provider_name)
-                    .bind(client_id)
-                    .bind(client_secret)
-                    .bind(authorization_url)
-                    .bind(token_url)
-                    .bind(user_info_url)
-                    .bind(button_text)
-                    .bind(scope)
-                    .bind(button_color)
-                    .bind(button_text_color)
-                    .bind(icon_svg)
-                    .bind(name_claim)
-                    .bind(email_claim)
-                    .bind(username_claim)
-                    .bind(roles_claim)
-                    .bind(user_role)
-                    .bind(admin_role)
-                    .bind(initialized_from_env)
-                    .execute(pool)
-                    .await?;
-                
-                result.last_insert_id() as i32
             },
         });
         
@@ -212,47 +146,6 @@ impl DatabasePool {
                 }
                 providers
             },
-            mysql(pool) => {
-                let rows = sqlx::query("
-                    SELECT ProviderID, ProviderName, ClientID, AuthorizationURL,
-                           TokenURL, UserInfoURL, ButtonText, Scope, ButtonColor,
-                           ButtonTextColor, IconSVG, NameClaim, EmailClaim, UsernameClaim,
-                           RolesClaim, UserRole, AdminRole, Enabled, Created, Modified, InitializedFromEnv
-                    FROM OIDCProviders 
-                    ORDER BY ProviderName
-                ")
-                    .fetch_all(pool)
-                    .await?;
-                
-                let mut providers = Vec::new();
-                for row in rows {
-                    let provider = serde_json::json!({
-                        "provider_id": row.try_get::<i32, _>("ProviderID")?,
-                        "provider_name": row.try_get::<String, _>("ProviderName")?,
-                        "client_id": row.try_get::<String, _>("ClientID")?,
-                        "authorization_url": row.try_get::<String, _>("AuthorizationURL")?,
-                        "token_url": row.try_get::<String, _>("TokenURL")?,
-                        "user_info_url": row.try_get::<String, _>("UserInfoURL")?,
-                        "button_text": row.try_get::<String, _>("ButtonText")?,
-                        "scope": row.try_get::<String, _>("Scope")?,
-                        "button_color": row.try_get::<String, _>("ButtonColor")?,
-                        "button_text_color": row.try_get::<String, _>("ButtonTextColor")?,
-                        "icon_svg": row.try_get::<Option<String>, _>("IconSVG")?,
-                        "name_claim": row.try_get::<Option<String>, _>("NameClaim")?,
-                        "email_claim": row.try_get::<Option<String>, _>("EmailClaim")?,
-                        "username_claim": row.try_get::<Option<String>, _>("UsernameClaim")?,
-                        "roles_claim": row.try_get::<Option<String>, _>("RolesClaim")?,
-                        "user_role": row.try_get::<Option<String>, _>("UserRole")?,
-                        "admin_role": row.try_get::<Option<String>, _>("AdminRole")?,
-                        "enabled": row.try_get::<bool, _>("Enabled")?,
-                        "created": row.try_get::<Option<chrono::NaiveDateTime>, _>("Created")?,
-                        "modified": row.try_get::<Option<chrono::NaiveDateTime>, _>("Modified")?,
-                        "initialized_from_env": row.try_get::<bool, _>("InitializedFromEnv").unwrap_or(false)
-                    });
-                    providers.push(provider);
-                }
-                providers
-            },
         });
         
         debug!("Found {} OIDC providers", providers.len());
@@ -266,14 +159,6 @@ impl DatabasePool {
         let rows_affected = dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"DELETE FROM "OIDCProviders" WHERE ProviderID = $1"#)
-                    .bind(provider_id)
-                    .execute(pool)
-                    .await?;
-                
-                result.rows_affected()
-            },
-            mysql(pool) => {
-                let result = sqlx::query("DELETE FROM OIDCProviders WHERE ProviderID = ?")
                     .bind(provider_id)
                     .execute(pool)
                     .await?;
@@ -365,16 +250,6 @@ impl DatabasePool {
                 
                 Ok(result.map(|row| row.try_get::<bool, _>("initializedfromenv").unwrap_or(false)).unwrap_or(false))
             },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    SELECT InitializedFromEnv FROM OIDCProviders WHERE ProviderID = ?
-                "#)
-                    .bind(provider_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                Ok(result.map(|row| row.try_get::<bool, _>("InitializedFromEnv").unwrap_or(false)).unwrap_or(false))
-            },
         })
     }
 
@@ -452,73 +327,6 @@ impl DatabasePool {
                     result.rows_affected()
                 }
             },
-            mysql(pool) => {
-                if let Some(secret) = client_secret {
-                    let result = sqlx::query("
-                        UPDATE OIDCProviders SET
-                            ProviderName = ?, ClientID = ?, ClientSecret = ?,
-                            AuthorizationURL = ?, TokenURL = ?, UserInfoURL = ?,
-                            ButtonText = ?, Scope = ?, ButtonColor = ?,
-                            ButtonTextColor = ?, IconSVG = ?, NameClaim = ?,
-                            EmailClaim = ?, UsernameClaim = ?, RolesClaim = ?,
-                            UserRole = ?, AdminRole = ?, Modified = CURRENT_TIMESTAMP
-                        WHERE ProviderID = ?
-                    ")
-                        .bind(provider_name)
-                        .bind(client_id)
-                        .bind(secret)
-                        .bind(authorization_url)
-                        .bind(token_url)
-                        .bind(user_info_url)
-                        .bind(button_text)
-                        .bind(scope)
-                        .bind(button_color)
-                        .bind(button_text_color)
-                        .bind(icon_svg)
-                        .bind(name_claim)
-                        .bind(email_claim)
-                        .bind(username_claim)
-                        .bind(roles_claim)
-                        .bind(user_role)
-                        .bind(admin_role)
-                        .bind(provider_id)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected()
-                } else {
-                    // Don't update client_secret if not provided
-                    let result = sqlx::query("
-                        UPDATE OIDCProviders SET
-                            ProviderName = ?, ClientID = ?,
-                            AuthorizationURL = ?, TokenURL = ?, UserInfoURL = ?,
-                            ButtonText = ?, Scope = ?, ButtonColor = ?,
-                            ButtonTextColor = ?, IconSVG = ?, NameClaim = ?,
-                            EmailClaim = ?, UsernameClaim = ?, RolesClaim = ?,
-                            UserRole = ?, AdminRole = ?, Modified = CURRENT_TIMESTAMP
-                        WHERE ProviderID = ?
-                    ")
-                        .bind(provider_name)
-                        .bind(client_id)
-                        .bind(authorization_url)
-                        .bind(token_url)
-                        .bind(user_info_url)
-                        .bind(button_text)
-                        .bind(scope)
-                        .bind(button_color)
-                        .bind(button_text_color)
-                        .bind(icon_svg)
-                        .bind(name_claim)
-                        .bind(email_claim)
-                        .bind(username_claim)
-                        .bind(roles_claim)
-                        .bind(user_role)
-                        .bind(admin_role)
-                        .bind(provider_id)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected()
-                }
-            },
         });
         
         let success = rows_affected > 0;
@@ -574,45 +382,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT ProviderID, ProviderName, ClientID, ClientSecret, AuthorizationURL, 
-                           TokenURL, UserInfoURL, Scope, ButtonColor, ButtonText, ButtonTextColor, 
-                           IconSVG, Enabled, NameClaim, EmailClaim, UsernameClaim, RolesClaim, 
-                           UserRole, AdminRole
-                    FROM OIDCProviders 
-                    WHERE ClientID = ? AND Enabled = true
-                "#)
-                    .bind(client_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = row {
-                    Ok(Some(serde_json::json!({
-                        "provider_id": row.try_get::<i32, _>("ProviderID")?,
-                        "provider_name": row.try_get::<String, _>("ProviderName")?,
-                        "client_id": row.try_get::<String, _>("ClientID")?,
-                        "client_secret": row.try_get::<String, _>("ClientSecret")?,
-                        "authorization_url": row.try_get::<String, _>("AuthorizationURL")?,
-                        "token_url": row.try_get::<String, _>("TokenURL")?,
-                        "userinfo_url": row.try_get::<String, _>("UserInfoURL")?,
-                        "scope": row.try_get::<String, _>("Scope")?,
-                        "button_color": row.try_get::<String, _>("ButtonColor")?,
-                        "button_text": row.try_get::<String, _>("ButtonText")?,
-                        "button_text_color": row.try_get::<String, _>("ButtonTextColor")?,
-                        "icon_svg": row.try_get::<Option<String>, _>("IconSVG")?,
-                        "enabled": row.try_get::<i8, _>("Enabled")? != 0,
-                        "name_claim": row.try_get::<Option<String>, _>("NameClaim")?,
-                        "email_claim": row.try_get::<Option<String>, _>("EmailClaim")?,
-                        "username_claim": row.try_get::<Option<String>, _>("UsernameClaim")?,
-                        "roles_claim": row.try_get::<Option<String>, _>("RolesClaim")?,
-                        "user_role": row.try_get::<Option<String>, _>("UserRole")?,
-                        "admin_role": row.try_get::<Option<String>, _>("AdminRole")?
-                    })))
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -642,34 +411,6 @@ impl DatabasePool {
                         row.try_get("rolesclaim")?,
                         row.try_get("userrole")?,
                         row.try_get("adminrole")?,
-                    )))
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    SELECT ProviderID, ClientID, ClientSecret, TokenURL, UserInfoURL, NameClaim, EmailClaim, UsernameClaim, RolesClaim, UserRole, AdminRole
-                    FROM OIDCProviders
-                    WHERE ClientID = ? AND Enabled = true
-                "#)
-                    .bind(client_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = result {
-                    Ok(Some((
-                        row.try_get("ProviderID")?,
-                        row.try_get("ClientID")?,
-                        row.try_get("ClientSecret")?,
-                        row.try_get("TokenURL")?,
-                        row.try_get("UserInfoURL")?,
-                        row.try_get("NameClaim")?,
-                        row.try_get("EmailClaim")?,
-                        row.try_get("UsernameClaim")?,
-                        row.try_get("RolesClaim")?,
-                        row.try_get("UserRole")?,
-                        row.try_get("AdminRole")?,
                     )))
                 } else {
                     Ok(None)
@@ -719,35 +460,6 @@ impl DatabasePool {
 
                 Ok(user_id)
             },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    INSERT INTO Users (Fullname, Username, Email, Hashed_PW, IsAdmin)
-                    VALUES (?, ?, ?, ?, 0)
-                "#)
-                    .bind(fullname)
-                    .bind(username)
-                    .bind(email)
-                    .bind(&hashed_password)
-                    .execute(pool)
-                    .await?;
-
-                let user_id = result.last_insert_id() as i32;
-
-                // Add default user settings
-                sqlx::query(r#"INSERT INTO UserSettings (UserID, Theme) VALUES (?, ?)"#)
-                    .bind(user_id)
-                    .bind("Nordic")
-                    .execute(pool)
-                    .await?;
-
-                // Add default user stats
-                sqlx::query(r#"INSERT INTO UserStats (UserID) VALUES (?)"#)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-
-                Ok(user_id)
-            },
         })
     }
 
@@ -763,15 +475,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?
                     .map(|row| -> AppResult<_> { Ok((row.try_get("userid")?, row.try_get("username")?)) })
-                    .transpose()?
-            },
-            mysql(pool) => {
-                sqlx::query("SELECT UserID, Username FROM Users WHERE oidc_provider_id = ? AND oidc_subject = ? ORDER BY UserID LIMIT 1")
-                    .bind(provider_id)
-                    .bind(subject)
-                    .fetch_optional(pool)
-                    .await?
-                    .map(|row| -> AppResult<_> { Ok((row.try_get("UserID")?, row.try_get("Username")?)) })
                     .transpose()?
             },
         }))
@@ -790,16 +493,6 @@ impl DatabasePool {
                     None => (None, None),
                 }
             },
-            mysql(pool) => {
-                match sqlx::query("SELECT oidc_provider_id, oidc_subject FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?
-                {
-                    Some(row) => (row.try_get("oidc_provider_id")?, row.try_get("oidc_subject")?),
-                    None => (None, None),
-                }
-            },
         }))
     }
 
@@ -808,14 +501,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET oidc_provider_id = $1, oidc_subject = $2 WHERE userid = $3"#)
-                    .bind(provider_id)
-                    .bind(subject)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET oidc_provider_id = ?, oidc_subject = ? WHERE UserID = ?")
                     .bind(provider_id)
                     .bind(subject)
                     .bind(user_id)

@@ -131,131 +131,6 @@ impl DatabasePool {
                 }
                 Ok(episodes)
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT * FROM (
-                        SELECT
-                            Podcasts.PodcastID as podcastid,
-                            Podcasts.PodcastName as podcastname,
-                            Podcasts.ArtworkURL as artworkurl,
-                            Episodes.EpisodeID as episodeid,
-                            Episodes.EpisodeTitle as episodetitle,
-                            Episodes.EpisodePubDate as episodepubdate,
-                            Episodes.EpisodeDescription as episodedescription,
-                            CASE 
-                                WHEN Podcasts.UsePodcastCoversCustomized = 1 AND Podcasts.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                ELSE Episodes.EpisodeArtwork
-                            END as episodeartwork,
-                            Episodes.EpisodeURL as episodeurl,
-                            Episodes.EpisodeDuration as episodeduration,
-                            Podcasts.PodcastIndexID as podcastindexid,
-                            Podcasts.WebsiteURL as websiteurl,
-                            DownloadedEpisodes.DownloadedLocation as downloadedlocation,
-                            UserEpisodeHistory.ListenDuration as listenduration,
-                            COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = Podcasts.UserID), 0) as completed,
-                            CASE WHEN SavedEpisodes.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            CASE WHEN EpisodeQueue.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS queued,
-                            TRUE as downloaded,
-                            FALSE as is_youtube,
-                            Episodes.IsVideo as is_video
-                        FROM DownloadedEpisodes
-                        INNER JOIN Episodes ON DownloadedEpisodes.EpisodeID = Episodes.EpisodeID
-                        INNER JOIN Podcasts ON Episodes.FeedID = Podcasts.FeedID AND Podcasts.UserID = DownloadedEpisodes.UserID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN UserEpisodeHistory ON
-                            DownloadedEpisodes.EpisodeID = UserEpisodeHistory.EpisodeID
-                            AND DownloadedEpisodes.UserID = UserEpisodeHistory.UserID
-                        LEFT JOIN SavedEpisodes ON
-                            DownloadedEpisodes.EpisodeID = SavedEpisodes.EpisodeID
-                            AND SavedEpisodes.UserID = ?
-                        LEFT JOIN EpisodeQueue ON
-                            DownloadedEpisodes.EpisodeID = EpisodeQueue.EpisodeID
-                            AND EpisodeQueue.UserID = ?
-                            AND EpisodeQueue.is_youtube = FALSE
-                        WHERE DownloadedEpisodes.UserID = ?
-
-                        UNION ALL
-
-                        SELECT
-                            Podcasts.PodcastID as podcastid,
-                            Podcasts.PodcastName as podcastname,
-                            Podcasts.ArtworkURL as artworkurl,
-                            YouTubeVideos.VideoID as episodeid,
-                            YouTubeVideos.VideoTitle as episodetitle,
-                            YouTubeVideos.PublishedAt as episodepubdate,
-                            YouTubeVideos.VideoDescription as episodedescription,
-                            CASE 
-                                WHEN Podcasts.UsePodcastCoversCustomized = 1 AND Podcasts.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                ELSE YouTubeVideos.ThumbnailURL
-                            END as episodeartwork,
-                            YouTubeVideos.VideoURL as episodeurl,
-                            YouTubeVideos.Duration as episodeduration,
-                            Podcasts.PodcastIndexID as podcastindexid,
-                            Podcasts.WebsiteURL as websiteurl,
-                            DownloadedVideos.DownloadedLocation as downloadedlocation,
-                            YouTubeVideos.ListenPosition as listenduration,
-                            YouTubeVideos.Completed as completed,
-                            CASE WHEN SavedVideos.VideoID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            CASE WHEN EpisodeQueue.EpisodeID IS NOT NULL AND EpisodeQueue.is_youtube = TRUE THEN TRUE ELSE FALSE END AS queued,
-                            TRUE as downloaded,
-                            TRUE as is_youtube,
-                            TRUE as is_video
-                        FROM DownloadedVideos
-                        INNER JOIN YouTubeVideos ON DownloadedVideos.VideoID = YouTubeVideos.VideoID
-                        INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN SavedVideos ON
-                            DownloadedVideos.VideoID = SavedVideos.VideoID
-                            AND SavedVideos.UserID = ?
-                        LEFT JOIN EpisodeQueue ON
-                            DownloadedVideos.VideoID = EpisodeQueue.EpisodeID
-                            AND EpisodeQueue.UserID = ?
-                            AND EpisodeQueue.is_youtube = TRUE
-                        WHERE DownloadedVideos.UserID = ?
-                    ) combined
-                    ORDER BY episodepubdate DESC"
-                )
-                .bind(user_id)
-                .bind(user_id)
-                .bind(user_id)
-                .bind(user_id)
-                .bind(user_id)
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-                
-                let mut episodes = Vec::new();
-                for row in rows {
-                    episodes.push(crate::handlers::podcasts::DownloadedEpisode {
-                        podcastid: row.try_get("podcastid")?,
-                        podcastname: row.try_get("podcastname")?,
-                        artworkurl: row.try_get("artworkurl").ok(),
-                        episodeid: row.try_get("episodeid")?,
-                        episodetitle: row.try_get("episodetitle")?,
-                        episodepubdate: {
-                            let naive = row.try_get::<chrono::NaiveDateTime, _>("episodepubdate")?;
-                            naive.format("%Y-%m-%dT%H:%M:%S").to_string()
-                        },
-                        episodedescription: row.try_get("episodedescription")?,
-                        episodeartwork: row.try_get("episodeartwork").ok(),
-                        episodeurl: row.try_get("episodeurl")?,
-                        episodeduration: row.try_get("episodeduration")?,
-                        podcastindexid: row.try_get("podcastindexid").ok(),
-                        websiteurl: row.try_get("websiteurl").ok(),
-                        downloadedlocation: row.try_get("downloadedlocation")?,
-                        listenduration: row.try_get("listenduration").ok(),
-                        completed: row.try_get("completed")?,
-                        saved: row.try_get("saved")?,
-                        queued: row.try_get("queued")?,
-                        downloaded: row.try_get("downloaded")?,
-                        is_youtube: row.try_get("is_youtube")?,
-                        is_video: row.try_get("is_video")?,
-                    });
-                }
-                Ok(episodes)
-            },
         })
     }
 
@@ -339,79 +214,6 @@ impl DatabasePool {
                         podcastname: row.try_get("podcastname")?,
                         artworkurl: row.try_get("artworkurl").ok(),
                         episode_count: row.try_get("episode_count")?,
-                    });
-                }
-                Ok(summaries)
-            },
-            mysql(pool) => {
-                // MySQL has no `$n` reuse, so the search pattern is bound once per `?` in textual
-                // order: branch 1 (title, name), then branch 2 (title, name).
-                let ep_search = if has_search {
-                    " AND (Episodes.EpisodeTitle LIKE ? OR ep.PodcastName LIKE ?)"
-                } else { "" };
-                let yt_search = if has_search {
-                    " AND (YouTubeVideos.VideoTitle LIKE ? OR yp.PodcastName LIKE ?)"
-                } else { "" };
-                let ep_filter = match filter {
-                    "completed"   => " AND COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = DownloadedEpisodes.UserID), 0) = 1",
-                    "in_progress" => " AND COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = DownloadedEpisodes.UserID), 0) = 0 AND UserEpisodeHistory.ListenDuration IS NOT NULL AND UserEpisodeHistory.ListenDuration > 0",
-                    _             => "",
-                };
-                let yt_filter = match filter {
-                    "completed"   => " AND YouTubeVideos.Completed = 1",
-                    "in_progress" => " AND YouTubeVideos.Completed = 0 AND YouTubeVideos.ListenPosition IS NOT NULL AND YouTubeVideos.ListenPosition > 0",
-                    _             => "",
-                };
-                let sql = format!(
-                    "SELECT
-                        p.PodcastID as podcastid,
-                        p.PodcastName as podcastname,
-                        p.ArtworkURL as artworkurl,
-                        COUNT(*) AS episode_count
-                    FROM (
-                        SELECT ep.PodcastID as podcastid
-                        FROM DownloadedEpisodes
-                        INNER JOIN Episodes ON DownloadedEpisodes.EpisodeID = Episodes.EpisodeID
-                        INNER JOIN Podcasts ep ON Episodes.FeedID = ep.FeedID AND ep.UserID = DownloadedEpisodes.UserID
-                        LEFT JOIN UserEpisodeHistory ON DownloadedEpisodes.EpisodeID = UserEpisodeHistory.EpisodeID AND DownloadedEpisodes.UserID = UserEpisodeHistory.UserID
-                        WHERE DownloadedEpisodes.UserID = ?{ep_search}{ep_filter}
-
-                        UNION ALL
-
-                        SELECT YouTubeVideos.PodcastID as podcastid
-                        FROM DownloadedVideos
-                        INNER JOIN YouTubeVideos ON DownloadedVideos.VideoID = YouTubeVideos.VideoID
-                        INNER JOIN Podcasts yp ON YouTubeVideos.PodcastID = yp.PodcastID
-                        WHERE DownloadedVideos.UserID = ?{yt_search}{yt_filter}
-                    ) downloads
-                    INNER JOIN Podcasts p ON downloads.podcastid = p.PodcastID
-                    GROUP BY p.PodcastID, p.PodcastName, p.ArtworkURL
-                    ORDER BY p.PodcastName ASC",
-                    ep_search = ep_search,
-                    ep_filter = ep_filter,
-                    yt_search = yt_search,
-                    yt_filter = yt_filter,
-                );
-
-                // SAFETY: see Postgres branch — only validated literals are interpolated; the
-                // search text is always bound.
-                let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(user_id);
-                if has_search {
-                    q = q.bind(search_pattern.clone()).bind(search_pattern.clone());
-                }
-                q = q.bind(user_id);
-                if has_search {
-                    q = q.bind(search_pattern.clone()).bind(search_pattern.clone());
-                }
-                let rows = q.fetch_all(pool).await?;
-
-                let mut summaries = Vec::new();
-                for row in rows {
-                    summaries.push(crate::handlers::podcasts::PodcastDownloadSummary {
-                        podcastid: row.try_get("podcastid")?,
-                        podcastname: row.try_get("podcastname")?,
-                        artworkurl: row.try_get("artworkurl").ok(),
-                        episode_count: row.try_get::<i64, _>("episode_count")?,
                     });
                 }
                 Ok(summaries)
@@ -592,170 +394,6 @@ impl DatabasePool {
                 }
                 Ok((episodes, total))
             },
-            mysql(pool) => {
-                // Search patterns are bound in textual order: episode branch (title, name) then
-                // youtube branch (title, name). The completion filter is applied to the merged
-                // `combined` set (lowercase `completed`/`listenduration` aliases).
-                let ep_search = if has_search {
-                    " AND (Episodes.EpisodeTitle LIKE ? OR Podcasts.PodcastName LIKE ?)"
-                } else { "" };
-                let yt_search = if has_search {
-                    " AND (YouTubeVideos.VideoTitle LIKE ? OR Podcasts.PodcastName LIKE ?)"
-                } else { "" };
-                let filter_clause = match filter {
-                    "completed"   => " WHERE completed = 1",
-                    "in_progress" => " WHERE completed = 0 AND listenduration IS NOT NULL AND listenduration > 0",
-                    _             => "",
-                };
-                let sql = format!(
-                    "SELECT *, COUNT(*) OVER() AS total_count FROM (
-                        SELECT
-                            Podcasts.PodcastID as podcastid,
-                            Podcasts.PodcastName as podcastname,
-                            Podcasts.ArtworkURL as artworkurl,
-                            Episodes.EpisodeID as episodeid,
-                            Episodes.EpisodeTitle as episodetitle,
-                            Episodes.EpisodePubDate as episodepubdate,
-                            Episodes.EpisodeDescription as episodedescription,
-                            CASE
-                                WHEN Podcasts.UsePodcastCoversCustomized = 1 AND Podcasts.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                ELSE Episodes.EpisodeArtwork
-                            END as episodeartwork,
-                            Episodes.EpisodeURL as episodeurl,
-                            Episodes.EpisodeDuration as episodeduration,
-                            Podcasts.PodcastIndexID as podcastindexid,
-                            Podcasts.WebsiteURL as websiteurl,
-                            DownloadedEpisodes.DownloadedLocation as downloadedlocation,
-                            UserEpisodeHistory.ListenDuration as listenduration,
-                            COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = Podcasts.UserID), 0) as completed,
-                            CASE WHEN SavedEpisodes.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            CASE WHEN EpisodeQueue.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS queued,
-                            TRUE as downloaded,
-                            FALSE as is_youtube,
-                            Episodes.IsVideo as is_video
-                        FROM DownloadedEpisodes
-                        INNER JOIN Episodes ON DownloadedEpisodes.EpisodeID = Episodes.EpisodeID
-                        INNER JOIN Podcasts ON Episodes.FeedID = Podcasts.FeedID AND Podcasts.UserID = DownloadedEpisodes.UserID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN UserEpisodeHistory ON
-                            DownloadedEpisodes.EpisodeID = UserEpisodeHistory.EpisodeID
-                            AND DownloadedEpisodes.UserID = UserEpisodeHistory.UserID
-                        LEFT JOIN SavedEpisodes ON
-                            DownloadedEpisodes.EpisodeID = SavedEpisodes.EpisodeID
-                            AND SavedEpisodes.UserID = ?
-                        LEFT JOIN EpisodeQueue ON
-                            DownloadedEpisodes.EpisodeID = EpisodeQueue.EpisodeID
-                            AND EpisodeQueue.UserID = ?
-                            AND EpisodeQueue.is_youtube = FALSE
-                        WHERE DownloadedEpisodes.UserID = ?
-                        AND Podcasts.PodcastID = ?{ep_search}
-
-                        UNION ALL
-
-                        SELECT
-                            Podcasts.PodcastID as podcastid,
-                            Podcasts.PodcastName as podcastname,
-                            Podcasts.ArtworkURL as artworkurl,
-                            YouTubeVideos.VideoID as episodeid,
-                            YouTubeVideos.VideoTitle as episodetitle,
-                            YouTubeVideos.PublishedAt as episodepubdate,
-                            YouTubeVideos.VideoDescription as episodedescription,
-                            CASE
-                                WHEN Podcasts.UsePodcastCoversCustomized = 1 AND Podcasts.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                ELSE YouTubeVideos.ThumbnailURL
-                            END as episodeartwork,
-                            YouTubeVideos.VideoURL as episodeurl,
-                            YouTubeVideos.Duration as episodeduration,
-                            Podcasts.PodcastIndexID as podcastindexid,
-                            Podcasts.WebsiteURL as websiteurl,
-                            DownloadedVideos.DownloadedLocation as downloadedlocation,
-                            YouTubeVideos.ListenPosition as listenduration,
-                            YouTubeVideos.Completed as completed,
-                            CASE WHEN SavedVideos.VideoID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            CASE WHEN EpisodeQueue.EpisodeID IS NOT NULL AND EpisodeQueue.is_youtube = TRUE THEN TRUE ELSE FALSE END AS queued,
-                            TRUE as downloaded,
-                            TRUE as is_youtube,
-                            TRUE as is_video
-                        FROM DownloadedVideos
-                        INNER JOIN YouTubeVideos ON DownloadedVideos.VideoID = YouTubeVideos.VideoID
-                        INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN SavedVideos ON
-                            DownloadedVideos.VideoID = SavedVideos.VideoID
-                            AND SavedVideos.UserID = ?
-                        LEFT JOIN EpisodeQueue ON
-                            DownloadedVideos.VideoID = EpisodeQueue.EpisodeID
-                            AND EpisodeQueue.UserID = ?
-                            AND EpisodeQueue.is_youtube = TRUE
-                        WHERE DownloadedVideos.UserID = ?
-                        AND Podcasts.PodcastID = ?{yt_search}
-                    ) combined{filter_clause}
-                    ORDER BY episodepubdate DESC
-                    LIMIT ? OFFSET ?",
-                    ep_search = ep_search,
-                    yt_search = yt_search,
-                    filter_clause = filter_clause,
-                );
-
-                // SAFETY: see Postgres branch — validated literals only; search text is bound.
-                let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
-                    .bind(user_id)    // SavedEpisodes join
-                    .bind(user_id)    // EpisodeQueue join
-                    .bind(user_id)    // DownloadedEpisodes WHERE
-                    .bind(podcast_id); // regular podcast filter
-                if has_search {
-                    q = q.bind(search_pattern.clone()).bind(search_pattern.clone());
-                }
-                q = q
-                    .bind(user_id)    // SavedVideos join
-                    .bind(user_id)    // EpisodeQueue join
-                    .bind(user_id)    // DownloadedVideos WHERE
-                    .bind(podcast_id); // youtube podcast filter
-                if has_search {
-                    q = q.bind(search_pattern.clone()).bind(search_pattern.clone());
-                }
-                let rows = q
-                    .bind(limit)
-                    .bind(offset)
-                    .fetch_all(pool)
-                    .await?;
-
-                let total: i64 = rows.first()
-                    .and_then(|r| r.try_get::<i64, _>("total_count").ok())
-                    .unwrap_or(0);
-
-                let mut episodes = Vec::new();
-                for row in rows {
-                    episodes.push(crate::handlers::podcasts::DownloadedEpisode {
-                        podcastid: row.try_get("podcastid")?,
-                        podcastname: row.try_get("podcastname")?,
-                        artworkurl: row.try_get("artworkurl").ok(),
-                        episodeid: row.try_get("episodeid")?,
-                        episodetitle: row.try_get("episodetitle")?,
-                        episodepubdate: {
-                            let naive = row.try_get::<chrono::NaiveDateTime, _>("episodepubdate")?;
-                            naive.format("%Y-%m-%dT%H:%M:%S").to_string()
-                        },
-                        episodedescription: row.try_get("episodedescription")?,
-                        episodeartwork: row.try_get("episodeartwork").ok(),
-                        episodeurl: row.try_get("episodeurl")?,
-                        episodeduration: row.try_get("episodeduration")?,
-                        podcastindexid: row.try_get("podcastindexid").ok(),
-                        websiteurl: row.try_get("websiteurl").ok(),
-                        downloadedlocation: row.try_get("downloadedlocation")?,
-                        listenduration: row.try_get("listenduration").ok(),
-                        completed: row.try_get("completed")?,
-                        saved: row.try_get("saved")?,
-                        queued: row.try_get("queued")?,
-                        downloaded: row.try_get("downloaded")?,
-                        is_youtube: row.try_get("is_youtube")?,
-                        is_video: row.try_get("is_video")?,
-                    });
-                }
-                Ok((episodes, total))
-            },
         })
     }
 
@@ -778,22 +416,6 @@ impl DatabasePool {
                 let count: i64 = row.try_get("count")?;
                 Ok(count > 0)
             },
-            mysql(pool) => {
-                let query = if is_youtube {
-                    "SELECT COUNT(*) as count FROM DownloadedVideos WHERE UserID = ? AND VideoID = ?"
-                } else {
-                    "SELECT COUNT(*) as count FROM DownloadedEpisodes WHERE UserID = ? AND EpisodeID = ?"
-                };
-                
-                let row = sqlx::query(query)
-                    .bind(user_id)
-                    .bind(episode_id)
-                    .fetch_one(pool)
-                    .await?;
-                    
-                let count: i64 = row.try_get("count")?;
-                Ok(count > 0)
-            },
         })
     }
 
@@ -807,14 +429,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?;
                 Ok(row.and_then(|r| r.try_get::<Option<String>, _>("downloadedlocation").ok().flatten()))
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT DownloadedLocation FROM DownloadedVideos WHERE UserID = ? AND VideoID = ?")
-                    .bind(user_id)
-                    .bind(video_id)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(row.and_then(|r| r.try_get::<Option<String>, _>("DownloadedLocation").ok().flatten()))
             },
         })
     }
@@ -857,40 +471,6 @@ impl DatabasePool {
                 };
                 Ok(deleted)
             },
-            mysql(pool) => {
-                let deleted = if is_youtube {
-                    let result = sqlx::query("DELETE FROM DownloadedVideos WHERE UserID = ? AND VideoID = ?")
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .execute(pool)
-                        .await?;
-
-                    // Only update UserStats if a row was actually deleted
-                    if result.rows_affected() > 0 {
-                        sqlx::query("UPDATE UserStats SET EpisodesDownloaded = EpisodesDownloaded - 1 WHERE UserID = ?")
-                            .bind(user_id)
-                            .execute(pool)
-                            .await?;
-                    }
-                    result.rows_affected() > 0
-                } else {
-                    let result = sqlx::query("DELETE FROM DownloadedEpisodes WHERE UserID = ? AND EpisodeID = ?")
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .execute(pool)
-                        .await?;
-
-                    // Only update UserStats if a row was actually deleted
-                    if result.rows_affected() > 0 {
-                        sqlx::query("UPDATE UserStats SET EpisodesDownloaded = EpisodesDownloaded - 1 WHERE UserID = ?")
-                            .bind(user_id)
-                            .execute(pool)
-                            .await?;
-                    }
-                    result.rows_affected() > 0
-                };
-                Ok(deleted)
-            },
         })
     }
 
@@ -915,29 +495,6 @@ impl DatabasePool {
                         "task_type": row.try_get::<String, _>("tasktype")?,
                         "progress": row.try_get::<Option<i32>, _>("progress")?,
                         "status": row.try_get::<String, _>("status")?
-                    }));
-                }
-                
-                Ok(serde_json::json!({ "active_downloads": tasks }))
-            },
-            mysql(pool) => {
-                // Get active download tasks
-                let rows = sqlx::query(
-                    "SELECT TaskID, TaskType, Progress, Status FROM UserTasks 
-                     WHERE UserID = ? AND TaskType IN ('download_episode', 'download_video', 'download_all_episodes', 'download_all_videos') 
-                     AND Status IN ('pending', 'running')"
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-                
-                let mut tasks = Vec::new();
-                for row in rows {
-                    tasks.push(serde_json::json!({
-                        "task_id": row.try_get::<String, _>("TaskID")?,
-                        "task_type": row.try_get::<String, _>("TaskType")?,
-                        "progress": row.try_get::<Option<i32>, _>("Progress")?,
-                        "status": row.try_get::<String, _>("Status")?
                     }));
                 }
                 
@@ -1016,27 +573,6 @@ impl DatabasePool {
                 r.try_get("downloadedlocation").unwrap_or(None),
             ))
             .collect(),
-            mysql(pool) => sqlx::query(
-                "SELECT de.UserID, de.EpisodeID, de.DownloadedLocation
-                 FROM DownloadedEpisodes de
-                 JOIN UserEpisodeState s ON s.UserID = de.UserID AND s.EpisodeID = de.EpisodeID AND s.Completed = 1
-                 JOIN Episodes e ON e.EpisodeID = de.EpisodeID
-                 JOIN Podcasts p ON p.FeedID = e.FeedID AND p.UserID = de.UserID
-                 JOIN Users u ON u.UserID = de.UserID
-                 WHERE COALESCE(p.AutoDeleteOnComplete, u.AutoDeleteOnComplete, 0) = 1
-                   AND p.FeedURL NOT LIKE 'local://%'
-                   AND (s.CompletedAt IS NULL
-                        OR (s.CompletedAt >= de.DownloadedDate AND s.CompletedAt < NOW() - INTERVAL 1 HOUR))",
-            )
-            .fetch_all(pool)
-            .await?
-            .iter()
-            .map(|r| (
-                r.try_get("UserID").unwrap_or(0),
-                r.try_get("EpisodeID").unwrap_or(0),
-                r.try_get("DownloadedLocation").unwrap_or(None),
-            ))
-            .collect(),
         });
 
         let mut deleted = 0;
@@ -1113,31 +649,6 @@ impl DatabasePool {
                     ));
                 }
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT de.UserID AS user_id, de.EpisodeID AS content_id,
-                            de.DownloadedLocation AS location, de.DownloadedDate AS downloaded_date,
-                            p.FeedURL AS feed_url,
-                            CAST(CASE WHEN p.AutoDownloadDeleteCustomized THEN p.AutoDownloadDeleteDays
-                                      ELSE u.AutoDownloadDeleteDays END AS SIGNED) AS effective_days
-                     FROM DownloadedEpisodes de
-                     JOIN Episodes e ON e.EpisodeID = de.EpisodeID
-                     JOIN Podcasts p ON p.FeedID = e.FeedID AND p.UserID = de.UserID
-                     JOIN Users u ON u.UserID = de.UserID",
-                )
-                .fetch_all(pool)
-                .await?;
-                for row in &rows {
-                    out.push((
-                        row.try_get::<i32, _>("user_id").unwrap_or(0),
-                        row.try_get::<i32, _>("content_id").unwrap_or(0),
-                        row.try_get::<Option<String>, _>("location").unwrap_or(None),
-                        row.try_get::<Option<chrono::NaiveDateTime>, _>("downloaded_date").unwrap_or(None),
-                        row.try_get::<Option<String>, _>("feed_url").unwrap_or(None),
-                        row.try_get::<i64, _>("effective_days").map(|v| v as i32).unwrap_or(0),
-                    ));
-                }
-            },
         });
         Ok(out)
     }
@@ -1174,31 +685,6 @@ impl DatabasePool {
                     ));
                 }
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT dv.UserID AS user_id, dv.VideoID AS content_id,
-                            dv.DownloadedLocation AS location, dv.DownloadedDate AS downloaded_date,
-                            p.FeedURL AS feed_url,
-                            CAST(CASE WHEN p.AutoDownloadDeleteCustomized THEN p.AutoDownloadDeleteDays
-                                      ELSE u.AutoDownloadDeleteDays END AS SIGNED) AS effective_days
-                     FROM DownloadedVideos dv
-                     JOIN YouTubeVideos v ON v.VideoID = dv.VideoID
-                     JOIN Podcasts p ON p.PodcastID = v.PodcastID
-                     JOIN Users u ON u.UserID = dv.UserID",
-                )
-                .fetch_all(pool)
-                .await?;
-                for row in &rows {
-                    out.push((
-                        row.try_get::<i32, _>("user_id").unwrap_or(0),
-                        row.try_get::<i32, _>("content_id").unwrap_or(0),
-                        row.try_get::<Option<String>, _>("location").unwrap_or(None),
-                        row.try_get::<Option<chrono::NaiveDateTime>, _>("downloaded_date").unwrap_or(None),
-                        row.try_get::<Option<String>, _>("feed_url").unwrap_or(None),
-                        row.try_get::<i64, _>("effective_days").map(|v| v as i32).unwrap_or(0),
-                    ));
-                }
-            },
         });
         Ok(out)
     }
@@ -1226,24 +712,6 @@ impl DatabasePool {
 
                 if let Some(row) = row {
                     row.try_get::<String, _>("youtubevideoid")?
-                } else {
-                    return Ok(None);
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT YouTubeVideos.YouTubeVideoID
-                    FROM YouTubeVideos
-                    INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                    WHERE YouTubeVideos.VideoID = ? AND Podcasts.UserID = ?
-                "#)
-                .bind(episode_id)
-                .bind(user_id)
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = row {
-                    row.try_get::<String, _>("YouTubeVideoID")?
                 } else {
                     return Ok(None);
                 }
@@ -1287,22 +755,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     let location: String = row.try_get("downloadedlocation")?;
-                    debug!("DownloadedLocation found: {}", location);
-                    Ok(Some(location))
-                } else {
-                    debug!("No DownloadedLocation found for the given EpisodeID and UserID");
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT DownloadedLocation FROM DownloadedEpisodes WHERE EpisodeID = ? AND UserID = ?")
-                    .bind(episode_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let location: String = row.try_get("DownloadedLocation")?;
                     debug!("DownloadedLocation found: {}", location);
                     Ok(Some(location))
                 } else {

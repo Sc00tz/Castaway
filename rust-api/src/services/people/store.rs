@@ -56,17 +56,6 @@ async fn insert_person(db: &DatabasePool, seed: &PersonSeed, norm: &str) -> AppR
         .bind(seed.podpeople_id)
         .fetch_one(pool)
         .await?),
-        mysql(pool) => {
-            let res = sqlx::query("INSERT INTO Persons (Name, NameNormalized, Img, Href, PodPeopleID) VALUES (?, ?, ?, ?, ?)")
-                .bind(name)
-                .bind(norm)
-                .bind(&seed.img)
-                .bind(&seed.href)
-                .bind(seed.podpeople_id)
-                .execute(pool)
-                .await?;
-            Ok(res.last_insert_id() as i32)
-        },
     })
 }
 
@@ -736,7 +725,6 @@ pub async fn library_episodes(
     // The one column named differently per backend.
     let is_video = dialect_match!(db, {
         pg(_) => "e.is_video",
-        mysql(_) => "e.IsVideo",
     });
     Ok(fetch_all!(
         db,

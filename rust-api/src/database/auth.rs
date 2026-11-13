@@ -16,14 +16,6 @@ impl DatabasePool {
                 
                 Ok(row.is_some())
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT * FROM APIKeys WHERE APIKey = ?")
-                    .bind(api_key)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                Ok(row.is_some())
-            },
         })
     }
 
@@ -40,18 +32,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     row.try_get::<String, _>("hashed_pw")?
-                } else {
-                    return Ok(false);
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Hashed_PW FROM Users WHERE Username = ?")
-                    .bind(username)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    row.try_get::<String, _>("Hashed_PW")?
                 } else {
                     return Ok(false);
                 }
@@ -87,29 +67,6 @@ impl DatabasePool {
                     None => Err(AppError::not_found("API key not found for user")),
                 }
             },
-            mysql(pool) => {
-                // First get UserID
-                let user_row = sqlx::query("SELECT UserID FROM Users WHERE Username = ?")
-                    .bind(username)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                let user_id: i32 = match user_row {
-                    Some(row) => row.try_get("UserID")?,
-                    None => return Err(AppError::not_found("User not found")),
-                };
-                
-                // Then get API key
-                let api_row = sqlx::query("SELECT APIKey FROM APIKeys WHERE UserID = ? LIMIT 1")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                match api_row {
-                    Some(row) => Ok(row.try_get("APIKey")?),
-                    None => Err(AppError::not_found("API key not found for user")),
-                }
-            },
         })
     }
 
@@ -123,14 +80,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?
                     .map(|row| row.try_get("userid"))
-                    .transpose()?
-            },
-            mysql(pool) => {
-                sqlx::query("SELECT UserID FROM APIKeys WHERE APIKey = ? LIMIT 1")
-                    .bind(api_key)
-                    .fetch_optional(pool)
-                    .await?
-                    .map(|row| row.try_get("UserID"))
                     .transpose()?
             },
         });
@@ -151,17 +100,6 @@ impl DatabasePool {
                     None => Err(AppError::not_found("User not found")),
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT UserID FROM Users WHERE Username = ?")
-                    .bind(username)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                match row {
-                    Some(row) => Ok(row.try_get("UserID")?),
-                    None => Err(AppError::not_found("User not found")),
-                }
-            },
         })
     }
 
@@ -175,14 +113,6 @@ impl DatabasePool {
                     .await?;
                 
                 Ok(row.try_get("userid")?)
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT UserID FROM APIKeys WHERE APIKey = ?")
-                    .bind(api_key)
-                    .fetch_one(pool)
-                    .await?;
-                
-                Ok(row.try_get("UserID")?)
             },
         })
     }
@@ -211,19 +141,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     Ok(row.try_get("isadmin")?)
-                } else {
-                    Ok(false)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT IsAdmin FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let is_admin: i8 = row.try_get("IsAdmin")?;
-                    Ok(is_admin != 0)
                 } else {
                     Ok(false)
                 }
@@ -289,54 +206,6 @@ impl DatabasePool {
                     Ok(Some(api_infos))
                 }
             },
-            mysql(pool) => {
-                // Check if user is admin
-                let is_admin: Option<i32> = sqlx::query_scalar("SELECT IsAdmin FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                let is_admin = is_admin.unwrap_or(0) == 1;
-
-                let query = if is_admin {
-                    // Admin sees all API keys
-                    "SELECT a.APIKeyID as apikeyid, a.UserID as userid, u.Username as username, RIGHT(a.APIKey, 4) as lastfourdigits,
-                     a.Created as created
-                     FROM APIKeys a
-                     JOIN Users u ON a.UserID = u.UserID"
-                } else {
-                    // Non-admin sees only their own API keys  
-                    "SELECT a.APIKeyID as apikeyid, a.UserID as userid, u.Username as username, RIGHT(a.APIKey, 4) as lastfourdigits,
-                     a.Created as created
-                     FROM APIKeys a
-                     JOIN Users u ON a.UserID = u.UserID
-                     WHERE a.UserID = ?"
-                };
-
-                let rows = if is_admin {
-                    sqlx::query(query).fetch_all(pool).await?
-                } else {
-                    sqlx::query(query).bind(user_id).fetch_all(pool).await?
-                };
-
-                let mut api_infos = Vec::new();
-                for row in rows {
-                    api_infos.push(crate::handlers::settings::ApiInfo {
-                        apikeyid: row.try_get("apikeyid")?,
-                        userid: row.try_get("userid")?,
-                        username: row.try_get("username")?,
-                        lastfourdigits: row.try_get("lastfourdigits")?,
-                        created: row.try_get::<chrono::DateTime<chrono::Utc>, _>("created")?.to_string(),
-                        podcastids: vec![], // Empty array as in Python
-                    });
-                }
-
-                if api_infos.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(api_infos))
-                }
-            },
         })
     }
 
@@ -366,13 +235,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("INSERT INTO APIKeys (UserID, APIKey) VALUES (?, ?)")
-                    .bind(user_id)
-                    .bind(&api_key)
-                    .execute(pool)
-                    .await?;
-            },
         });
 
         Ok(api_key)
@@ -389,14 +251,6 @@ impl DatabasePool {
                     .await?;
                 Ok(row.try_get::<i64, _>("count")? as i32)
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT COUNT(*) as count FROM APIKeys WHERE UserID = ? AND APIKeyID != ?")
-                    .bind(user_id)
-                    .bind(exclude_api_id)
-                    .fetch_one(pool)
-                    .await?;
-                Ok(row.try_get::<i64, _>("count")? as i32)
-            },
         })
     }
 
@@ -405,12 +259,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"DELETE FROM "APIKeys" WHERE apikeyid = $1"#)
-                    .bind(api_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM APIKeys WHERE APIKeyID = ?")
                     .bind(api_id)
                     .execute(pool)
                     .await?;
@@ -430,14 +278,6 @@ impl DatabasePool {
                 
                 Ok(result.map(|key| key == api_key).unwrap_or(false))
             },
-            mysql(pool) => {
-                let result: Option<String> = sqlx::query_scalar("SELECT APIKey FROM APIKeys WHERE APIKeyID = ?")
-                    .bind(api_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                Ok(result.map(|key| key == api_key).unwrap_or(false))
-            },
         })
     }
 
@@ -446,14 +286,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result: Option<i32> = q::query_scalar(r#"SELECT userid FROM "APIKeys" WHERE apikeyid = $1"#)
-                    .bind(api_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                Ok(result)
-            },
-            mysql(pool) => {
-                let result: Option<i32> = sqlx::query_scalar("SELECT UserID FROM APIKeys WHERE APIKeyID = ?")
                     .bind(api_id)
                     .fetch_optional(pool)
                     .await?;
@@ -479,23 +311,6 @@ impl DatabasePool {
 
                 if let Some(row) = result {
                     Ok(Some(row.try_get("apikey")?))
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    SELECT APIKey FROM APIKeys 
-                    WHERE UserID = ? 
-                    ORDER BY Created DESC 
-                    LIMIT 1
-                "#)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = result {
-                    Ok(Some(row.try_get("APIKey")?))
                 } else {
                     Ok(None)
                 }
@@ -528,26 +343,6 @@ impl DatabasePool {
 
                 Ok(api_key)
             },
-            mysql(pool) => {
-                let existing_key = sqlx::query("SELECT APIKey FROM APIKeys WHERE UserID = ? LIMIT 1")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = existing_key {
-                    return Ok(row.try_get("APIKey")?);
-                }
-
-                let api_key = format!("pk_{}", uuid::Uuid::new_v4().simple());
-                
-                sqlx::query("INSERT INTO APIKeys (UserID, APIKey) VALUES (?, ?)")
-                    .bind(user_id)
-                    .bind(&api_key)
-                    .execute(pool)
-                    .await?;
-
-                Ok(api_key)
-            },
         })
     }
 
@@ -556,14 +351,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"SELECT userid FROM "Users" WHERE username = $1 AND email = $2"#)
-                    .bind(username)
-                    .bind(email)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(result.is_some())
-            },
-            mysql(pool) => {
-                let result = sqlx::query("SELECT UserID FROM Users WHERE Username = ? AND Email = ?")
                     .bind(username)
                     .bind(email)
                     .fetch_optional(pool)
@@ -618,35 +405,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                // Check if user exists first
-                let user_exists = sqlx::query("SELECT UserID FROM Users WHERE Email = ?")
-                    .bind(user_email)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if user_exists.is_none() {
-                    return Ok(None);
-                }
-
-                // Update reset code and expiry
-                let result = sqlx::query(r#"
-                    UPDATE Users
-                    SET Reset_Code = ?, Reset_Expiry = ?
-                    WHERE Email = ?
-                "#)
-                    .bind(&reset_code)
-                    .bind(reset_expiry)
-                    .bind(user_email)
-                    .execute(pool)
-                    .await?;
-
-                if result.rows_affected() > 0 {
-                    Ok(Some(reset_code))
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -655,12 +413,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET reset_code = NULL, reset_expiry = NULL WHERE email = $1"#)
-                    .bind(email)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET Reset_Code = NULL, Reset_Expiry = NULL WHERE Email = ?")
                     .bind(email)
                     .execute(pool)
                     .await?;
@@ -696,25 +448,6 @@ impl DatabasePool {
                     Ok(None) // User not found
                 }
             },
-            mysql(pool) => {
-                let result = sqlx::query("SELECT Reset_Code, Reset_Expiry FROM Users WHERE Email = ?")
-                    .bind(user_email)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = result {
-                    let stored_code: Option<String> = row.try_get("Reset_Code").ok();
-                    let expiry: Option<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>> = row.try_get("Reset_Expiry").ok();
-                    
-                    if let (Some(stored_code), Some(expiry)) = (stored_code, expiry) {
-                        Ok(Some(stored_code == reset_code && Utc::now() < expiry))
-                    } else {
-                        Ok(Some(false)) // No reset code set
-                    }
-                } else {
-                    Ok(None) // User not found
-                }
-            },
         })
     }
 
@@ -726,23 +459,6 @@ impl DatabasePool {
                     UPDATE "Users"
                     SET hashed_pw = $1, reset_code = NULL, reset_expiry = NULL
                     WHERE email = $2
-                "#)
-                    .bind(hashed_password)
-                    .bind(user_email)
-                    .execute(pool)
-                    .await?;
-                
-                if result.rows_affected() > 0 {
-                    Ok(Some("Password Reset Successfully".to_string()))
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    UPDATE Users
-                    SET Hashed_PW = ?, Reset_Code = NULL, Reset_Expiry = NULL
-                    WHERE Email = ?
                 "#)
                     .bind(hashed_password)
                     .bind(user_email)

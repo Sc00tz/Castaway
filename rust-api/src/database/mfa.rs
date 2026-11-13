@@ -45,13 +45,6 @@ impl DatabasePool {
                     .await?;
                 row.try_get::<String, _>("email")?
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT Email FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-                row.try_get::<String, _>("Email")?
-            },
         });
         
         // Create TOTP instance and provisioning URI
@@ -137,19 +130,6 @@ impl DatabasePool {
                     Ok(false)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT MFA_Secret FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let secret: Option<String> = row.try_get("MFA_Secret")?;
-                    Ok(secret.is_some())
-                } else {
-                    Ok(false)
-                }
-            },
         })
     }
 
@@ -158,15 +138,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"UPDATE "Users" SET mfa_secret = $1 WHERE userid = $2"#)
-                    .bind(mfa_secret)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET MFA_Secret = ? WHERE UserID = ?")
                     .bind(mfa_secret)
                     .bind(user_id)
                     .execute(pool)
@@ -188,14 +159,6 @@ impl DatabasePool {
                 
                 Ok(result.rows_affected() > 0)
             },
-            mysql(pool) => {
-                let result = sqlx::query("UPDATE Users SET MFA_Secret = NULL WHERE UserID = ?")
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
         })
     }
 
@@ -210,18 +173,6 @@ impl DatabasePool {
                 
                 if let Some(row) = row {
                     Ok(row.try_get("mfa_secret").ok())
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT MFA_Secret FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    Ok(row.try_get("MFA_Secret").ok())
                 } else {
                     Ok(None)
                 }

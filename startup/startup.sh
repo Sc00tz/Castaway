@@ -41,10 +41,6 @@ export DB_HOST=$DB_HOST
 export DB_NAME=$DB_NAME
 export DB_PORT=$DB_PORT
 export DB_TYPE=$DB_TYPE
-export FULLNAME=${FULLNAME}
-export USERNAME=${USERNAME}
-export EMAIL=${EMAIL}
-export PASSWORD=${PASSWORD}
 export REVERSE_PROXY=$REVERSE_PROXY
 export SEARCH_API_URL=${SEARCH_API_URL:-'https://search.pinepods.online/api/search'}
 export PEOPLE_API_URL=${PEOPLE_API_URL:-'https://people.pinepods.online'}
@@ -101,14 +97,6 @@ export OIDC_ROLES_CLAIM=${OIDC_ROLES_CLAIM}
 export OIDC_USER_ROLE=${OIDC_USER_ROLE}
 export OIDC_ADMIN_ROLE=${OIDC_ADMIN_ROLE}
 
-# Print admin info if the example admin from the compose files is used. The password is never
-# printed: container logs are often shared or shipped elsewhere.
-if [[ $FULLNAME == 'Castaway Admin' ]]; then
-  echo "Admin User Information:"
-  echo "FULLNAME: $FULLNAME"
-  echo "USERNAME: $USERNAME"
-  echo "EMAIL: $EMAIL"
-fi
 
 # Print the Castaway banner
 cat << "EOF"
@@ -238,34 +226,7 @@ if [[ "$BUNDLED_DB" == true ]]; then
         echo "Updating database file ownership for the new PUID..."
         chown -R pinepods:pinepods "$PGDATA" "$pw_file"
     fi
-
-    # Start PostgreSQL for the setup step below; Horust takes it over afterwards.
-    pg "$PG_BIN/pg_ctl" -D "$PGDATA" -w -t 120 -l "$PG_ROOT/startup.log" \
-        -o "-c listen_addresses=127.0.0.1 -k $PG_SOCKETS" start >/dev/null
-fi
-
-# Database Setup
-echo "Using $DB_TYPE database"
-# Use compiled database setup binary (no Python dependency)
-# Web API key file creation has been removed for security
-/usr/local/bin/pinepods-db-setup
-echo "Database validation complete"
-if [[ "$BUNDLED_DB" == true ]]; then
-    pg "$PG_BIN/pg_ctl" -D "$PGDATA" -w -t 120 -m fast stop >/dev/null
-fi
-
-# Cron jobs removed - now handled by internal Rust scheduler
-
-# Check if we need to create exim directories
-# Only do this if the user/group exists on the system
-if getent group | grep -q "Debian-exim"; then
-    echo "Setting up exim directories and permissions..."
-    mkdir -p /var/log/exim4
-    mkdir -p /var/spool/exim4
-    chown -R Debian-exim:Debian-exim /var/log/exim4
-    chown -R Debian-exim:Debian-exim /var/spool/exim4
-else
-    echo "Skipping exim setup as user/group doesn't exist on this system"
+    # The Castaway server creates its database and schema itself when it starts.
 fi
 
 # Set up environment variables for Horust logging modes

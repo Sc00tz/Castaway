@@ -1005,13 +1005,10 @@ pub async fn call_backup_user(
 
 pub async fn call_backup_server(
     server_name: &str,
-    database_pass: &str,
     api_key: &str,
 ) -> Result<String, anyhow::Error> {
     let url = format!("{}/api/data/backup_server", server_name);
-    let request_body = serde_json::json!({
-        "database_pass": database_pass
-    });
+    let request_body = serde_json::json!({});
 
     let response = Request::post(&url)
         .header("Content-Type", "application/json")

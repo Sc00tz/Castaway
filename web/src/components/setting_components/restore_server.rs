@@ -26,7 +26,6 @@ pub fn restore_server() -> Html {
     let i18n_upload_backup_hint = i18n.t("restore_server.upload_backup_hint").to_string();
     let i18n_choose_file = i18n.t("restore_server.choose_file").to_string();
     let i18n_file_selected = i18n.t("restore_server.file_selected").to_string();
-    let i18n_database_password = i18n.t("restore_server.database_password").to_string();
     let i18n_restore_server = i18n.t("restore_server.restore_server").to_string();
     let i18n_server_backup_files = i18n.t("restore_server.server_backup_files").to_string();
     let i18n_server_backups_hint = i18n.t("restore_server.server_backups_hint").to_string();
@@ -36,7 +35,6 @@ pub fn restore_server() -> Html {
     let i18n_restore_from_selected = i18n.t("restore_server.restore_from_selected").to_string();
     let i18n_restoring_database = i18n.t("restore_server.restoring_database").to_string();
     let i18n_dont_close_window = i18n.t("restore_server.dont_close_window").to_string();
-    let database_password = use_state(|| "".to_string());
     let selected_file = use_state(|| None::<File>);
     let is_loading = use_state(|| false);
 
@@ -51,23 +49,6 @@ pub fn restore_server() -> Html {
     let server_name = state.auth_details.as_ref().map(|ud| ud.server_name.clone());
     let user_id = state.user_details.as_ref().map(|ud| ud.UserID);
 
-    // SQLite servers have no database password to ask for.
-    let is_sqlite = use_state(|| false);
-    {
-        let is_sqlite = is_sqlite.clone();
-        use_effect_with((api_key.clone(), server_name.clone()), move |(api_key, server_name)| {
-            if let (Some(Some(api_key)), Some(server_name), Some(user_id)) =
-                (api_key.clone(), server_name.clone(), user_id)
-            {
-                wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(response) = call_list_backup_files(&server_name, &api_key, user_id).await {
-                        is_sqlite.set(response.get("database_type").and_then(|t| t.as_str()) == Some("sqlite"));
-                    }
-                });
-            }
-            || ()
-        });
-    }
 
     // Load backup files when switching to select mode
     {
@@ -139,8 +120,6 @@ pub fn restore_server() -> Html {
         let history = BrowserHistory::new();
         let api_key = api_key.clone().unwrap_or_default();
         let server_name = server_name.clone().unwrap_or_default();
-        let database_password = (*database_password).clone();
-        let is_sqlite = *is_sqlite;
         let selected_file = selected_file.clone();
         let dispatch = dispatch.clone();
         let is_loading = is_loading.clone();
@@ -157,18 +136,8 @@ pub fn restore_server() -> Html {
                 return;
             }
 
-            if database_password.trim().is_empty() && !is_sqlite {
-                Dispatch::<NotificationState>::global().reduce_mut(|state| {
-                    state.error_message = Some("Database password is required".to_string());
-                });
-                return;
-            }
-
             is_loading.set(true);
             let form_data = FormData::new().unwrap();
-            form_data
-                .append_with_str("database_pass", &database_password)
-                .unwrap();
             form_data
                 .append_with_blob("backup_file", &selected_file.unwrap())
                 .unwrap();
@@ -350,25 +319,8 @@ pub fn restore_server() -> Html {
 
                             <div class="settings-row" style="flex-wrap: wrap;">
                                 <div class="settings-row-label">
-                                    if !*is_sqlite {
-                                        <div>{ &i18n_database_password }</div>
-                                    }
                                 </div>
                                 <div class="settings-row-control" style="flex: 1 1 200px; min-width: 0;">
-                                    if !*is_sqlite {
-                                        <input
-                                            type="password"
-                                            id="db_pw"
-                                            disabled={*is_loading}
-                                            oninput={Callback::from(move |e: InputEvent| {
-                                                let input: HtmlInputElement = e.target_unchecked_into();
-                                                database_password.set(input.value());
-                                            })}
-                                            class="input"
-                                            placeholder="Database password"
-                                            style="flex: 1; min-width: 0;"
-                                        />
-                                    }
                                     <button
                                         onclick={onclick_restore}
                                         disabled={*is_loading}

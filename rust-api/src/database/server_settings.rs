@@ -26,11 +26,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE AppSettings SET DownloadEnabled = CASE WHEN DownloadEnabled = 1 THEN 0 ELSE 1 END")
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -40,11 +35,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "AppSettings" SET selfserviceuser = CASE WHEN selfserviceuser = true THEN false ELSE true END"#)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE AppSettings SET SelfServiceUser = CASE WHEN SelfServiceUser = 1 THEN 0 ELSE 1 END")
                     .execute(pool)
                     .await?;
             },
@@ -60,12 +50,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?;
                 Ok(result.unwrap_or(false))
-            },
-            mysql(pool) => {
-                let result: Option<i32> = sqlx::query_scalar("SELECT DownloadEnabled FROM AppSettings")
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(result.unwrap_or(0) == 1)
             },
         })
     }
@@ -92,27 +76,6 @@ impl DatabasePool {
                         metadata_sidecar: row.try_get::<Option<bool>, _>("downloadmetadatasidecar")?.unwrap_or(false),
                         metadata_format: row.try_get::<Option<String>, _>("downloadmetadataformat")?.unwrap_or_else(|| "both".to_string()),
                         metadata_subfolder: row.try_get::<Option<bool>, _>("downloadmetadatasubfolder")?.unwrap_or(true),
-                    },
-                    None => DownloadSettings::disabled(),
-                })
-            },
-            mysql(pool) => {
-                let row = sqlx::query("
-                    SELECT DownloadFolderCover, DownloadEpisodeCover, DownloadMetadataSidecar,
-                           DownloadMetadataFormat, DownloadMetadataSubfolder
-                    FROM AppSettings
-                    LIMIT 1
-                ")
-                .fetch_optional(pool)
-                .await?;
-
-                Ok(match row {
-                    Some(row) => DownloadSettings {
-                        folder_cover: row.try_get::<Option<i32>, _>("DownloadFolderCover")?.unwrap_or(0) == 1,
-                        episode_cover: row.try_get::<Option<i32>, _>("DownloadEpisodeCover")?.unwrap_or(0) == 1,
-                        metadata_sidecar: row.try_get::<Option<i32>, _>("DownloadMetadataSidecar")?.unwrap_or(0) == 1,
-                        metadata_format: row.try_get::<Option<String>, _>("DownloadMetadataFormat")?.unwrap_or_else(|| "both".to_string()),
-                        metadata_subfolder: row.try_get::<Option<i32>, _>("DownloadMetadataSubfolder")?.unwrap_or(1) == 1,
                     },
                     None => DownloadSettings::disabled(),
                 })
@@ -148,23 +111,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?;
             },
-            mysql(pool) => {
-                sqlx::query("
-                    UPDATE AppSettings
-                    SET DownloadFolderCover = ?,
-                        DownloadEpisodeCover = ?,
-                        DownloadMetadataSidecar = ?,
-                        DownloadMetadataFormat = ?,
-                        DownloadMetadataSubfolder = ?
-                ")
-                .bind(settings.folder_cover as i32)
-                .bind(settings.episode_cover as i32)
-                .bind(settings.metadata_sidecar as i32)
-                .bind(format)
-                .bind(settings.metadata_subfolder as i32)
-                .execute(pool)
-                .await?;
-            },
         });
         Ok(())
     }
@@ -187,25 +133,6 @@ impl DatabasePool {
                 .bind(&email_settings.send_mode)
                 .bind(&email_settings.encryption)
                 .bind(auth_required)
-                .bind(&email_settings.email_username)
-                .bind(&email_settings.email_password)
-                .execute(pool)
-                .await?;
-            },
-            mysql(pool) => {
-                sqlx::query(
-                    "UPDATE EmailSettings SET 
-                     Server_Name = ?, Server_Port = ?, From_Email = ?, 
-                     Send_Mode = ?, Encryption = ?, Auth_Required = ?, 
-                     Username = ?, Password = ? 
-                     WHERE EmailSettingsID = 1"
-                )
-                .bind(&email_settings.server_name)
-                .bind(email_settings.server_port)
-                .bind(&email_settings.from_email)
-                .bind(&email_settings.send_mode)
-                .bind(&email_settings.encryption)
-                .bind(email_settings.auth_required)
                 .bind(&email_settings.email_username)
                 .bind(&email_settings.email_password)
                 .execute(pool)
@@ -239,31 +166,6 @@ impl DatabasePool {
                         auth_required: if auth_required { 1 } else { 0 },
                         username: row.try_get("username")?,
                         password: row.try_get("password")?,
-                    }))
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query(
-                    "SELECT EmailSettingsID, Server_Name, Server_Port, From_Email, 
-                     Send_Mode, Encryption, Auth_Required, Username, Password 
-                     FROM EmailSettings"
-                )
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = row {
-                    Ok(Some(crate::handlers::settings::EmailSettingsResponse {
-                        emailsettingsid: row.try_get("EmailSettingsID")?,
-                        server_name: row.try_get("Server_Name")?,
-                        server_port: row.try_get("Server_Port")?,
-                        from_email: row.try_get("From_Email")?,
-                        send_mode: row.try_get("Send_Mode")?,
-                        encryption: row.try_get("Encryption")?,
-                        auth_required: row.try_get("Auth_Required")?,
-                        username: row.try_get("Username")?,
-                        password: row.try_get("Password")?,
                     }))
                 } else {
                     Ok(None)

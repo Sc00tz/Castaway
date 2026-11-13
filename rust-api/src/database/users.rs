@@ -46,22 +46,6 @@ impl DatabasePool {
                     UseGravatar: row.try_get("usegravatar")?,
                 })
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT UserID, Fullname, Username, Email, UseGravatar FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-
-                Ok(crate::handlers::auth::UserDetails {
-                    UserID: row.try_get("UserID")?,
-                    Fullname: row.try_get("Fullname").ok(),
-                    Username: row.try_get("Username").ok(),
-                    Email: row.try_get("Email").ok(),
-                    Hashed_PW: None,
-                    Salt: None,
-                    UseGravatar: row.try_get::<bool, _>("UseGravatar")?,
-                })
-            },
         })
     }
 
@@ -71,26 +55,6 @@ impl DatabasePool {
                 let row = q::query(
                     r#"SELECT userid as user_id, username as username, hashed_pw as hashed_password, email as email
                      FROM "Users" WHERE username = $1"#
-                )
-                .bind(username)
-                .fetch_optional(pool)
-                .await?;
-                
-                if let Some(row) = row {
-                    Ok(Some(UserCredentials {
-                        user_id: row.try_get("user_id")?,
-                        username: row.try_get("username")?,
-                        hashed_password: row.try_get("hashed_password")?,
-                        email: row.try_get("email")?,
-                    }))
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query(
-                    "SELECT UserID as user_id, Username as username, Hashed_PW as hashed_password, Email as email
-                     FROM Users WHERE Username = ?"
                 )
                 .bind(username)
                 .fetch_optional(pool)
@@ -137,27 +101,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query(
-                    "SELECT user_id, api_key, theme, auto_download_episodes, auto_delete_episodes
-                     FROM UserSettings WHERE user_id = ?"
-                )
-                .bind(user_id)
-                .fetch_optional(pool)
-                .await?;
-                
-                if let Some(row) = row {
-                    Ok(Some(UserSettings {
-                        user_id: row.try_get("user_id")?,
-                        api_key: row.try_get("api_key")?,
-                        theme: row.try_get("theme")?,
-                        auto_download_episodes: row.try_get("auto_download_episodes")?,
-                        auto_delete_episodes: row.try_get("auto_delete_episodes")?,
-                    }))
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -174,27 +117,6 @@ impl DatabasePool {
                 
                 // Check if admin exists (excluding background_tasks user)
                 let admin_row = q::query(r#"SELECT COUNT(*) as count FROM "Users" WHERE isadmin = true AND username != 'background_tasks'"#)
-                    .fetch_one(pool)
-                    .await?;
-                
-                let admin_count: i64 = admin_row.try_get("count")?;
-                let admin_exists = admin_count > 0;
-                
-                Ok(SelfServiceStatus {
-                    status: self_service_enabled,
-                    admin_exists,
-                })
-            },
-            mysql(pool) => {
-                // Get self-service status
-                let self_service_row = sqlx::query("SELECT SelfServiceUser FROM AppSettings WHERE SelfServiceUser = 1")
-                    .fetch_optional(pool)
-                    .await?;
-                
-                let self_service_enabled = self_service_row.is_some();
-                
-                // Check if admin exists (excluding background_tasks user)
-                let admin_row = sqlx::query("SELECT COUNT(*) as count FROM Users WHERE IsAdmin = 1 AND Username != 'background_tasks'")
                     .fetch_one(pool)
                     .await?;
                 
@@ -266,52 +188,6 @@ impl DatabasePool {
                 tx.commit().await?;
                 Ok(user_id)
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                
-                // Insert the admin user
-                let result = sqlx::query(
-                    "INSERT INTO Users (Fullname, Username, Email, Hashed_PW, IsAdmin) VALUES (?, ?, ?, ?, 1)"
-                )
-                .bind(fullname)
-                .bind(username)
-                .bind(email)
-                .bind(hashed_password)
-                .execute(&mut *tx)
-                .await?;
-                
-                let user_id = result.last_insert_id() as i32;
-                
-                // Add user settings
-                sqlx::query(
-                    "INSERT INTO UserSettings (UserID, Theme) VALUES (?, ?)"
-                )
-                .bind(user_id)
-                .bind("Nordic")
-                .execute(&mut *tx)
-                .await?;
-                
-                // Add user stats
-                sqlx::query(
-                    "INSERT INTO UserStats (UserID) VALUES (?)"
-                )
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await?;
-                
-                // Create API key for the user
-                let api_key = self.generate_api_key();
-                sqlx::query(
-                    "INSERT INTO APIKeys (UserID, APIKey) VALUES (?, ?)"
-                )
-                .bind(user_id)
-                .bind(&api_key)
-                .execute(&mut *tx)
-                .await?;
-                
-                tx.commit().await?;
-                Ok(user_id)
-            },
         })
     }
 
@@ -320,14 +196,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let row = q::query(r#"SELECT COUNT(*) as count FROM "Users" WHERE isadmin = true AND username != 'background_tasks'"#)
-                    .fetch_one(pool)
-                    .await?;
-                
-                let count: i64 = row.try_get("count")?;
-                Ok(count > 0)
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT COUNT(*) as count FROM Users WHERE IsAdmin = 1 AND Username != 'background_tasks'")
                     .fetch_one(pool)
                     .await?;
                 
@@ -348,17 +216,6 @@ impl DatabasePool {
                 
                 match row {
                     Some(row) => Ok(row.try_get("firstlogin").unwrap_or(false)),
-                    None => Err(AppError::not_found("User not found")),
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT FirstLogin FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                match row {
-                    Some(row) => Ok(row.try_get("FirstLogin").unwrap_or(false)),
                     None => Err(AppError::not_found("User not found")),
                 }
             },
@@ -387,25 +244,6 @@ impl DatabasePool {
                 }
                 Ok(users)
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT UserID as userid, Fullname as fullname, Username as username, Email as email, IsAdmin as isadmin FROM Users"
-                )
-                .fetch_all(pool)
-                .await?;
-
-                let mut users = Vec::new();
-                for row in rows {
-                    users.push(crate::handlers::settings::UserInfo {
-                        userid: row.try_get("userid")?,
-                        fullname: row.try_get("fullname")?,
-                        username: row.try_get("username")?,
-                        email: row.try_get("email")?,
-                        isadmin: row.try_get("isadmin")?,
-                    });
-                }
-                Ok(users)
-            },
         })
     }
 
@@ -415,30 +253,6 @@ impl DatabasePool {
             pg(pool) => {
                 let row = q::query(
                     r#"SELECT userid, fullname, username, email, CASE WHEN isadmin THEN 1 ELSE 0 END AS isadmin, timezone, timeformat, dateformat, language FROM "Users" WHERE userid = $1"#
-                )
-                .bind(user_id)
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = row {
-                    Ok(Some(serde_json::json!({
-                        "userid": row.try_get::<i32, _>("userid")?,
-                        "fullname": row.try_get::<String, _>("fullname")?,
-                        "username": row.try_get::<String, _>("username")?,
-                        "email": row.try_get::<String, _>("email")?,
-                        "isadmin": row.try_get::<i32, _>("isadmin")?,
-                        "timezone": row.try_get::<String, _>("timezone")?,
-                        "timeformat": row.try_get::<i32, _>("timeformat")?,
-                        "dateformat": row.try_get::<String, _>("dateformat")?,
-                        "language": row.try_get::<String, _>("language")?,
-                    })))
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query(
-                    "SELECT UserID as userid, Fullname as fullname, Username as username, Email as email, IsAdmin as isadmin, TimeZone as timezone, TimeFormat as timeformat, DateFormat as dateformat, Language as language FROM Users WHERE UserID = ?"
                 )
                 .bind(user_id)
                 .fetch_optional(pool)
@@ -500,40 +314,6 @@ impl DatabasePool {
 
                 Ok(user_id)
             },
-            mysql(pool) => {
-                let result = sqlx::query(
-                    "INSERT INTO Users (Fullname, Username, Email, Hashed_PW, IsAdmin) VALUES (?, ?, ?, ?, 0)"
-                )
-                .bind(fullname)
-                .bind(username)
-                .bind(email)
-                .bind(hashed_pw)
-                .execute(pool)
-                .await?;
-
-                let user_id = result.last_insert_id() as i32;
-
-                // Add user settings like Python version
-                sqlx::query("INSERT INTO UserSettings (UserID, Theme) VALUES (?, ?)")
-                    .bind(user_id)
-                    .bind("Nordic")
-                    .execute(pool)
-                    .await?;
-
-                // Stats row (the stats page and every stats counter depend on it).
-                sqlx::query("INSERT IGNORE INTO UserStats (UserID) VALUES (?)")
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-
-                // Create default playlists for the new user
-                if let Err(e) = self.create_default_playlists_for_user(user_id).await {
-                    tracing::warn!("⚠️ Failed to create default playlists for new user {}: {}", user_id, e);
-                    // Don't fail user creation if playlist creation fails
-                }
-
-                Ok(user_id)
-            },
         })
     }
 
@@ -542,13 +322,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET fullname = $1 WHERE userid = $2"#)
-                    .bind(new_name)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET Fullname = ? WHERE UserID = ?")
                     .bind(new_name)
                     .bind(user_id)
                     .execute(pool)
@@ -568,13 +341,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET Hashed_PW = ? WHERE UserID = ?")
-                    .bind(hash_pw)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -586,12 +352,6 @@ impl DatabasePool {
         let podcast_ids: Vec<i32> = dialect_match!(self, {
             pg(pool) => {
                 q::query_scalar(r#"SELECT podcastid FROM "Podcasts" WHERE userid = $1"#)
-                    .bind(user_id)
-                    .fetch_all(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar("SELECT PodcastID FROM Podcasts WHERE UserID = ?")
                     .bind(user_id)
                     .fetch_all(pool)
                     .await?
@@ -619,21 +379,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                for table in [
-                    "UserEpisodeHistory", "UserVideoHistory", "SavedEpisodes", "SavedVideos",
-                    "DownloadedEpisodes", "DownloadedVideos", "EpisodeQueue", "UserSettings", "UserStats",
-                ] {
-                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table} WHERE UserID = ?")))
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                }
-                sqlx::query("DELETE FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -643,13 +388,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET email = $1 WHERE userid = $2"#)
-                    .bind(new_email)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET Email = ? WHERE UserID = ?")
                     .bind(new_email)
                     .bind(user_id)
                     .execute(pool)
@@ -669,13 +407,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET Username = ? WHERE UserID = ?")
-                    .bind(new_username)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -686,13 +417,6 @@ impl DatabasePool {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET isadmin = $1 WHERE userid = $2"#)
                     .bind(isadmin)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Users SET IsAdmin = ? WHERE UserID = ?")
-                    .bind(isadmin as i32)
                     .bind(user_id)
                     .execute(pool)
                     .await?;
@@ -722,24 +446,6 @@ impl DatabasePool {
                     Ok(false)
                 }
             },
-            mysql(pool) => {
-                // Count total admins
-                let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM Users WHERE IsAdmin = 1")
-                    .fetch_one(pool)
-                    .await?;
-
-                if admin_count == 1 {
-                    // Check if this user is admin
-                    let is_admin: Option<i32> = sqlx::query_scalar("SELECT IsAdmin FROM Users WHERE UserID = ?")
-                        .bind(user_id)
-                        .fetch_optional(pool)
-                        .await?;
-
-                    Ok(is_admin.unwrap_or(0) == 1)
-                } else {
-                    Ok(false)
-                }
-            },
         })
     }
 
@@ -762,22 +468,6 @@ impl DatabasePool {
                     admin_exists: admin_count > 0,
                 })
             },
-            mysql(pool) => {
-                // Get self-service status
-                let self_service_result: Option<i32> = sqlx::query_scalar("SELECT SelfServiceUser FROM AppSettings WHERE SelfServiceUser = 1")
-                    .fetch_optional(pool)
-                    .await?;
-
-                // Get admin count
-                let admin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM Users WHERE IsAdmin = 1")
-                    .fetch_one(pool)
-                    .await?;
-
-                Ok(SelfServiceStatus {
-                    status: self_service_result.unwrap_or(0) == 1,
-                    admin_exists: admin_count > 0,
-                })
-            },
         })
     }
 
@@ -792,17 +482,6 @@ impl DatabasePool {
                 let mut users = Vec::new();
                 for row in rows {
                     users.push(row.try_get("userid")?);
-                }
-                Ok(users)
-            },
-            mysql(pool) => {
-                let rows = sqlx::query("SELECT DISTINCT UserID FROM Podcasts ORDER BY UserID")
-                    .fetch_all(pool)
-                    .await?;
-                
-                let mut users = Vec::new();
-                for row in rows {
-                    users.push(row.try_get("UserID")?);
                 }
                 Ok(users)
             },
@@ -834,29 +513,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    SELECT UserID, Email, Username, Fullname, IsAdmin
-                    FROM Users
-                    WHERE Email = ?
-                "#)
-                    .bind(email)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = result {
-                    let is_admin: i32 = row.try_get("IsAdmin")?;
-                    Ok(Some((
-                        row.try_get("UserID")?,
-                        row.try_get("Email")?,
-                        row.try_get("Username")?,
-                        row.try_get("Fullname")?,
-                        is_admin != 0,
-                    )))
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -865,14 +521,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"SELECT COUNT(*) as count FROM "Users" WHERE username = $1"#)
-                    .bind(username)
-                    .fetch_one(pool)
-                    .await?;
-                let count: i64 = result.try_get("count")?;
-                Ok(count > 0)
-            },
-            mysql(pool) => {
-                let result = sqlx::query(r#"SELECT COUNT(*) as count FROM Users WHERE Username = ?"#)
                     .bind(username)
                     .fetch_one(pool)
                     .await?;
@@ -892,13 +540,6 @@ impl DatabasePool {
                     .await?;
                 Ok(result.is_some())
             },
-            mysql(pool) => {
-                let result = sqlx::query("SELECT 1 FROM Users WHERE Username = ? LIMIT 1")
-                    .bind(username)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(result.is_some())
-            },
         })
     }
 
@@ -912,17 +553,6 @@ impl DatabasePool {
                 
                 let user_ids: Vec<i32> = rows.into_iter()
                     .map(|row| row.try_get("userid"))
-                    .collect::<Result<Vec<_>, _>>()?;
-                
-                Ok(user_ids)
-            },
-            mysql(pool) => {
-                let rows = sqlx::query("SELECT UserID FROM Users WHERE IsAdmin = 1")
-                    .fetch_all(pool)
-                    .await?;
-                
-                let user_ids: Vec<i32> = rows.into_iter()
-                    .map(|row| row.try_get("UserID"))
                     .collect::<Result<Vec<_>, _>>()?;
                 
                 Ok(user_ids)
