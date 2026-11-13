@@ -1,7 +1,7 @@
 // lib/ui/widgets/episode_description.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
-import 'package:pinepods_mobile/ui/widgets/pinepods_widget_factory.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_widget_factory.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// A specialized widget for displaying episode descriptions with clickable timestamps.
@@ -24,7 +24,7 @@ class EpisodeDescription extends StatelessWidget {
   Widget build(BuildContext context) {
     return HtmlWidget(
       _processTimestamps(content),
-      factoryBuilder: () => PinepodsWidgetFactory(),
+      factoryBuilder: () => CastawayWidgetFactory(),
       textStyle: TextStyle(
         fontSize: fontSize ?? 16.25,
         height: 1.1,

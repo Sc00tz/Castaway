@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use pinepods_api::services::scheduler::BackgroundScheduler;
+use castaway_api::services::scheduler::BackgroundScheduler;
 
 use crate::harness::*;
 

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:pinepods_mobile/services/logging/app_logger.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/logging/app_logger.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 class DebugLogsPage extends StatefulWidget {
   const DebugLogsPage({Key? key}) : super(key: key);

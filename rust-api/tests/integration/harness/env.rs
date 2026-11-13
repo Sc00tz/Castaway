@@ -45,18 +45,18 @@ pub fn env() -> &'static TestEnv {
 
 fn init() -> TestEnv {
     sandbox_network();
-    pinepods_api::services::url_guard::allow_loopback_for_tests();
-    let ytdlp_dir = std::env::temp_dir().join(format!("pinepods-ytdlp-{}", std::process::id()));
+    castaway_api::services::url_guard::allow_loopback_for_tests();
+    let ytdlp_dir = std::env::temp_dir().join(format!("castaway-ytdlp-{}", std::process::id()));
     super::youtube::install_stub(&ytdlp_dir);
     super::files::install_sandbox();
 
     let mut env = TestEnv {
-        db_host: var("PINEPODS_TEST_DB_HOST", "127.0.0.1"),
-        db_port: var("PINEPODS_TEST_DB_PORT", "55433").parse().expect("PINEPODS_TEST_DB_PORT"),
-        db_user: var("PINEPODS_TEST_DB_USER", "pinepods"),
-        db_password: var("PINEPODS_TEST_DB_PASSWORD", "testpass"),
-        valkey_host: var("PINEPODS_TEST_VALKEY_HOST", "127.0.0.1"),
-        valkey_port: var("PINEPODS_TEST_VALKEY_PORT", "56380").parse().expect("PINEPODS_TEST_VALKEY_PORT"),
+        db_host: var("CASTAWAY_TEST_DB_HOST", "127.0.0.1"),
+        db_port: var("CASTAWAY_TEST_DB_PORT", "55433").parse().expect("CASTAWAY_TEST_DB_PORT"),
+        db_user: var("CASTAWAY_TEST_DB_USER", "castaway"),
+        db_password: var("CASTAWAY_TEST_DB_PASSWORD", "testpass"),
+        valkey_host: var("CASTAWAY_TEST_VALKEY_HOST", "127.0.0.1"),
+        valkey_port: var("CASTAWAY_TEST_VALKEY_PORT", "56380").parse().expect("CASTAWAY_TEST_VALKEY_PORT"),
         template: String::new(),
         fixtures: FixtureServer::start(),
         ytdlp_dir,
@@ -121,7 +121,7 @@ pub fn pg_url(env: &TestEnv, db: &str) -> String {
 }
 
 async fn ensure_template(env: &TestEnv) -> String {
-    let name = format!("pinepods_tmpl_{}", schema_fingerprint());
+    let name = format!("castaway_tmpl_{}", schema_fingerprint());
     let mut conn = PgConnection::connect(&pg_url(env, "postgres"))
         .await
         .unwrap_or_else(|e| panic!("{}", not_running_hint(env, e)));
@@ -156,7 +156,7 @@ pub async fn run_migrations(env: &TestEnv, db_name: &str) {
         .connect(&pg_url(env, db_name))
         .await
         .unwrap_or_else(|e| panic!("{}", not_running_hint(env, e)));
-    pinepods_api::database::migrate::run(&pool)
+    castaway_api::database::migrate::run(&pool)
         .await
         .unwrap_or_else(|e| panic!("schema migrations failed for template {db_name}: {e:?}"));
     pool.close().await;

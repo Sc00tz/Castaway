@@ -5,8 +5,8 @@
 use std::collections::HashSet;
 
 use chrono::{Duration, Utc};
-use pinepods_api::services::sync::engine::{self, RunMode, RunSummary};
-use pinepods_api::services::sync::engine_db::{SyncTargetRow, TargetKind};
+use castaway_api::services::sync::engine::{self, RunMode, RunSummary};
+use castaway_api::services::sync::engine_db::{SyncTargetRow, TargetKind};
 
 use crate::harness::antennapod::check_episode_action;
 use crate::harness::gpodder::{play_action, GpodderClient};
@@ -198,7 +198,7 @@ async fn seed_progress_rows(app: &TestApp, user: &TestUser, n: u32) -> Vec<i64> 
     let values: Vec<String> = (0..n)
         .map(|i| {
             format!(
-                "({}, 'https://feeds.example.invalid/bulk.xml', 'https://cdn.example.invalid/bulk/{i}.mp3', 'play', {ts}, {ts}, 0, {}, 3000, 'pinepods')",
+                "({}, 'https://feeds.example.invalid/bulk.xml', 'https://cdn.example.invalid/bulk/{i}.mp3', 'play', {ts}, {ts}, 0, {}, 3000, 'castaway')",
                 user.id,
                 100 + i
             )
@@ -381,7 +381,7 @@ async fn nextcloud_failed_batch_resumes_after_the_last_good_one() {
 /// advancing the cursor, the cursor stops below the row so the newer position still goes out.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_row_rewritten_during_a_push_is_sent_again() {
-    use pinepods_api::services::sync::engine_db::Outbox;
+    use castaway_api::services::sync::engine_db::Outbox;
     let base = setup().await;
     let feed = base.0.feed("inflight.xml", &Feed::with_episodes("In Flight", 2));
     let pod = base.0.subscribe(&base.1, &feed, 2).await;

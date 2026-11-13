@@ -1,7 +1,7 @@
 // lib/ui/widgets/server_error_page.dart
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 class ServerErrorPage extends StatelessWidget {
   final String? errorMessage;

@@ -4,15 +4,15 @@
 
 import 'dart:io';
 
-import 'package:pinepods_mobile/bloc/search/search_bloc.dart';
-import 'package:pinepods_mobile/bloc/search/search_state_event.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/ui/search/search_results.dart';
+import 'package:castaway_mobile/bloc/search/search_bloc.dart';
+import 'package:castaway_mobile/bloc/search/search_state_event.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/search/search_results.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// This widget renders the search bar and allows the user to search for podcasts.
 class Search extends StatefulWidget {

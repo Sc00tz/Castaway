@@ -9,7 +9,7 @@ use sqlx::Row;
 
 use super::model::{ActionKind, EpisodeAction};
 use super::resolver::ResolveKey;
-use super::{PINEPODS_DEVICE_CAPTION, PINEPODS_DEVICE_NAME, PINEPODS_DEVICE_TYPE, PINEPODS_ROLE};
+use super::{CASTAWAY_DEVICE_CAPTION, CASTAWAY_DEVICE_NAME, CASTAWAY_DEVICE_TYPE, CASTAWAY_ROLE};
 use crate::database::DatabasePool;
 use crate::error::{AppError, AppResult};
 use crate::database::dialect::{dialect_fn, dialect_match};
@@ -59,7 +59,7 @@ pub struct LoggedAction {
 }
 
 fn device_name_candidates(user_id: i32) -> [String; 3] {
-    [PINEPODS_DEVICE_NAME.to_string(), "castaway-server".to_string(), format!("castaway-{user_id}")]
+    [CASTAWAY_DEVICE_NAME.to_string(), "castaway-server".to_string(), format!("castaway-{user_id}")]
 }
 
 fn legacy_device_name(user_id: i32) -> String {
@@ -99,20 +99,20 @@ fn locked(rows: Vec<(i64, bool)>) -> LockedTargets {
     }
 }
 
-// The user's pinepods device, created on first use. The pre-overhaul internal device
+// The user's castaway device, created on first use. The pre-overhaul internal device
 // (`pinepods-internal-<uid>`) is claimed if nothing has the role yet, so Castaway keeps one
-// device. A client may already own the name `pinepods` (UNIQUE(UserID, DeviceName)), so other
+// device. A client may already own the name `castaway` (UNIQUE(UserID, DeviceName)), so other
 // names are tried after it.
-dialect_fn!([pg_pinepods_device]
+dialect_fn!([pg_castaway_device]
     pub async fn(conn: &mut q::Conn, user_id: i32) -> AppResult<i32> {
-    let by_role = r#"SELECT deviceid FROM "GpodderDevices" WHERE userid = $1 AND systemrole = 'pinepods'"#;
+    let by_role = r#"SELECT deviceid FROM "GpodderDevices" WHERE userid = $1 AND systemrole = 'castaway'"#;
     if let Some(id) = q::query_scalar::<i32>(by_role).bind(user_id).fetch_optional(&mut *conn).await? {
         return Ok(id);
     }
     let claimed: Option<i32> = q::query_scalar(
-        r#"UPDATE "GpodderDevices" SET systemrole = 'pinepods'
+        r#"UPDATE "GpodderDevices" SET systemrole = 'castaway'
            WHERE userid = $1 AND devicename = $2 AND systemrole IS NULL
-             AND NOT EXISTS (SELECT 1 FROM "GpodderDevices" d WHERE d.userid = $1 AND d.systemrole = 'pinepods')
+             AND NOT EXISTS (SELECT 1 FROM "GpodderDevices" d WHERE d.userid = $1 AND d.systemrole = 'castaway')
            RETURNING deviceid"#,
     )
     .bind(user_id)
@@ -131,9 +131,9 @@ dialect_fn!([pg_pinepods_device]
         )
         .bind(user_id)
         .bind(&name)
-        .bind(PINEPODS_DEVICE_TYPE)
-        .bind(PINEPODS_DEVICE_CAPTION)
-        .bind(PINEPODS_ROLE)
+        .bind(CASTAWAY_DEVICE_TYPE)
+        .bind(CASTAWAY_DEVICE_CAPTION)
+        .bind(CASTAWAY_ROLE)
         .fetch_optional(&mut *conn)
         .await?;
         if let Some(id) = created {
@@ -144,16 +144,16 @@ dialect_fn!([pg_pinepods_device]
             return Ok(id);
         }
     }
-    Err(AppError::internal(&format!("no free device name for user {user_id}'s pinepods device")))
+    Err(AppError::internal(&format!("no free device name for user {user_id}'s castaway device")))
 });
 
 dialect_fn!([pg_log_subscription]
     pub async fn(conn: &mut q::Conn, user_id: i32, feed_url: &str, action: &str) -> AppResult<bool> {
     let targets = pg_lock_targets_shared(conn, user_id).await?;
-    let device_id = pg_pinepods_device(conn, user_id).await?;
+    let device_id = pg_castaway_device(conn, user_id).await?;
     q::query(sqlx::AssertSqlSafe(format!(
         r#"INSERT INTO "GpodderSyncSubscriptions" (userid, deviceid, podcasturl, action, timestamp, serverts, origin)
-           SELECT $1, $2, $3, $4, n.t, n.t, 'pinepods' FROM {PG_NOW}"#
+           SELECT $1, $2, $3, $4, n.t, n.t, 'castaway' FROM {PG_NOW}"#
     )))
     .bind(user_id)
     .bind(device_id)
@@ -201,7 +201,7 @@ fn play_values(ep: &EpisodeForEvent, event: EpisodeEvent) -> Option<(i32, i32)> 
     (position > 0).then(|| (position, duration.unwrap_or(position).max(position)))
 }
 
-// Write one episode event. Progress and completion update the latest unpushed `pinepods` play
+// Write one episode event. Progress and completion update the latest unpushed `castaway` play
 // row for the episode (coalescing: playback saves every few seconds) and bump its timestamps so
 // cursor readers see it again; otherwise a new row is inserted. "Unpushed" means above every
 // target's ActionsPushCursor, so an external target never misses a position.
@@ -209,12 +209,12 @@ dialect_fn!([pg_log_episode]
     pub async fn(conn: &mut q::Conn, user_id: i32, episode_id: i32, ep: &EpisodeForEvent, event: EpisodeEvent) -> AppResult<bool> {
     let targets = pg_lock_targets_shared(conn, user_id).await?;
     let pushed = targets.max_push_cursor;
-    let device_id = pg_pinepods_device(conn, user_id).await?;
+    let device_id = pg_castaway_device(conn, user_id).await?;
     if let EpisodeEvent::New = event {
         q::query(sqlx::AssertSqlSafe(format!(
             r#"INSERT INTO "GpodderSyncEpisodeActions"
                  (userid, deviceid, podcasturl, episodeurl, action, timestamp, serverts, guid, episodeid, origin)
-               SELECT $1, $2, $3, $4, 'new', n.t, n.t, $5, $6, 'pinepods' FROM {PG_NOW}"#
+               SELECT $1, $2, $3, $4, 'new', n.t, n.t, $5, $6, 'castaway' FROM {PG_NOW}"#
         )))
         .bind(user_id)
         .bind(device_id)
@@ -229,7 +229,7 @@ dialect_fn!([pg_log_episode]
     let Some((position, total)) = play_values(ep, event) else { return Ok(false) };
     let latest = q::query(
         r#"SELECT a.actionid, a.action FROM "GpodderSyncEpisodeActions" a
-           WHERE a.episodeid = $1 AND a.userid = $2 AND a.origin = 'pinepods' AND a.actionid > $3
+           WHERE a.episodeid = $1 AND a.userid = $2 AND a.origin = 'castaway' AND a.actionid > $3
            ORDER BY a.actionid DESC LIMIT 1"#,
     )
     .bind(episode_id)
@@ -262,7 +262,7 @@ dialect_fn!([pg_log_episode]
     q::query(sqlx::AssertSqlSafe(format!(
         r#"INSERT INTO "GpodderSyncEpisodeActions"
              (userid, deviceid, podcasturl, episodeurl, action, timestamp, serverts, started, position, total, guid, episodeid, origin)
-           SELECT $1, $2, $3, $4, 'play', n.t, n.t, 0, $5, $6, $7, $8, 'pinepods' FROM {PG_NOW}"#
+           SELECT $1, $2, $3, $4, 'play', n.t, n.t, 0, $5, $6, $7, $8, 'castaway' FROM {PG_NOW}"#
     )))
     .bind(user_id)
     .bind(device_id)
@@ -544,12 +544,12 @@ impl DatabasePool {
         Ok(())
     }
 
-    /// The user's pinepods device name, creating the device if needed.
-    pub async fn sync_ensure_pinepods_device(&self, user_id: i32) -> AppResult<String> {
+    /// The user's castaway device name, creating the device if needed.
+    pub async fn sync_ensure_castaway_device(&self, user_id: i32) -> AppResult<String> {
         dialect_match!(self, {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
-                let id = pg_pinepods_device(&mut tx, user_id).await?;
+                let id = pg_castaway_device(&mut tx, user_id).await?;
                 let name: String = q::query_scalar(r#"SELECT devicename FROM "GpodderDevices" WHERE deviceid = $1"#)
                     .bind(id)
                     .fetch_one(&mut *tx)
@@ -805,7 +805,7 @@ impl DatabasePool {
     /// log, so apps and the external server drop it too. False when there's no such row.
     pub async fn sync_import_remove(&self, user_id: i32, id: i32) -> AppResult<bool> {
         let Some(failure) = self.sync_import_failure(user_id, id).await? else { return Ok(false) };
-        let log = super::events::should_log(self, user_id, super::SyncOrigin::Pinepods).await;
+        let log = super::events::should_log(self, user_id, super::SyncOrigin::Castaway).await;
         dialect_match!(self, {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;

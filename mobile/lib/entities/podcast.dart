@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/core/extensions.dart';
-import 'package:pinepods_mobile/entities/funding.dart';
-import 'package:pinepods_mobile/entities/person.dart';
+import 'package:castaway_mobile/core/extensions.dart';
+import 'package:castaway_mobile/entities/funding.dart';
+import 'package:castaway_mobile/entities/person.dart';
 import 'package:podcast_search/podcast_search.dart' as search;
 
 import 'episode.dart';

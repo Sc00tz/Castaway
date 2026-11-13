@@ -2,13 +2,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/ui/widgets/pinepods_episode_card.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_episode_card.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// A queue row: the standard episode card with a reorder handle in front.
 class DraggableQueueEpisodeCard extends StatelessWidget {
-  final PinepodsEpisode episode;
+  final CastawayEpisode episode;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final FutureOr<void> Function()? onPlayPressed;
@@ -25,7 +25,7 @@ class DraggableQueueEpisodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PinepodsEpisodeCard(
+    return CastawayEpisodeCard(
       episode: episode,
       onTap: onTap,
       onLongPress: onLongPress,

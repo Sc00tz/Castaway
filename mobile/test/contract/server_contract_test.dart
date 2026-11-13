@@ -8,20 +8,20 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/pinepods/create_playlist.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/castaway/create_playlist.dart';
 
 final _env = Platform.environment;
-final _server = _env['PINEPODS_CONTRACT_SERVER'];
-final _username = _env['PINEPODS_CONTRACT_USERNAME'] ?? '';
-final _password = _env['PINEPODS_CONTRACT_PASSWORD'] ?? '';
-final _userId = int.tryParse(_env['PINEPODS_CONTRACT_USER_ID'] ?? '') ?? 0;
-final _podcastId = int.tryParse(_env['PINEPODS_CONTRACT_PODCAST_ID'] ?? '') ?? 0;
-final _showTitle = _env['PINEPODS_CONTRACT_SHOW_TITLE'] ?? '';
+final _server = _env['CASTAWAY_CONTRACT_SERVER'];
+final _username = _env['CASTAWAY_CONTRACT_USERNAME'] ?? '';
+final _password = _env['CASTAWAY_CONTRACT_PASSWORD'] ?? '';
+final _userId = int.tryParse(_env['CASTAWAY_CONTRACT_USER_ID'] ?? '') ?? 0;
+final _podcastId = int.tryParse(_env['CASTAWAY_CONTRACT_PODCAST_ID'] ?? '') ?? 0;
+final _showTitle = _env['CASTAWAY_CONTRACT_SHOW_TITLE'] ?? '';
 
 void main() {
   final skip = _server == null ? 'needs a server from rust-api\'s integration suite' : null;
-  final service = PinepodsService(timeout: const Duration(seconds: 30));
+  final service = CastawayService(timeout: const Duration(seconds: 30));
   late List<int> episodes;
 
   setUpAll(() async {
@@ -33,11 +33,11 @@ void main() {
 
   group('signing in', () {
     test('the server is recognised', () async {
-      expect(await service.verifyPinepodsInstance(_server!), isTrue);
+      expect(await service.verifyCastawayInstance(_server!), isTrue);
     });
 
     test('a wrong password is refused', () async {
-      final other = PinepodsService();
+      final other = CastawayService();
       expect(await other.login(_server!, _username, 'wrong-password'), isFalse);
     });
 
@@ -47,7 +47,7 @@ void main() {
     });
 
     test('the server reports a version', () async {
-      expect(await service.getPinepodsVersion(), isNotEmpty);
+      expect(await service.getCastawayVersion(), isNotEmpty);
     });
   }, skip: skip);
 

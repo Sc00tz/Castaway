@@ -3,9 +3,9 @@
 // apply different rules and disagree.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/home_data.dart';
-import 'package:pinepods_mobile/services/offline/offline_action_queue.dart';
-import 'package:pinepods_mobile/ui/utils/position_utils.dart';
+import 'package:castaway_mobile/entities/home_data.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
+import 'package:castaway_mobile/ui/utils/position_utils.dart';
 
 import '../support/factories.dart';
 
@@ -38,8 +38,8 @@ HomeOverview overview(List<HomeEpisode> inProgress) => HomeOverview(
 void main() {
   test('unsynced progress replaces the server position, including an earlier one', () {
     final episodes = [
-      buildPinepodsEpisode(episodeId: 1, listenDuration: 600),
-      buildPinepodsEpisode(episodeId: 2, listenDuration: 50),
+      buildCastawayEpisode(episodeId: 1, listenDuration: 600),
+      buildCastawayEpisode(episodeId: 2, listenDuration: 50),
     ];
     final shown = PositionUtils.overlay(episodes, {
       PositionUpdate.keyFor(1, false): 120, // skipped back on this phone, not synced yet
@@ -48,7 +48,7 @@ void main() {
   });
 
   test('nothing to apply returns the same list, so screens can skip a rebuild', () {
-    final episodes = [buildPinepodsEpisode(episodeId: 1, listenDuration: 600)];
+    final episodes = [buildCastawayEpisode(episodeId: 1, listenDuration: 600)];
     expect(identical(PositionUtils.overlay(episodes, {}), episodes), isTrue);
     expect(identical(PositionUtils.applyUpdate(episodes, const PositionUpdate(9, false, 5)), episodes), isTrue);
     expect(

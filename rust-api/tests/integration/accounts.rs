@@ -1,7 +1,7 @@
 //! Accounts: login, rate limiting, MFA, API keys, profile changes, deletion, admin rights, sign-up.
 
 use crate::harness::*;
-use pinepods_api::database::{build_totp, DatabasePool};
+use castaway_api::database::{build_totp, DatabasePool};
 
 async fn login_status(app: &TestApp, username: &str, password: &str) -> u16 {
     app.get("/api/data/get_key").basic_auth(username, password).send().await.status.as_u16()

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/search_providers.dart';
+import 'package:castaway_mobile/entities/search_providers.dart';
 
 /// Every bottom-bar page, in the default order.
 /// These are page ids, not display text; see bottomNavLabel.
@@ -66,15 +66,15 @@ class AppSettings {
   /// If 0, list view; else grid view
   final int layout;
 
-  final String? pinepodsServer;
+  final String? castawayServer;
 
-  final String? pinepodsApiKey;
+  final String? castawayApiKey;
 
-  final int? pinepodsUserId;
+  final int? castawayUserId;
 
-  final String? pinepodsUsername;
+  final String? castawayUsername;
 
-  final String? pinepodsEmail;
+  final String? castawayEmail;
 
   /// Custom order for bottom navigation bar items
   final List<String> bottomBarOrder;
@@ -87,7 +87,7 @@ class AppSettings {
   final bool preferServerDownloadSource;
 
   /// Whether to show the user's Gravatar. Mirrors the server setting; off by default.
-  final bool pinepodsUseGravatar;
+  final bool castawayUseGravatar;
 
   /// Number of leading queue episodes to keep downloaded locally (0 = disabled).
   final int autoDownloadQueueCount;
@@ -124,15 +124,15 @@ class AppSettings {
     required this.fastForwardInterval,
     required this.rewindInterval,
     required this.layout,
-    this.pinepodsServer,
-    this.pinepodsApiKey,
-    this.pinepodsUserId,
-    this.pinepodsUsername,
-    this.pinepodsEmail,
+    this.castawayServer,
+    this.castawayApiKey,
+    this.castawayUserId,
+    this.castawayUsername,
+    this.castawayEmail,
     required this.bottomBarOrder,
     this.autoDownloadWifiOnly = true,
     this.preferServerDownloadSource = true,
-    this.pinepodsUseGravatar = false,
+    this.castawayUseGravatar = false,
     this.autoDownloadQueueCount = 0,
     this.mirrorServerDownloads = false,
     this.deleteDownloadsAfterDays = 0,
@@ -158,15 +158,15 @@ class AppSettings {
         fastForwardInterval = 30,
         rewindInterval = 10,
         layout = 0,
-        pinepodsServer = null,
-        pinepodsApiKey = null,
-        pinepodsUserId = null,
-        pinepodsUsername = null,
-        pinepodsEmail = null,
+        castawayServer = null,
+        castawayApiKey = null,
+        castawayUserId = null,
+        castawayUsername = null,
+        castawayEmail = null,
         bottomBarOrder = defaultBottomBarOrder,
         autoDownloadWifiOnly = true,
         preferServerDownloadSource = true,
-        pinepodsUseGravatar = false,
+        castawayUseGravatar = false,
         autoDownloadQueueCount = 0,
         mirrorServerDownloads = false,
         deleteDownloadsAfterDays = 0,
@@ -191,15 +191,15 @@ class AppSettings {
     int? fastForwardInterval,
     int? rewindInterval,
     int? layout,
-    String? pinepodsServer,
-    String? pinepodsApiKey,
-    int? pinepodsUserId,
-    String? pinepodsUsername,
-    String? pinepodsEmail,
+    String? castawayServer,
+    String? castawayApiKey,
+    int? castawayUserId,
+    String? castawayUsername,
+    String? castawayEmail,
     List<String>? bottomBarOrder,
     bool? autoDownloadWifiOnly,
     bool? preferServerDownloadSource,
-    bool? pinepodsUseGravatar,
+    bool? castawayUseGravatar,
     int? autoDownloadQueueCount,
     bool? mirrorServerDownloads,
     int? deleteDownloadsAfterDays,
@@ -224,15 +224,15 @@ class AppSettings {
         fastForwardInterval: fastForwardInterval ?? this.fastForwardInterval,
         rewindInterval: rewindInterval ?? this.rewindInterval,
         layout: layout ?? this.layout,
-        pinepodsServer: pinepodsServer ?? this.pinepodsServer,
-        pinepodsApiKey: pinepodsApiKey ?? this.pinepodsApiKey,
-        pinepodsUserId: pinepodsUserId ?? this.pinepodsUserId,
-        pinepodsUsername: pinepodsUsername ?? this.pinepodsUsername,
-        pinepodsEmail: pinepodsEmail ?? this.pinepodsEmail,
+        castawayServer: castawayServer ?? this.castawayServer,
+        castawayApiKey: castawayApiKey ?? this.castawayApiKey,
+        castawayUserId: castawayUserId ?? this.castawayUserId,
+        castawayUsername: castawayUsername ?? this.castawayUsername,
+        castawayEmail: castawayEmail ?? this.castawayEmail,
         bottomBarOrder: bottomBarOrder ?? this.bottomBarOrder,
         autoDownloadWifiOnly: autoDownloadWifiOnly ?? this.autoDownloadWifiOnly,
         preferServerDownloadSource: preferServerDownloadSource ?? this.preferServerDownloadSource,
-        pinepodsUseGravatar: pinepodsUseGravatar ?? this.pinepodsUseGravatar,
+        castawayUseGravatar: castawayUseGravatar ?? this.castawayUseGravatar,
         autoDownloadQueueCount: autoDownloadQueueCount ?? this.autoDownloadQueueCount,
         mirrorServerDownloads: mirrorServerDownloads ?? this.mirrorServerDownloads,
         deleteDownloadsAfterDays: deleteDownloadsAfterDays ?? this.deleteDownloadsAfterDays,

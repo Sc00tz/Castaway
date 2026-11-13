@@ -1,5 +1,5 @@
 [package]
-name = "pinepods-api"
+name = "castaway-api"
 version = "0.10.1"
 edition = "2021"
 rust-version = "1.99"
@@ -102,7 +102,7 @@ test-support = []
 
 [dev-dependencies]
 tower-test = "0.4"
-pinepods-api = { path = ".", features = ["test-support"] }
+castaway-api = { path = ".", features = ["test-support"] }
 # Integration harness (tests/integration). Same versions as the main dependency set.
 http-body-util = "0.1"
 tokio-tungstenite = "0.29"

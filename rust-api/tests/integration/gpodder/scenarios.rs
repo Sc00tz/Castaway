@@ -282,7 +282,7 @@ async fn put_from_one_device_keeps_other_devices_subscriptions() {
 
 /// The same for podcasts added in Castaway itself, which no gpodder device ever reported.
 #[tokio::test(flavor = "multi_thread")]
-async fn put_keeps_podcasts_added_in_pinepods() {
+async fn put_keeps_podcasts_added_in_castaway() {
     conformance("put library", async {
         let s = GpodderScene::start().await;
         if !s.has_library() {

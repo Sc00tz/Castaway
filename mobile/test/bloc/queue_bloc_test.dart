@@ -6,8 +6,8 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pinepods_mobile/bloc/podcast/queue_bloc.dart';
-import 'package:pinepods_mobile/state/queue_event_state.dart';
+import 'package:castaway_mobile/bloc/podcast/queue_bloc.dart';
+import 'package:castaway_mobile/state/queue_event_state.dart';
 
 import '../support/factories.dart';
 import '../support/fakes.dart';

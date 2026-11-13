@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/queue.dart';
+import 'package:castaway_mobile/entities/queue.dart';
 
 void main() {
   group('toMap/fromMap', () {

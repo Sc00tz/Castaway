@@ -43,7 +43,7 @@
     "feed": "Flöde",
     "history": "Historik",
     "local_downloads": "Lokala nedladdningar",
-    "pinepods": "Castaway",
+    "castaway": "Castaway",
     "podcasts": "Poddar",
     "queue": "Kö",
     "saved": "Sparat",
@@ -167,8 +167,8 @@
     "ok": "Ok",
     "oldest_first": "Äldst först",
     "password": "Lösenord",
-    "pinepods": "Castaway",
-    "pinepods_logo": "Castaway logga",
+    "castaway": "Castaway",
+    "castaway_logo": "Castaway logga",
     "previous": "Föregående",
     "remove": "Ta bort",
     "reset": "Återställ",
@@ -609,7 +609,7 @@
     "unknown": "Okänt",
     "username": "Användarnamn",
     "valid_email_required": "Vänligen ange en giltig e-postadress",
-    "welcome_to_pinepods": "",
+    "welcome_to_castaway": "",
     "youtube": "YouTube"
   },
   "history": {
@@ -636,7 +636,7 @@
     "top_podcasts": "Bästa poddarna",
     "unknown_author": "Okänd författare",
     "welcome_description": "Börja med att lägga till poddar via sökfältet ovanför.",
-    "welcome_to_pinepods": "Välkommen till Castaway",
+    "welcome_to_castaway": "Välkommen till Castaway",
     "welcome_hero_subtitle": "",
     "welcome_intro": "",
     "welcome_get_started": "",
@@ -657,7 +657,7 @@
   "internal_error": {
     "clever_quip": "",
     "head_back_home": "",
-    "you_broke_pinepods": ""
+    "you_broke_castaway": ""
   },
   "import_options": {
     "add_them": "Lägg till dem!",

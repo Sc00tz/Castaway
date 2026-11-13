@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/core/annotations.dart';
-import 'package:pinepods_mobile/core/extensions.dart';
-import 'package:pinepods_mobile/entities/chapter.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/person.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/core/annotations.dart';
+import 'package:castaway_mobile/core/extensions.dart';
+import 'package:castaway_mobile/entities/chapter.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/person.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' show parseFragment;
 import 'package:logging/logging.dart';

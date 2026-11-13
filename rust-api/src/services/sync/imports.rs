@@ -47,13 +47,13 @@ pub struct ImportFailure {
 }
 
 pub fn origin_value(origin: SyncOrigin) -> String {
-    origin.log_value().unwrap_or_else(|| "pinepods".into())
+    origin.log_value().unwrap_or_else(|| "castaway".into())
 }
 
 pub fn parse_origin(value: &str) -> SyncOrigin {
     match value {
         "client" => SyncOrigin::Client,
-        "pinepods" => SyncOrigin::Pinepods,
+        "castaway" => SyncOrigin::Castaway,
         v => v.strip_prefix("target:").and_then(|id| id.parse().ok()).map(SyncOrigin::Target).unwrap_or(SyncOrigin::Client),
     }
 }

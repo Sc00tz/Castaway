@@ -46,19 +46,19 @@ jobs:
       - name: Set environment variables
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            echo "ARTIFACT_NAME1=Pinepods_${{ env.IMAGE_TAG }}_amd64.deb" >> $GITHUB_ENV
-            echo "ARTIFACT_NAME2=Pinepods_${{ env.IMAGE_TAG }}_amd64.AppImage" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME1=Castaway_${{ env.IMAGE_TAG }}_amd64.deb" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME2=Castaway_${{ env.IMAGE_TAG }}_amd64.AppImage" >> $GITHUB_ENV
             echo "ARTIFACT_NAME3=Castaway-${{ env.IMAGE_TAG }}-1.x86_64.rpm" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" = "ubuntu-arm64" ]; then
-            echo "ARTIFACT_NAME1=Pinepods_${{ env.IMAGE_TAG }}_arm64.deb" >> $GITHUB_ENV
-            echo "ARTIFACT_NAME2=Pinepods_${{ env.IMAGE_TAG }}_aarch64.AppImage" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME1=Castaway_${{ env.IMAGE_TAG }}_arm64.deb" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME2=Castaway_${{ env.IMAGE_TAG }}_aarch64.AppImage" >> $GITHUB_ENV
             echo "ARTIFACT_NAME3=Castaway-${{ env.IMAGE_TAG }}-1.aarch64.rpm" >> $GITHUB_ENV
           # ... rest of conditions ...
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            echo "ARTIFACT_NAME1=Pinepods_${{ env.IMAGE_TAG }}_x64-setup.exe" >> $Env:GITHUB_ENV
-            echo "ARTIFACT_NAME2=Pinepods_${{ env.IMAGE_TAG }}_x64_en-US.msi" >> $Env:GITHUB_ENV
+            echo "ARTIFACT_NAME1=Castaway_${{ env.IMAGE_TAG }}_x64-setup.exe" >> $Env:GITHUB_ENV
+            echo "ARTIFACT_NAME2=Castaway_${{ env.IMAGE_TAG }}_x64_en-US.msi" >> $Env:GITHUB_ENV
           elif [ "${{ matrix.os }}" = "macOS-latest" ]; then
-            echo "ARTIFACT_NAME1=Pinepods_${{ env.IMAGE_TAG }}_aarch64.dmg" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME1=Castaway_${{ env.IMAGE_TAG }}_aarch64.dmg" >> $GITHUB_ENV
             echo "ARTIFACT_NAME2=Castaway.app" >> $GITHUB_ENV
           fi
         shell: bash
@@ -66,8 +66,8 @@ jobs:
 
       - name: Set environment variables (Windows)
         run: |
-          echo "ARTIFACT_NAME1=Pinepods_${{ env.IMAGE_TAG }}_x64-setup.exe" >> $Env:GITHUB_ENV
-          echo "ARTIFACT_NAME2=Pinepods_${{ env.IMAGE_TAG }}_x64_en-US.msi" >> $Env:GITHUB_ENV
+          echo "ARTIFACT_NAME1=Castaway_${{ env.IMAGE_TAG }}_x64-setup.exe" >> $Env:GITHUB_ENV
+          echo "ARTIFACT_NAME2=Castaway_${{ env.IMAGE_TAG }}_x64_en-US.msi" >> $Env:GITHUB_ENV
         shell: pwsh
         if: ${{ matrix.os == 'windows-latest' }}
 

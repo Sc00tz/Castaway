@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/entities/pinepods_search.dart';
-import 'package:pinepods_mobile/ui/podcast/podcast_details.dart';
-import 'package:pinepods_mobile/ui/pinepods/podcast_details.dart';
-import 'package:pinepods_mobile/ui/widgets/tile_image.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/castaway_search.dart';
+import 'package:castaway_mobile/ui/podcast/podcast_details.dart';
+import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
+import 'package:castaway_mobile/ui/widgets/tile_image.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -61,31 +61,31 @@ class PodcastTile extends StatelessWidget {
     final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     final settings = settingsBloc.currentSettings;
     
-    if (settings.pinepodsServer != null && 
-        settings.pinepodsApiKey != null && 
-        settings.pinepodsUserId != null) {
+    if (settings.castawayServer != null && 
+        settings.castawayApiKey != null && 
+        settings.castawayUserId != null) {
       
       // Check if podcast is already subscribed
-      final pinepodsService = PinepodsService();
-      pinepodsService.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
+      final castawayService = CastawayService();
+      castawayService.setCredentials(settings.castawayServer!, settings.castawayApiKey!);
       
       try {
-        final isSubscribed = await pinepodsService.checkPodcastExists(
+        final isSubscribed = await castawayService.checkPodcastExists(
           podcast.title, 
           podcast.url!, 
-          settings.pinepodsUserId!
+          settings.castawayUserId!
         );
         
         if (isSubscribed) {
           // Get the internal Castaway database ID
-          final internalPodcastId = await pinepodsService.getPodcastId(
-            settings.pinepodsUserId!,
+          final internalPodcastId = await castawayService.getPodcastId(
+            settings.castawayUserId!,
             podcast.url!,
             podcast.title
           );
           
           // Use Castaway podcast details for subscribed podcasts
-          final unifiedPodcast = UnifiedPinepodsPodcast(
+          final unifiedPodcast = UnifiedCastawayPodcast(
             id: internalPodcastId ?? 0,
             indexId: 0, // Default for subscribed podcasts
             title: podcast.title,
@@ -106,8 +106,8 @@ class PodcastTile extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute<void>(
-                settings: const RouteSettings(name: 'pinepodspodcastdetails'),
-                builder: (context) => PinepodsPodcastDetails(
+                settings: const RouteSettings(name: 'castawaypodcastdetails'),
+                builder: (context) => CastawayPodcastDetails(
                   podcast: unifiedPodcast,
                   isFollowing: true,
                 ),

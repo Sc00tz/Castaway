@@ -9,7 +9,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:pinepods_mobile/services/pinepods/login_service.dart';
+import 'package:castaway_mobile/services/castaway/login_service.dart';
 
 void main() {
   test('maps a DNS/connection failure to a reachability message, not the generic one', () async {
@@ -17,12 +17,12 @@ void main() {
       (_) => throw const SocketException('Failed host lookup: does-not-exist.invalid'),
     );
 
-    final r = await PinepodsLoginService.checkServer(
+    final r = await CastawayLoginService.checkServer(
       'https://does-not-exist.invalid',
       client: client,
     );
 
-    expect(r.isPinepods, isFalse);
+    expect(r.isCastaway, isFalse);
     expect(r.errorMessage, isNotNull);
     // Must NOT be the old misleading generic message.
     expect(r.errorMessage, isNot(equals('Not a valid Castaway server')));
@@ -35,12 +35,12 @@ void main() {
   test('maps a reachable-but-not-Castaway host to a distinct message', () async {
     final client = MockClient((_) async => http.Response('{"something_else": true}', 200));
 
-    final r = await PinepodsLoginService.checkServer(
+    final r = await CastawayLoginService.checkServer(
       'https://example.com',
       client: client,
     );
 
-    expect(r.isPinepods, isFalse);
+    expect(r.isCastaway, isFalse);
     expect(r.errorMessage, isNotNull);
     expect(r.errorMessage!.toLowerCase(), contains('does not look like a castaway'));
   });
@@ -48,21 +48,21 @@ void main() {
   test('a genuine Castaway response checks out', () async {
     final client = MockClient((_) async => http.Response('{"castaway_instance": true}', 200));
 
-    final r = await PinepodsLoginService.checkServer(
+    final r = await CastawayLoginService.checkServer(
       'https://pods.example.com',
       client: client,
     );
 
-    expect(r.isPinepods, isTrue);
+    expect(r.isCastaway, isTrue);
     expect(r.errorMessage, isNull);
   });
 
   test('a malformed address is handled gracefully without throwing', () async {
     // No injected client on purpose: a schemeless URL makes the real client
     // throw synchronously before any I/O, exercising the catch-all mapping.
-    final r = await PinepodsLoginService.checkServer('not-a-url');
+    final r = await CastawayLoginService.checkServer('not-a-url');
 
-    expect(r.isPinepods, isFalse);
+    expect(r.isCastaway, isFalse);
     expect(r.errorMessage, isNotNull);
   });
 }

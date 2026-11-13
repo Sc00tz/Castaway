@@ -4,9 +4,9 @@
 
 import 'dart:io';
 
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/services/settings/mobile_settings_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/services/settings/mobile_settings_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 

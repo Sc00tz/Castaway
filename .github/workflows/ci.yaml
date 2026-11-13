@@ -64,5 +64,5 @@ jobs:
 
   #     - name: Build and test Docker image
   #       run: |
-  #         docker build -t pinepods:test .
-  #         docker run --rm pinepods:test /bin/sh -c "python3 -m pytest /pinepods/tests/"
+  #         docker build -t castaway:test .
+  #         docker run --rm castaway:test /bin/sh -c "python3 -m pytest /castaway/tests/"

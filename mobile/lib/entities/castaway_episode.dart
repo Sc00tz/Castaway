@@ -1,0 +1,162 @@
+import 'package:castaway_mobile/core/date_utils.dart';
+
+class CastawayEpisode {
+  final String podcastName;
+  final String episodeTitle;
+  final String episodePubDate;
+  final String episodeDescription;
+  final String episodeArtwork;
+  final String episodeUrl;
+  final int episodeDuration;
+  final int? listenDuration;
+  final int episodeId;
+  final bool completed;
+  final bool saved;
+  final bool queued;
+  final bool downloaded;
+  final bool isYoutube;
+  final int? podcastId;
+  final String? listenDate;
+  final String? saveDate;
+
+  /// Absolute path to a locally-cached copy of [episodeArtwork], if one was
+  /// downloaded alongside the audio. Lets the artwork render with no network
+  /// (offline). Null for server/streamed episodes.
+  final String? localImagePath;
+
+  CastawayEpisode({
+    required this.podcastName,
+    required this.episodeTitle,
+    required this.episodePubDate,
+    required this.episodeDescription,
+    required this.episodeArtwork,
+    required this.episodeUrl,
+    required this.episodeDuration,
+    this.listenDuration,
+    required this.episodeId,
+    required this.completed,
+    required this.saved,
+    required this.queued,
+    required this.downloaded,
+    required this.isYoutube,
+    this.podcastId,
+    this.listenDate,
+    this.saveDate,
+    this.localImagePath,
+  });
+
+  factory CastawayEpisode.fromJson(Map<String, dynamic> json) {
+    return CastawayEpisode(
+      podcastName: json['Podcastname'] ?? json['podcastname'] ?? '',
+      episodeTitle: json['Episodetitle'] ?? json['episodetitle'] ?? '',
+      episodePubDate: json['Episodepubdate'] ?? json['episodepubdate'] ?? '',
+      episodeDescription: json['Episodedescription'] ?? json['episodedescription'] ?? '',
+      episodeArtwork: json['Episodeartwork'] ?? json['episodeartwork'] ?? '',
+      episodeUrl: json['Episodeurl'] ?? json['episodeurl'] ?? '',
+      episodeDuration: json['Episodeduration'] ?? json['episodeduration'] ?? 0,
+      listenDuration: json['Listenduration'] ?? json['listenduration'],
+      episodeId: json['Episodeid'] ?? json['episodeid'] ?? 0,
+      completed: json['Completed'] ?? json['completed'] ?? false,
+      saved: json['Saved'] ?? json['saved'] ?? false,
+      queued: json['Queued'] ?? json['queued'] ?? false,
+      downloaded: json['Downloaded'] ?? json['downloaded'] ?? false,
+      isYoutube: json['Is_youtube'] ?? json['is_youtube'] ?? false,
+      podcastId: json['Podcastid'] ?? json['podcastid'],
+      listenDate: json['listendate'],
+      saveDate: json['savedate'],
+    );
+  }
+
+  /// A copy that resumes from [listenDuration] seconds (e.g. a cross-device
+  /// handoff carrying the source's live position instead of the stored one).
+  CastawayEpisode withListenDuration(int? listenDuration) {
+    return CastawayEpisode(
+      podcastName: podcastName,
+      episodeTitle: episodeTitle,
+      episodePubDate: episodePubDate,
+      episodeDescription: episodeDescription,
+      episodeArtwork: episodeArtwork,
+      episodeUrl: episodeUrl,
+      episodeDuration: episodeDuration,
+      listenDuration: listenDuration,
+      episodeId: episodeId,
+      completed: completed,
+      saved: saved,
+      queued: queued,
+      downloaded: downloaded,
+      isYoutube: isYoutube,
+      podcastId: podcastId,
+      listenDate: listenDate,
+      saveDate: saveDate,
+      localImagePath: localImagePath,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'podcastname': podcastName,
+      'episodetitle': episodeTitle,
+      'episodepubdate': episodePubDate,
+      'episodedescription': episodeDescription,
+      'episodeartwork': episodeArtwork,
+      'episodeurl': episodeUrl,
+      'episodeduration': episodeDuration,
+      'listenduration': listenDuration,
+      'episodeid': episodeId,
+      'completed': completed,
+      'saved': saved,
+      'queued': queued,
+      'downloaded': downloaded,
+      'is_youtube': isYoutube,
+      'podcastid': podcastId,
+    };
+  }
+
+  /// Format duration from seconds to MM:SS or HH:MM:SS
+  String get formattedDuration {
+    if (episodeDuration <= 0) return '0:00';
+    
+    final hours = episodeDuration ~/ 3600;
+    final minutes = (episodeDuration % 3600) ~/ 60;
+    final seconds = episodeDuration % 60;
+    
+    if (hours > 0) {
+      return '${hours.toString().padLeft(1, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+  }
+
+  /// Get progress percentage (0-100)
+  double get progressPercentage {
+    if (episodeDuration <= 0 || listenDuration == null) return 0.0;
+    return (listenDuration! / episodeDuration * 100).clamp(0.0, 100.0);
+  }
+
+  /// Check if episode has been started (has some listen duration)
+  bool get isStarted {
+    return listenDuration != null && listenDuration! > 0;
+  }
+
+  /// Format listen duration from seconds to MM:SS or HH:MM:SS
+  String get formattedListenDuration {
+    if (listenDuration == null || listenDuration! <= 0) return '0:00';
+    
+    final duration = listenDuration!;
+    final hours = duration ~/ 3600;
+    final minutes = (duration % 3600) ~/ 60;
+    final seconds = duration % 60;
+    
+    if (hours > 0) {
+      return '${hours.toString().padLeft(1, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+  }
+
+  /// Format the publish date to a more readable format.
+  ///
+  /// Uses device-local calendar dates so "Today" snaps to local midnight (see
+  /// [relativePubDateLabel] in core/date_utils.dart).
+  String get formattedPubDate => relativePubDateLabel(episodePubDate);
+}

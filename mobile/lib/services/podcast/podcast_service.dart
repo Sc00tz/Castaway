@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/api/podcast/podcast_api.dart';
-import 'package:pinepods_mobile/entities/chapter.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
-import 'package:pinepods_mobile/state/episode_state.dart';
+import 'package:castaway_mobile/api/podcast/podcast_api.dart';
+import 'package:castaway_mobile/entities/chapter.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/state/episode_state.dart';
 import 'package:podcast_search/podcast_search.dart' as pcast;
 
 /// The [PodcastService] handles interactions around podcasts including searching, fetching

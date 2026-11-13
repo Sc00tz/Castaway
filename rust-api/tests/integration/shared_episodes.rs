@@ -3,7 +3,7 @@
 //! unsubscribing touching only the leaver's state, the upgrade merging the copies users had, and
 //! old episode ids still working afterwards.
 
-use pinepods_api::services::sync::SyncOrigin;
+use castaway_api::services::sync::SyncOrigin;
 
 use crate::harness::*;
 
@@ -50,7 +50,7 @@ async fn a_refresh_inserts_once_and_hands_new_episodes_to_each_subscriber() {
 
     app.feed("show.xml", &feed.episode(Episode::new(3)));
     set_next_refresh(&app, a, "2000-01-01 00:00:00").await;
-    assert_eq!(pinepods_api::handlers::refresh::refresh_due_podcasts(&app.state).await.unwrap(), 1);
+    assert_eq!(castaway_api::handlers::refresh::refresh_due_podcasts(&app.state).await.unwrap(), 1);
 
     assert_eq!(feed_episodes(&app, a).await, 3);
     let new = app.episode_id(&alice, a, "Episode 3").await;

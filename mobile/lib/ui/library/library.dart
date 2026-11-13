@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/ui/widgets/platform_progress_indicator.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_grid_tile.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_tile.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/widgets/platform_progress_indicator.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_grid_tile.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// This class displays the list of podcasts the user is currently following.
 class Library extends StatefulWidget {

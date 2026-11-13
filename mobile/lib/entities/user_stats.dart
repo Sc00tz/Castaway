@@ -1,4 +1,4 @@
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 class UserStats {
   final String userCreated;

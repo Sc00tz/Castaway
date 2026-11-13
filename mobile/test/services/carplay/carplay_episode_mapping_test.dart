@@ -3,14 +3,14 @@
 // YouTube flags decide the stream URL, so they must survive the round trip.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/services/carplay/carplay_service.dart';
+import 'package:castaway_mobile/services/carplay/carplay_service.dart';
 
 import '../../support/factories.dart';
 
 void main() {
   test('rebuilds id, position and source URL from a CarPlay item', () {
-    final ep = CarPlayService.toPinepodsEpisode(buildEpisode(
-      guid: 'pinepods_101',
+    final ep = CarPlayService.toCastawayEpisode(buildEpisode(
+      guid: 'castaway_101',
       contentUrl: 'https://example.com/episode.mp3',
     )
       ..link = 'https://example.com/episode.mp3'
@@ -27,12 +27,12 @@ void main() {
   });
 
   test('recovers server-download and YouTube flags from the stream URL', () {
-    final downloaded = CarPlayService.toPinepodsEpisode(buildEpisode(
-      guid: 'pinepods_5',
+    final downloaded = CarPlayService.toCastawayEpisode(buildEpisode(
+      guid: 'castaway_5',
       contentUrl: 'https://pp.example/api/data/stream/5?api_key=k&user_id=1',
     ));
-    final youtube = CarPlayService.toPinepodsEpisode(buildEpisode(
-      guid: 'pinepods_6',
+    final youtube = CarPlayService.toCastawayEpisode(buildEpisode(
+      guid: 'castaway_6',
       contentUrl: 'https://pp.example/api/data/stream/6?api_key=k&user_id=1&type=youtube',
     ));
 
@@ -43,17 +43,17 @@ void main() {
   });
 
   test('items without a Castaway id are left to the direct play path', () {
-    expect(CarPlayService.toPinepodsEpisode(buildEpisode(guid: 'https://feed/ep')), isNull);
-    expect(CarPlayService.toPinepodsEpisode(buildEpisode(guid: 'pinepods_x')), isNull);
+    expect(CarPlayService.toCastawayEpisode(buildEpisode(guid: 'https://feed/ep')), isNull);
+    expect(CarPlayService.toCastawayEpisode(buildEpisode(guid: 'castaway_x')), isNull);
   });
 
   test('Up Next is the server queue minus the playing and finished episodes', () {
     final queue = [
-      buildPinepodsEpisode(episodeId: 1),
-      buildPinepodsEpisode(episodeId: 2),
-      buildPinepodsEpisode(episodeId: 3, completed: true),
-      buildPinepodsEpisode(episodeId: 4),
-      buildPinepodsEpisode(episodeId: 5),
+      buildCastawayEpisode(episodeId: 1),
+      buildCastawayEpisode(episodeId: 2),
+      buildCastawayEpisode(episodeId: 3, completed: true),
+      buildCastawayEpisode(episodeId: 4),
+      buildCastawayEpisode(episodeId: 5),
     ];
 
     expect(CarPlayService.upNextFrom(queue, playingEpisodeId: 2).map((e) => e.episodeId), [1, 4, 5]);

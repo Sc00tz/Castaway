@@ -1352,7 +1352,7 @@ impl DatabasePool {
 
                 for row in episode_rows {
                     let episode_id: i32 = row.try_get("episodeid")?;
-                    let _ = self.mark_episode_completed(episode_id, user_id, false, crate::services::sync::SyncOrigin::Pinepods).await;
+                    let _ = self.mark_episode_completed(episode_id, user_id, false, crate::services::sync::SyncOrigin::Castaway).await;
                     completed_count += 1;
                 }
 
@@ -1374,7 +1374,7 @@ impl DatabasePool {
 
                 for row in youtube_rows {
                     let video_id: i32 = row.try_get("videoid")?;
-                    let _ = self.mark_episode_completed(video_id, user_id, true, crate::services::sync::SyncOrigin::Pinepods).await;
+                    let _ = self.mark_episode_completed(video_id, user_id, true, crate::services::sync::SyncOrigin::Castaway).await;
                     completed_count += 1;
                 }
             },
@@ -1435,7 +1435,7 @@ impl DatabasePool {
                 
                 if is_youtube {
                     for episode_id in episode_ids {
-                        match self.mark_episode_completed(episode_id, user_id, is_youtube, crate::services::sync::SyncOrigin::Pinepods).await {
+                        match self.mark_episode_completed(episode_id, user_id, is_youtube, crate::services::sync::SyncOrigin::Castaway).await {
                             Ok(_) => processed += 1,
                             Err(_) => failed += 1,
                         }

@@ -4,9 +4,9 @@
 
 import 'dart:io';
 
-import 'package:pinepods_mobile/api/podcast/podcast_api.dart';
-import 'package:pinepods_mobile/core/environment.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/api/podcast/podcast_api.dart';
+import 'package:castaway_mobile/core/environment.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
 import 'package:flutter/foundation.dart';
 import 'package:podcast_search/podcast_search.dart' as podcast_search;
 import 'package:http/http.dart' as http;

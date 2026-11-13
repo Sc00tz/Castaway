@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Where Add to queue puts an episode by default. Stored on the server, so it
 /// applies to every client.
@@ -15,7 +15,7 @@ class QueuePositionSetting extends StatefulWidget {
 }
 
 class _QueuePositionSettingState extends State<QueuePositionSetting> {
-  final _service = PinepodsService();
+  final _service = CastawayService();
   String? _position;
   int? _userId;
 
@@ -23,11 +23,11 @@ class _QueuePositionSettingState extends State<QueuePositionSetting> {
   void initState() {
     super.initState();
     final settings = Provider.of<SettingsBloc>(context, listen: false).currentSettings;
-    if (settings.pinepodsServer == null || settings.pinepodsApiKey == null || settings.pinepodsUserId == null) {
+    if (settings.castawayServer == null || settings.castawayApiKey == null || settings.castawayUserId == null) {
       return;
     }
-    _userId = settings.pinepodsUserId;
-    _service.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
+    _userId = settings.castawayUserId;
+    _service.setCredentials(settings.castawayServer!, settings.castawayApiKey!);
     _service.getQueueAddPosition(_userId!).then((position) {
       if (mounted) setState(() => _position = position);
     }).catchError((_) {});

@@ -2,7 +2,7 @@
 //!
 //! Each test gets its own database cloned from the migrated template, a real `AppState`
 //! (real `DatabasePool`, real Valkey), and the exact production router from
-//! `pinepods_api::create_app`. Requests go through the router in-process (no sockets), so a
+//! `castaway_api::create_app`. Requests go through the router in-process (no sockets), so a
 //! test exercises routing, extractors, auth checks, handlers and SQL exactly as production
 //! does — minus background schedulers, which tests trigger explicitly when they need them.
 
@@ -15,12 +15,12 @@ use base64::Engine as _;
 use serde_json::json;
 use sqlx::{Connection, Executor, PgConnection};
 
-use pinepods_api::config::{
+use castaway_api::config::{
     ApiConfig, Config, DatabaseConfig, EmailConfig, OIDCConfig, RedisConfig, SecurityConfig, ServerConfig,
 };
-use pinepods_api::database::DatabasePool;
-use pinepods_api::redis_client::RedisClient;
-use pinepods_api::AppState;
+use castaway_api::database::DatabasePool;
+use castaway_api::redis_client::RedisClient;
+use castaway_api::AppState;
 
 use super::env::{self, TestEnv};
 use super::fixtures::Fixtures;
@@ -93,7 +93,7 @@ impl TestApp {
             }),
             server: ServerConfig { port: 0, host: "127.0.0.1".into() },
             security: SecurityConfig {
-                api_key_header: "pinepods_api".into(),
+                api_key_header: "castaway_api".into(),
                 jwt_secret: "integration-test-secret".into(),
                 password_salt_rounds: 4,
             },
@@ -138,12 +138,12 @@ impl TestApp {
         let db_pool = DatabasePool::new(&config).await.expect("connect test database");
         let redis_client = RedisClient::new(&config).await.expect("connect test valkey (or the in-memory store)");
         let instance_id: Arc<str> = Arc::from(format!("test-{tag}").as_str());
-        let task_manager = Arc::new(pinepods_api::services::task_manager::TaskManager::new(
+        let task_manager = Arc::new(castaway_api::services::task_manager::TaskManager::new(
             redis_client.clone(),
             db_pool.clone(),
             instance_id.clone(),
         ));
-        let task_spawner = Arc::new(pinepods_api::services::tasks::TaskSpawner::new(
+        let task_spawner = Arc::new(castaway_api::services::tasks::TaskSpawner::new(
             task_manager.clone(),
             db_pool.clone(),
         ));
@@ -153,17 +153,17 @@ impl TestApp {
             config,
             task_manager,
             task_spawner,
-            websocket_manager: Arc::new(pinepods_api::handlers::websocket::WebSocketManager::new()),
-            now_playing_manager: Arc::new(pinepods_api::handlers::nowplaying::NowPlayingManager::new()),
+            websocket_manager: Arc::new(castaway_api::handlers::websocket::WebSocketManager::new()),
+            now_playing_manager: Arc::new(castaway_api::handlers::nowplaying::NowPlayingManager::new()),
             instance_id,
-            import_progress_manager: Arc::new(pinepods_api::redis_manager::ImportProgressManager::new(
+            import_progress_manager: Arc::new(castaway_api::redis_manager::ImportProgressManager::new(
                 redis_client,
             )),
-            notification_manager: Arc::new(pinepods_api::redis_manager::NotificationManager::new()),
+            notification_manager: Arc::new(castaway_api::redis_manager::NotificationManager::new()),
             restore_in_progress: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             merged_episodes: Default::default(),
         };
-        let router = pinepods_api::create_app(state.clone());
+        let router = castaway_api::create_app(state.clone());
 
         TestApp { env, state, router, db_name, tag, fixtures, admin: tokio::sync::OnceCell::new() }
     }
@@ -281,7 +281,7 @@ impl TestApp {
 
 impl Drop for TestApp {
     fn drop(&mut self) {
-        if std::env::var("PINEPODS_TEST_KEEP_DB").is_ok() {
+        if std::env::var("CASTAWAY_TEST_KEEP_DB").is_ok() {
             eprintln!("[harness] keeping test database {}", self.db_name);
             return;
         }
@@ -342,12 +342,12 @@ async fn clone_template(env: &TestEnv, db_name: &str, id_base: i64) {
     .expect("offset sequences");
 }
 
-/// `PINEPODS_TEST_LOG=<filter>` (e.g. `warn` or `pinepods_api=debug`) prints the server's logs,
+/// `CASTAWAY_TEST_LOG=<filter>` (e.g. `warn` or `castaway_api=debug`) prints the server's logs,
 /// for finding out why a request failed. Run with `-- --nocapture`.
 fn init_logging() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
-        if let Ok(filter) = std::env::var("PINEPODS_TEST_LOG") {
+        if let Ok(filter) = std::env::var("CASTAWAY_TEST_LOG") {
             let _ = tracing_subscriber::fmt()
                 .with_env_filter(tracing_subscriber::EnvFilter::new(filter))
                 .with_test_writer()

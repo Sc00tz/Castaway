@@ -517,7 +517,7 @@ impl DatabasePool {
     // Resolution mirrors the PlaybackSpeed pattern: for each downloaded item, the effective
     // retention is the per-podcast AutoDownloadDeleteDays when AutoDownloadDeleteCustomized is
     // set, otherwise the user's default. A resolved value of 0 means "never delete". Files under
-    // /opt/pinepods/downloads/ are removed first, then the DB row (reusing delete_episode, which
+    // /opt/castaway/downloads/ are removed first, then the DB row (reusing delete_episode, which
     // also decrements UserStats.EpisodesDownloaded). local:// feeds are never touched.
     pub async fn auto_delete_old_downloads(&self) -> AppResult<()> {
         let now = chrono::Utc::now().naive_utc();

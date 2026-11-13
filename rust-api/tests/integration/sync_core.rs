@@ -3,8 +3,8 @@
 //! that arrived before their episode.
 
 use chrono::{DateTime, Utc};
-use pinepods_api::database::DatabasePool;
-use pinepods_api::services::sync::{self, EpisodeAction, ResolveKey, SyncOrigin};
+use castaway_api::database::DatabasePool;
+use castaway_api::services::sync::{self, EpisodeAction, ResolveKey, SyncOrigin};
 use sqlx::Row;
 
 use crate::harness::*;
@@ -234,9 +234,9 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
     let pod = app.subscribe(&user, &url, 2).await;
     let ep = app.episode_id(&user, pod, "Episode 1").await;
 
-    // Subscribing is an `add` from the pinepods device, created on first use.
-    assert_eq!(subscription_log(&app, &user).await, vec![("add".into(), "pinepods".into(), url.clone())]);
-    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await;
+    // Subscribing is an `add` from the castaway device, created on first use.
+    assert_eq!(subscription_log(&app, &user).await, vec![("add".into(), "castaway".into(), url.clone())]);
+    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'castaway'"#, user.id)).await;
     assert_eq!(device.as_deref(), Some("castaway"));
 
     // Progress saves every few seconds collapse into one play row, timestamps bumped.
@@ -249,7 +249,7 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
     let log = action_log(&app, &user).await;
     assert_eq!(log.len(), 1, "{log:#?}");
     let row = &log[0];
-    assert_eq!((row.action.as_str(), row.origin.as_str()), ("play", "pinepods"));
+    assert_eq!((row.action.as_str(), row.origin.as_str()), ("play", "castaway"));
     assert_eq!((row.position, row.total), (Some(200), Some(1801)));
     assert_eq!((row.episode_id, row.guid.as_deref(), row.device.as_deref()), (Some(ep as i64), Some("guid-1"), Some("castaway")));
     assert!(row.server_ts > 1 && row.timestamp > 1, "coalescing bumps ServerTs/Timestamp: {row:?}");
@@ -294,7 +294,7 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
         .assert_ok();
     assert_eq!(
         subscription_log(&app, &user).await,
-        vec![("add".into(), "pinepods".into(), url.clone()), ("remove".into(), "pinepods".into(), url.clone())]
+        vec![("add".into(), "castaway".into(), url.clone()), ("remove".into(), "castaway".into(), url.clone())]
     );
     assert!(action_log(&app, &user).await.iter().all(|r| r.episode_id.is_none()));
 }
@@ -319,11 +319,11 @@ async fn nothing_is_logged_for_users_without_sync() {
     assert!(action_log(&app, &user).await.is_empty());
     assert!(subscription_log(&app, &user).await.is_empty());
     let devices = int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {}"#, user.id)).await;
-    assert_eq!(devices, Some(0), "no pinepods device is created for a user who doesn't sync");
+    assert_eq!(devices, Some(0), "no castaway device is created for a user who doesn't sync");
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_pinepods_device_avoids_a_name_a_client_owns() {
+async fn the_castaway_device_avoids_a_name_a_client_owns() {
     let app = TestApp::new().await;
     let user = app.user("crowded").await;
     exec(
@@ -335,13 +335,13 @@ async fn the_pinepods_device_avoids_a_name_a_client_owns() {
     let url = app.feed("crowded.xml", &Feed::with_episodes("Crowded", 1));
     app.subscribe(&user, &url, 1).await;
 
-    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await;
+    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'castaway'"#, user.id)).await;
     assert_eq!(device.as_deref(), Some("castaway-server"));
     assert_eq!(subscription_log(&app, &user).await.len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_old_internal_device_is_claimed_as_the_pinepods_device() {
+async fn the_old_internal_device_is_claimed_as_the_castaway_device() {
     let app = TestApp::new().await;
     let user = app.user("legacy").await;
     let legacy = format!("pinepods-internal-{}", user.id);
@@ -356,7 +356,7 @@ async fn the_old_internal_device_is_claimed_as_the_pinepods_device() {
 
     let devices = int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {}"#, user.id)).await;
     assert_eq!(devices, Some(1), "no second Castaway device");
-    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await;
+    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'castaway'"#, user.id)).await;
     assert_eq!(device, Some(legacy));
 }
 
@@ -458,15 +458,15 @@ async fn applied_changes_are_tagged_with_their_origin_and_not_echoed() {
     let e2 = app.episode_id(&user, pod, "Episode 2").await;
     assert!(action_log(&app, &user).await.is_empty());
 
-    // Internal-server client: applied, nothing logged (the server logged it), no pinepods row.
+    // Internal-server client: applied, nothing logged (the server logged it), no castaway row.
     sync::apply_episode_actions(app.db(), user.id, &[play(&url, &ep_url(1), 120, Some(1801), ts(60))], SyncOrigin::Client)
         .await
         .unwrap();
     assert_eq!(position(&app, &user, e1).await, Some(120));
     assert!(action_log(&app, &user).await.is_empty());
 
-    // External target: logged as target:<id>, matched or not; still no pinepods rows. Completing
-    // through apply doesn't produce a pinepods `play` either.
+    // External target: logged as target:<id>, matched or not; still no castaway rows. Completing
+    // through apply doesn't produce a castaway `play` either.
     let at = ts(30);
     let actions = [
         play(&url, &ep_url(2), 1802, Some(1802), at),
@@ -478,7 +478,7 @@ async fn applied_changes_are_tagged_with_their_origin_and_not_echoed() {
     assert_eq!(log.iter().map(|r| (r.origin.as_str(), r.episode_id)).collect::<Vec<_>>(), vec![("target:7", Some(e2 as i64)), ("target:7", None)]);
     assert_eq!(log[0].timestamp, at.timestamp(), "the action's own time is kept");
 
-    // A subscription removed by a target: logged as the target's, not as a pinepods remove.
+    // A subscription removed by a target: logged as the target's, not as a castaway remove.
     let s = sync::apply_subscription_changes(app.db(), &app.state.task_spawner, user.id, &[], &[url.clone()], SyncOrigin::Target(7))
         .await
         .unwrap();
@@ -486,7 +486,7 @@ async fn applied_changes_are_tagged_with_their_origin_and_not_echoed() {
     assert!(app.podcasts(&user).await.is_empty());
     assert_eq!(
         subscription_log(&app, &user).await,
-        vec![("add".into(), "pinepods".into(), url.clone()), ("remove".into(), "target:7".into(), url.clone())]
+        vec![("add".into(), "castaway".into(), url.clone()), ("remove".into(), "target:7".into(), url.clone())]
     );
 }
 
@@ -546,7 +546,7 @@ async fn subscription_adds_are_queued_once_and_never_fetched_inline() {
     eventually("episodes imported", || async { (app.episodes(&user, pod).await.len() == 2).then_some(()) }).await;
     assert_eq!(app.fixtures().hits("queued.xml").len(), 1, "the feed is fetched once, by the import");
 
-    // Already subscribed: nothing to queue. A client's add isn't logged again as a pinepods add.
+    // Already subscribed: nothing to queue. A client's add isn't logged again as a castaway add.
     let again = sync::apply_subscription_changes(app.db(), tasks, user.id, &[url.clone()], &[], SyncOrigin::Client).await.unwrap();
     assert_eq!(again.queued, 0);
     assert!(subscription_log(&app, &user).await.is_empty());

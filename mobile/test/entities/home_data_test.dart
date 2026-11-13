@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/home_data.dart';
+import 'package:castaway_mobile/entities/home_data.dart';
 
 HomeEpisode _homeEpisode({
   int episodeDuration = 600,

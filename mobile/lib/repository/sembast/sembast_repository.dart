@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/core/extensions.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/pending_action.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/entities/queue.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/repository/sembast/sembast_database_service.dart';
-import 'package:pinepods_mobile/state/episode_state.dart';
+import 'package:castaway_mobile/core/extensions.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/pending_action.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/queue.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/repository/sembast/sembast_database_service.dart';
+import 'package:castaway_mobile/state/episode_state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
@@ -40,7 +40,7 @@ class SembastRepository extends Repository {
 
   SembastRepository({
     bool cleanup = true,
-    String databaseName = 'pinepods.db',
+    String databaseName = 'castaway.db',
     DatabaseFactory? databaseFactory,
   }) {
     _databaseService = DatabaseService(databaseName,
@@ -55,18 +55,18 @@ class SembastRepository extends Repository {
   }
 
   /// Remove "download" records created as a side effect of playing a local
-  /// download. Local downloads are always stored under a 'pinepods_<id>' guid;
+  /// download. Local downloads are always stored under a 'castaway_<id>' guid;
   /// playback used to persist a second record keyed by the episode's content
   /// URL and mark it downloaded, which then appeared as a duplicate entry in the
   /// downloads list (often with a bogus duration). These artifacts are only ever
-  /// created by playback, so any downloaded record without a 'pinepods_' guid is
+  /// created by playback, so any downloaded record without a 'castaway_' guid is
   /// safe to delete on startup (nothing is playing yet).
   Future<void> _cleanupPlaybackDownloadArtifacts() async {
     try {
       final all = await findAllEpisodes();
       final artifacts = all
           .where((e) =>
-              e.downloadState == DownloadState.downloaded && !e.guid.startsWith('pinepods_'))
+              e.downloadState == DownloadState.downloaded && !e.guid.startsWith('castaway_'))
           .toList();
 
       if (artifacts.isNotEmpty) {
@@ -223,11 +223,11 @@ class SembastRepository extends Repository {
   }
 
   @override
-  Future<List<Episode>> findPinepodsEpisodes() async {
+  Future<List<Episode>> findCastawayEpisodes() async {
     final finder = Finder(
       filter: Filter.custom((record) {
         final value = record['guid'];
-        return value is String && value.startsWith('pinepods_');
+        return value is String && value.startsWith('castaway_');
       }),
     );
 

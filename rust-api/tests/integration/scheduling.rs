@@ -5,10 +5,10 @@
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
-use pinepods_api::services::scheduler;
-use pinepods_api::services::sync::engine::{self, RunMode};
-use pinepods_api::services::sync::engine_db::TargetKind;
-use pinepods_api::services::sync::push::{self, PushDelays};
+use castaway_api::services::scheduler;
+use castaway_api::services::sync::engine::{self, RunMode};
+use castaway_api::services::sync::engine_db::TargetKind;
+use castaway_api::services::sync::push::{self, PushDelays};
 
 use crate::harness::gpodder::{play_action, GpodderClient};
 use crate::harness::mock_gpodder::MockGpodder;
@@ -88,7 +88,7 @@ async fn record(app: &TestApp, user: &TestUser, ep: i32, secs: f64) {
 
 async fn manual_refresh(app: &TestApp, user: &TestUser) -> Vec<Value> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
-    pinepods_api::handlers::refresh::run_refresh_process(user.id, false, tx, app.state.clone()).await.expect("manual refresh");
+    castaway_api::handlers::refresh::run_refresh_process(user.id, false, tx, app.state.clone()).await.expect("manual refresh");
     let mut messages = Vec::new();
     while let Some(m) = rx.recv().await {
         messages.push(serde_json::to_value(&m).unwrap());
@@ -165,7 +165,7 @@ async fn no_push_without_an_enabled_target_or_for_the_targets_own_changes() {
     s.app.post("/api/data/gpodder/toggle").key(&s.user).json(&json!({ "enabled": true })).send().await.assert_ok();
     let runs = s.runs();
     record(&s.app, &s.user, ep, 900.0).await;
-    let logged = int(&s.app, &format!(r#"SELECT COUNT(*) FROM "GpodderSyncEpisodeActions" WHERE UserID = {} AND Origin = 'pinepods' AND Position = 900"#, s.user.id)).await;
+    let logged = int(&s.app, &format!(r#"SELECT COUNT(*) FROM "GpodderSyncEpisodeActions" WHERE UserID = {} AND Origin = 'castaway' AND Position = 900"#, s.user.id)).await;
     assert_eq!(logged, Some(1), "the event was logged for the internal server");
     assert!(!push::pending(s.app.db(), s.user.id), "no enabled target, no push");
     tokio::time::sleep(Duration::from_millis(600)).await;
@@ -344,7 +344,7 @@ async fn auto_complete_happens_at_write_time_and_the_sweep_only_looks_back_a_wee
     }
     scheduler::run_refresh_job(&app.state).await.unwrap();
     assert!(!completed(e2).await, "the refresh doesn't scan for auto-complete");
-    pinepods_api::handlers::tasks::auto_complete_episodes_internal(&app.state).await.unwrap();
+    castaway_api::handlers::tasks::auto_complete_episodes_internal(&app.state).await.unwrap();
     assert!(completed(e2).await, "the sweep completes recent history");
     assert!(!completed(e3).await, "history older than a week is left alone");
 }

@@ -1,11 +1,11 @@
 // lib/services/auto_download/queue_download_service.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/services/network/network_status.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/utils/local_download_utils.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/services/network/network_status.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/utils/local_download_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Keeps the first N episodes of the server queue downloaded locally. When an
@@ -24,7 +24,7 @@ class QueueDownloadService {
   /// the feature is disabled and any previously-managed downloads are pruned.
   static Future<void> syncQueueDownloads({
     required BuildContext context,
-    required PinepodsService pinepodsService,
+    required CastawayService castawayService,
     required int userId,
   }) async {
     if (!context.mounted) return;
@@ -49,9 +49,9 @@ class QueueDownloadService {
       return;
     }
 
-    List<PinepodsEpisode> queue;
+    List<CastawayEpisode> queue;
     try {
-      queue = await pinepodsService.getQueuedEpisodes(userId);
+      queue = await castawayService.getQueuedEpisodes(userId);
     } catch (_) {
       return;
     }

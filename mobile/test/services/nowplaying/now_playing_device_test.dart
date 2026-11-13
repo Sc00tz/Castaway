@@ -3,7 +3,7 @@
 // original action set.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/services/nowplaying/nowplaying_service.dart';
+import 'package:castaway_mobile/services/nowplaying/nowplaying_service.dart';
 
 void main() {
   test('a device that lists its actions supports only those', () {

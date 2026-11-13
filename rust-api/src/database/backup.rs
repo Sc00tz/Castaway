@@ -211,7 +211,7 @@ impl DatabasePool {
             pg(_) => {
                 let host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
                 let port = std::env::var("DB_PORT").unwrap_or_else(|_| "5432".to_string());
-                let database = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods".to_string());
+                let database = std::env::var("DB_NAME").unwrap_or_else(|_| "castaway".to_string());
                 let username = std::env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
                 let password = std::env::var("DB_PASSWORD").unwrap_or_else(|_| "password".to_string());
 

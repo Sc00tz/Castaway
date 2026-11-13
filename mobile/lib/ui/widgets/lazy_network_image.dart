@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 class LazyNetworkImage extends StatefulWidget {
   final String imageUrl;

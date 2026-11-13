@@ -372,6 +372,63 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "castaway-api"
+version = "0.10.1"
+dependencies = [
+ "ammonia",
+ "argon2",
+ "async-trait",
+ "axum",
+ "base64 0.23.1",
+ "bigdecimal",
+ "castaway-api",
+ "chrono",
+ "chrono-tz",
+ "config",
+ "croner 4.0.2",
+ "dotenvy",
+ "feed-rs",
+ "fernet",
+ "futures",
+ "hex",
+ "http-body-util",
+ "id3",
+ "lazy_static",
+ "lettre",
+ "mp3-metadata",
+ "pbkdf2",
+ "qrcode",
+ "quick-xml 0.42.0",
+ "rand 0.10.3",
+ "redis",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha1 0.11.0",
+ "sha2 0.11.1",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tokio-cron-scheduler",
+ "tokio-tungstenite",
+ "tokio-util",
+ "totp-rs",
+ "tower",
+ "tower-http 0.7.1",
+ "tower-test",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "url",
+ "urlencoding",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-scalar",
+ "uuid",
+]
+
+[[package]]
 name = "cc"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2226,63 +2283,6 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
-
-[[package]]
-name = "pinepods-api"
-version = "0.10.1"
-dependencies = [
- "ammonia",
- "argon2",
- "async-trait",
- "axum",
- "base64 0.23.1",
- "bigdecimal",
- "chrono",
- "chrono-tz",
- "config",
- "croner 4.0.2",
- "dotenvy",
- "feed-rs",
- "fernet",
- "futures",
- "hex",
- "http-body-util",
- "id3",
- "lazy_static",
- "lettre",
- "mp3-metadata",
- "pbkdf2",
- "pinepods-api",
- "qrcode",
- "quick-xml 0.42.0",
- "rand 0.10.3",
- "redis",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sha1 0.11.0",
- "sha2 0.11.1",
- "sqlx",
- "thiserror",
- "tokio",
- "tokio-cron-scheduler",
- "tokio-tungstenite",
- "tokio-util",
- "totp-rs",
- "tower",
- "tower-http 0.7.1",
- "tower-test",
- "tracing",
- "tracing-subscriber",
- "unicode-normalization",
- "url",
- "urlencoding",
- "utoipa",
- "utoipa-axum",
- "utoipa-scalar",
- "uuid",
-]
 
 [[package]]
 name = "pkg-config"

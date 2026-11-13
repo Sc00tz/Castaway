@@ -81,7 +81,7 @@ impl DatabasePool {
         username: Option<&str>,
         password: Option<&str>,
     ) -> AppResult<(i32, Option<i32>)> {
-        self.add_podcast_with_feed(podcast_values, podcast_index_id, username, password, None, crate::services::sync::SyncOrigin::Pinepods).await
+        self.add_podcast_with_feed(podcast_values, podcast_index_id, username, password, None, crate::services::sync::SyncOrigin::Castaway).await
     }
 
     /// `add_podcast`, importing episodes from `feed_body` when the caller already fetched the

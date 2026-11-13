@@ -722,7 +722,7 @@ pub struct SyncActionEntry {
     pub timestamp: i64,
     pub position: Option<i32>,
     pub device: Option<String>,
-    /// `pinepods`, `client` (an app on the Castaway server) or `target` (the external server).
+    /// `castaway`, `client` (an app on the Castaway server) or `target` (the external server).
     pub origin: String,
 }
 
@@ -753,7 +753,7 @@ pub struct SyncStats {
 
 fn origin_kind(origin: &str) -> &'static str {
     match origin {
-        "pinepods" => "pinepods",
+        "castaway" => "castaway",
         o if o.starts_with("target:") => "target",
         _ => "client",
     }
@@ -861,13 +861,13 @@ mod tests {
     #[test]
     fn server_url_from_forwarded_headers() {
         let mut h = HeaderMap::new();
-        h.insert("host", "pinepods:8040".parse().unwrap());
-        assert_eq!(public_server_url(&h).0, "http://pinepods:8040");
+        h.insert("host", "castaway:8040".parse().unwrap());
+        assert_eq!(public_server_url(&h).0, "http://castaway:8040");
         h.insert("x-forwarded-host", "pods.example.com".parse().unwrap());
         h.insert("x-forwarded-proto", "https".parse().unwrap());
         assert_eq!(public_server_url(&h).0, "https://pods.example.com");
         // Chained proxies: the first entry is the client-facing one.
-        h.insert("x-forwarded-host", "pods.example.com:8443, pinepods:8040".parse().unwrap());
+        h.insert("x-forwarded-host", "pods.example.com:8443, castaway:8040".parse().unwrap());
         h.insert("x-forwarded-proto", "https, http".parse().unwrap());
         assert_eq!(public_server_url(&h).0, "https://pods.example.com:8443");
     }

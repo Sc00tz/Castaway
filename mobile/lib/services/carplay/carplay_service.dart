@@ -7,16 +7,16 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_carplay/flutter_carplay.dart';
 import 'package:logging/logging.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/home_data.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart' show AudioPlayerService, AudioState;
-import 'package:pinepods_mobile/services/global_services.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/home_data.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart' show AudioPlayerService, AudioState;
+import 'package:castaway_mobile/services/global_services.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Service that provides content for CarPlay browsing
 /// Mirrors the functionality of MediaBrowserHelper on Android Auto
@@ -25,7 +25,7 @@ class CarPlayService {
   final Repository repository;
   final SettingsService settingsService;
   final AudioPlayerService audioPlayerService;
-  PinepodsService? pinepodsService;
+  CastawayService? castawayService;
 
   final FlutterCarplay _flutterCarplay = FlutterCarplay();
   bool _isConnected = false;
@@ -34,7 +34,7 @@ class CarPlayService {
 
   /// True once we have everything needed to fetch content from the server.
   bool get _isReady =>
-      pinepodsService != null && settingsService.pinepodsUserId != null;
+      castawayService != null && settingsService.castawayUserId != null;
 
   // Note: We use FlutterCarplay.showSharedNowPlaying() instead of a custom method channel
   // because flutter_carplay manages its own template stack and interface controller
@@ -53,7 +53,7 @@ class CarPlayService {
   /// Most Up Next artwork a CarPlay image row can show.
   static const _upNextRowLimit = 8;
 
-  int? get _playingEpisodeId => GlobalServices.pinepodsAudioService?.currentEpisodeId;
+  int? get _playingEpisodeId => GlobalServices.castawayAudioService?.currentEpisodeId;
 
   CarPlayService({
     required this.repository,
@@ -66,9 +66,9 @@ class CarPlayService {
     }
   }
 
-  void setPinepodsService(PinepodsService? service) {
-    pinepodsService = service;
-    log.info('PinepodsService reference set for CarPlay');
+  void setCastawayService(CastawayService? service) {
+    castawayService = service;
+    log.info('CastawayService reference set for CarPlay');
     if (_isConnected) {
       _refreshDynamicTabs();
     }
@@ -493,12 +493,12 @@ class CarPlayService {
       }
 
       // Also get recent/home episodes if available
-      if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+      if (castawayService != null && settingsService.castawayUserId != null) {
         try {
-          final homeData = await pinepodsService!.getHomeOverview(settingsService.pinepodsUserId!);
+          final homeData = await castawayService!.getHomeOverview(settingsService.castawayUserId!);
           // The playing episode's guid is its feed URL, so match it by id.
           final playingId = _playingEpisodeId;
-          bool listed(int id) => id == playingId || episodes.any((e) => e.guid == 'pinepods_$id');
+          bool listed(int id) => id == playingId || episodes.any((e) => e.guid == 'castaway_$id');
           // Add in-progress episodes first (limit to 5 for initial load)
           for (final ep in homeData.inProgressEpisodes.take(5)) {
             if (!listed(ep.episodeId)) {
@@ -536,11 +536,11 @@ class CarPlayService {
 
   Future<List<CPListItem>> _loadSavedEpisodes() async {
     final items = <CPListItem>[];
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       try {
-        final saved = await pinepodsService!.getSavedEpisodes(settingsService.pinepodsUserId!);
+        final saved = await castawayService!.getSavedEpisodes(settingsService.castawayUserId!);
         for (final ep in saved.take(50)) {
-          items.add(_createEpisodeItem(_convertPinepodsEpisode(ep)));
+          items.add(_createEpisodeItem(_convertCastawayEpisode(ep)));
         }
         log.info('Loaded ${items.length} saved episodes');
       } catch (e) {
@@ -552,10 +552,10 @@ class CarPlayService {
 
   /// The server queue minus the playing episode and finished ones, in queue
   /// order. The queue lives on the server; the local queue is no longer used.
-  Future<List<PinepodsEpisode>> _loadUpNext() async {
+  Future<List<CastawayEpisode>> _loadUpNext() async {
     if (!_isReady) return [];
     try {
-      final queue = await pinepodsService!.getQueuedEpisodes(settingsService.pinepodsUserId!);
+      final queue = await castawayService!.getQueuedEpisodes(settingsService.castawayUserId!);
       return upNextFrom(queue, playingEpisodeId: _playingEpisodeId, limit: _upNextRowLimit);
     } catch (e) {
       log.warning('Failed to load Up Next: $e');
@@ -564,15 +564,15 @@ class CarPlayService {
   }
 
   @visibleForTesting
-  static List<PinepodsEpisode> upNextFrom(List<PinepodsEpisode> queue, {int? playingEpisodeId, int? limit}) {
+  static List<CastawayEpisode> upNextFrom(List<CastawayEpisode> queue, {int? playingEpisodeId, int? limit}) {
     final upNext = queue.where((ep) => ep.episodeId != playingEpisodeId && !ep.completed);
     return (limit == null ? upNext : upNext.take(limit)).toList();
   }
 
   /// Artwork row of Up Next episodes: tapping artwork plays that episode,
   /// tapping the row title opens the full queue.
-  CPListImageRowItem _buildUpNextRow(List<PinepodsEpisode> upNext) {
-    final episodes = upNext.map(_convertPinepodsEpisode).toList();
+  CPListImageRowItem _buildUpNextRow(List<CastawayEpisode> upNext) {
+    final episodes = upNext.map(_convertCastawayEpisode).toList();
     return CPListImageRowItem(
       text: L.current.up_next_queue_label,
       // iOS before 26
@@ -616,8 +616,8 @@ class CarPlayService {
 
     if (!_isReady) return;
     try {
-      final queue = await pinepodsService!.getQueuedEpisodes(settingsService.pinepodsUserId!);
-      final items = queue.take(50).map((ep) => _createEpisodeItem(_convertPinepodsEpisode(ep))).toList();
+      final queue = await castawayService!.getQueuedEpisodes(settingsService.castawayUserId!);
+      final items = queue.take(50).map((ep) => _createEpisodeItem(_convertCastawayEpisode(ep))).toList();
 
       await _flutterCarplay.updateListTemplateSections(
         elementId: template.uniqueId,
@@ -670,10 +670,10 @@ class CarPlayService {
     FlutterCarplay.push(template: template, animated: true);
 
     // Load history
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       try {
-        final history = await pinepodsService!.getUserHistory(settingsService.pinepodsUserId!);
-        final items = history.take(50).map((ep) => _createEpisodeItem(_convertPinepodsEpisode(ep))).toList();
+        final history = await castawayService!.getUserHistory(settingsService.castawayUserId!);
+        final items = history.take(50).map((ep) => _createEpisodeItem(_convertCastawayEpisode(ep))).toList();
 
         await _flutterCarplay.updateListTemplateSections(
           elementId: template.uniqueId,
@@ -700,9 +700,9 @@ class CarPlayService {
     FlutterCarplay.push(template: template, animated: true);
 
     // Load podcasts
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       try {
-        final podcasts = await pinepodsService!.getUserPodcasts(settingsService.pinepodsUserId!);
+        final podcasts = await castawayService!.getUserPodcasts(settingsService.castawayUserId!);
         final items = <CPListItem>[];
         // No limit needed without images
         for (final podcast in podcasts) {
@@ -775,13 +775,13 @@ class CarPlayService {
     FlutterCarplay.push(template: template, animated: true);
 
     // Load podcast episodes
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       try {
         final numericId = podcastId.replaceAll(RegExp(r'[^0-9]'), '');
         final id = int.tryParse(numericId);
         if (id != null) {
-          final episodes = await pinepodsService!.getPodcastEpisodes(settingsService.pinepodsUserId!, id);
-          final items = episodes.map((ep) => _createEpisodeItem(_convertPinepodsEpisode(ep))).toList();
+          final episodes = await castawayService!.getPodcastEpisodes(settingsService.castawayUserId!, id);
+          final items = episodes.map((ep) => _createEpisodeItem(_convertCastawayEpisode(ep))).toList();
 
           await _flutterCarplay.updateListTemplateSections(
             elementId: template.uniqueId,
@@ -809,9 +809,9 @@ class CarPlayService {
     FlutterCarplay.push(template: template, animated: true);
 
     // Load playlists
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       try {
-        final playlists = await pinepodsService!.getUserPlaylists(settingsService.pinepodsUserId!);
+        final playlists = await castawayService!.getUserPlaylists(settingsService.castawayUserId!);
         final items = playlists.map((playlist) => CPListItem(
           text: playlist.name,
           detailText: L.current.episodes_count(playlist.episodeCount ?? 0),
@@ -847,12 +847,12 @@ class CarPlayService {
     FlutterCarplay.push(template: template, animated: true);
 
     // Load playlist episodes
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       try {
         final id = int.tryParse(playlistId);
         if (id != null) {
-          final response = await pinepodsService!.getPlaylistEpisodes(settingsService.pinepodsUserId!, id);
-          final items = response.episodes.map((ep) => _createEpisodeItem(_convertPinepodsEpisode(ep))).toList();
+          final response = await castawayService!.getPlaylistEpisodes(settingsService.castawayUserId!, id);
+          final items = response.episodes.map((ep) => _createEpisodeItem(_convertCastawayEpisode(ep))).toList();
 
           await _flutterCarplay.updateListTemplateSections(
             elementId: template.uniqueId,
@@ -920,11 +920,11 @@ class CarPlayService {
     // Auto, so progress is tracked and synced. Playing them straight on the
     // native player would leave the server position untouched for the whole
     // drive, and pause would sync against whatever episode the app last played.
-    final pinepodsAudioService = GlobalServices.pinepodsAudioService;
-    final pinepodsEpisode = toPinepodsEpisode(episode);
-    if (pinepodsAudioService != null && pinepodsEpisode != null) {
+    final castawayAudioService = GlobalServices.castawayAudioService;
+    final castawayEpisode = toCastawayEpisode(episode);
+    if (castawayAudioService != null && castawayEpisode != null) {
       try {
-        await pinepodsAudioService.playPinepodsEpisode(pinepodsEpisode: pinepodsEpisode, resume: true);
+        await castawayAudioService.playCastawayEpisode(castawayEpisode: castawayEpisode, resume: true);
         log.info('Started playback from CarPlay: ${episode.title}');
       } catch (e) {
         log.severe('Failed to play episode from CarPlay: $e');
@@ -932,11 +932,11 @@ class CarPlayService {
       return;
     }
 
-    // Local-first: episodes converted from PinepodsEpisode/HomeEpisode carry a
-    // 'pinepods_<id>' guid but no downloadState, so they'd stream even when a
+    // Local-first: episodes converted from CastawayEpisode/HomeEpisode carry a
+    // 'castaway_<id>' guid but no downloadState, so they'd stream even when a
     // local copy exists. Resolve the on-device download here before playing.
     if (episode.downloadState != DownloadState.downloaded) {
-      final idStr = episode.guid.replaceFirst('pinepods_', '').split('_').first;
+      final idStr = episode.guid.replaceFirst('castaway_', '').split('_').first;
       final episodeId = int.tryParse(idStr);
       if (episodeId != null) {
         final local = await audioPlayerService.findDownloadedEpisode(episodeId);
@@ -964,21 +964,21 @@ class CarPlayService {
   // MARK: - Episode Conversion
 
   /// Rebuilds the Castaway episode behind a CarPlay list item, or null when
-  /// the item has no `pinepods_<id>` guid. Built from the item itself (no
+  /// the item has no `castaway_<id>` guid. Built from the item itself (no
   /// network) so it still works offline; the server-download and YouTube flags
-  /// are recovered from the stream URL the item was given. playPinepodsEpisode
+  /// are recovered from the stream URL the item was given. playCastawayEpisode
   /// resolves the up-to-date resume position itself.
   @visibleForTesting
-  static PinepodsEpisode? toPinepodsEpisode(Episode episode) {
-    if (!episode.guid.startsWith('pinepods_')) return null;
-    final episodeId = int.tryParse(episode.guid.replaceFirst('pinepods_', '').split('_').first);
+  static CastawayEpisode? toCastawayEpisode(Episode episode) {
+    if (!episode.guid.startsWith('castaway_')) return null;
+    final episodeId = int.tryParse(episode.guid.replaceFirst('castaway_', '').split('_').first);
     if (episodeId == null || episodeId == 0) return null;
 
     final contentUrl = episode.contentUrl ?? '';
     final viaStream = contentUrl.contains('/api/data/stream/');
     final isYoutube = viaStream && contentUrl.contains('type=youtube');
 
-    return PinepodsEpisode(
+    return CastawayEpisode(
       podcastName: episode.podcast ?? '',
       episodeTitle: episode.title ?? '',
       episodePubDate: episode.publicationDate?.toIso8601String() ?? '',
@@ -996,13 +996,13 @@ class CarPlayService {
     );
   }
 
-  Episode _convertPinepodsEpisode(PinepodsEpisode ep) {
+  Episode _convertCastawayEpisode(CastawayEpisode ep) {
     String contentUrl = ep.episodeUrl;
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       if (ep.downloaded || ep.isYoutube) {
-        contentUrl = pinepodsService!.getStreamUrl(
+        contentUrl = castawayService!.getStreamUrl(
           ep.episodeId,
-          settingsService.pinepodsUserId!,
+          settingsService.castawayUserId!,
           isYoutube: ep.isYoutube,
           isLocal: ep.downloaded,
         );
@@ -1010,8 +1010,8 @@ class CarPlayService {
     }
 
     return Episode(
-      guid: 'pinepods_${ep.episodeId}',
-      pguid: 'pinepods_${ep.podcastId}',
+      guid: 'castaway_${ep.episodeId}',
+      pguid: 'castaway_${ep.podcastId}',
       podcast: ep.podcastName,
       title: ep.episodeTitle,
       description: ep.episodeDescription,
@@ -1032,11 +1032,11 @@ class CarPlayService {
 
   Episode _convertHomeEpisode(HomeEpisode ep) {
     String contentUrl = ep.episodeUrl;
-    if (pinepodsService != null && settingsService.pinepodsUserId != null) {
+    if (castawayService != null && settingsService.castawayUserId != null) {
       if (ep.downloaded || ep.isYoutube) {
-        contentUrl = pinepodsService!.getStreamUrl(
+        contentUrl = castawayService!.getStreamUrl(
           ep.episodeId,
-          settingsService.pinepodsUserId!,
+          settingsService.castawayUserId!,
           isYoutube: ep.isYoutube,
           isLocal: ep.downloaded,
         );
@@ -1047,8 +1047,8 @@ class CarPlayService {
     }
 
     return Episode(
-      guid: 'pinepods_${ep.episodeId}',
-      pguid: 'pinepods_${ep.podcastId}',
+      guid: 'castaway_${ep.episodeId}',
+      pguid: 'castaway_${ep.podcastId}',
       podcast: ep.podcastName,
       title: ep.episodeTitle,
       description: ep.episodeDescription,

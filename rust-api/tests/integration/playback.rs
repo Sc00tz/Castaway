@@ -237,7 +237,7 @@ async fn downloads_over_2_gib_are_recorded_and_counted() {
 async fn bulk_deleting_downloads_removes_the_files() {
     let app = TestApp::new().await;
     let (user, _pod, ep) = setup(&app).await;
-    let file = std::env::temp_dir().join(format!("pinepods-bulk-delete-{ep}.mp3"));
+    let file = std::env::temp_dir().join(format!("castaway-bulk-delete-{ep}.mp3"));
     std::fs::write(&file, b"audio").unwrap();
     exec(
         &app,
@@ -266,7 +266,7 @@ async fn bulk_deleting_downloads_removes_the_files() {
 async fn removing_a_podcast_removes_its_downloaded_files() {
     let app = TestApp::new().await;
     let (user, pod, ep) = setup(&app).await;
-    let file = std::env::temp_dir().join(format!("pinepods-unsubscribe-{ep}.mp3"));
+    let file = std::env::temp_dir().join(format!("castaway-unsubscribe-{ep}.mp3"));
     std::fs::write(&file, b"audio").unwrap();
     exec(
         &app,
@@ -322,8 +322,8 @@ async fn auto_play_next_skips_finished_episodes() {
 async fn sessions_use_utc_whatever_the_database_time_zone() {
     let app = TestApp::new().await;
     exec(&app, &format!(r#"ALTER DATABASE "{}" SET timezone = 'Pacific/Kiritimati'"#, app.db_name)).await;
-    let fresh = pinepods_api::database::DatabasePool::new(&app.state.config).await.unwrap();
-    let pinepods_api::database::DatabasePool::Postgres(pool) = &fresh;
+    let fresh = castaway_api::database::DatabasePool::new(&app.state.config).await.unwrap();
+    let castaway_api::database::DatabasePool::Postgres(pool) = &fresh;
     let tz: String = sqlx::query_scalar("SELECT current_setting('TimeZone')").fetch_one(pool).await.unwrap();
     assert_eq!(tz, "UTC");
 

@@ -245,7 +245,7 @@ async fn enabling_the_server_from_settings_publishes_the_library_and_progress() 
     let server = app.rust_gpodder_server().await;
     let resp = app.post("/api/data/gpodder/toggle").key(&user).json(&json!({ "enabled": true })).send().await.ok_json();
     assert_eq!(resp["gpodder_enabled"], true, "{resp}");
-    assert_eq!(int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await, Some(1));
+    assert_eq!(int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'castaway'"#, user.id)).await, Some(1));
 
     let password = app.app_password(&user).await;
     let s = GpodderScene { server, app, user, password };

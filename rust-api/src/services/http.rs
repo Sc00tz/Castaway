@@ -6,7 +6,7 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-pub const PINEPODS_USER_AGENT: &str = "Castaway/1.0";
+pub const CASTAWAY_USER_AGENT: &str = "Castaway/1.0";
 
 /// Some hosts block podcast-app user agents; feeds retry once with this on 403/406.
 pub const BROWSER_USER_AGENT: &str =
@@ -15,7 +15,7 @@ pub const BROWSER_USER_AGENT: &str =
 const FEED_TIMEOUT: Duration = Duration::from_secs(30);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
-static FEED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| feed_builder(PINEPODS_USER_AGENT).build().expect("feed HTTP client"));
+static FEED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| feed_builder(CASTAWAY_USER_AGENT).build().expect("feed HTTP client"));
 
 static BROWSER_FEED_CLIENT: LazyLock<reqwest::Client> =
     LazyLock::new(|| feed_builder(BROWSER_USER_AGENT).build().expect("browser feed HTTP client"));
@@ -35,7 +35,7 @@ static PROBE_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 
 static SERVICE_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
-        .user_agent(PINEPODS_USER_AGENT)
+        .user_agent(CASTAWAY_USER_AGENT)
         .timeout(FEED_TIMEOUT)
         .build()
         .expect("service HTTP client")
@@ -90,7 +90,7 @@ pub fn service_client() -> &'static reqwest::Client {
 /// Builder for clients that need their own state, e.g. a cookie jar per sync run.
 pub fn sync_client_builder() -> reqwest::ClientBuilder {
     reqwest::Client::builder()
-        .user_agent(PINEPODS_USER_AGENT)
+        .user_agent(CASTAWAY_USER_AGENT)
         .timeout(FEED_TIMEOUT)
         .cookie_store(true)
 }

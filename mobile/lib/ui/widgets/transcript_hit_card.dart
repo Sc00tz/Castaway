@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/ui/widgets/lazy_network_image.dart';
-import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/widgets/lazy_network_image.dart';
+import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Moments shown before "more moments".
 const _foldedMoments = 2;

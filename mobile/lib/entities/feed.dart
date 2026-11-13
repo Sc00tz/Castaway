@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
 
 /// This class is used when loading a [Podcast] feed.
 ///

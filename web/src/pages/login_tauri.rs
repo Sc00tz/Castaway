@@ -122,7 +122,7 @@ pub fn login() -> Html {
         i18n.t("login.error_setting_timezone_details").to_string();
     let _i18n_language = i18n.t("common.language").to_string();
     let _i18n_login = i18n.t("auth.login").to_string();
-    let i18n_pinepods = i18n.t("common.pinepods").to_string();
+    let i18n_castaway = i18n.t("common.castaway").to_string();
     let _i18n_password_reset_successfully = i18n.t("login.password_reset_successfully").to_string();
     let i18n_date_format_mdy = i18n.t("login.date_format_mdy").to_string();
     let i18n_date_format_dmy = i18n.t("login.date_format_dmy").to_string();
@@ -969,9 +969,9 @@ pub fn login() -> Html {
         <div class="flex justify-center items-center h-screen">
             <div class="modal-container flex flex-col space-y-4 w-full max-w-xs p-8 border rounded-lg shadow-lg">
                 <div class="flex justify-center items-center">
-                    <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt={i18n.t("common.pinepods_logo")} />
+                    <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt={i18n.t("common.castaway_logo")} />
                 </div>
-                <h1 class="item_container-text text-xl font-bold mb-2 text-center">{&i18n_pinepods}</h1>
+                <h1 class="item_container-text text-xl font-bold mb-2 text-center">{&i18n_castaway}</h1>
                 <p class="item_container-text text-center">{&i18n.t("login.tagline")}</p>
                 <input
                     type="text"
@@ -1039,8 +1039,8 @@ pub fn logout() -> Html {
     // Preserve the restore-in-progress flags. A server restore signs the admin out
     // (it truncates the Sessions table), but RestoreOverlay needs these to survive the
     // sign-out so it can show the overlay and poll after the reload.
-    let restore_active = local_storage.get_item("pinepods_restore_active").ok().flatten();
-    let restore_server = local_storage.get_item("pinepods_restore_server").ok().flatten();
+    let restore_active = local_storage.get_item("castaway_restore_active").ok().flatten();
+    let restore_server = local_storage.get_item("castaway_restore_server").ok().flatten();
 
     // Clear storages
     local_storage.clear().expect("failed to clear localStorage");
@@ -1056,8 +1056,8 @@ pub fn logout() -> Html {
     }
     // Restore the restore-in-progress flags.
     if let (Some(active), Some(server)) = (restore_active, restore_server) {
-        let _ = local_storage.set_item("pinepods_restore_active", &active);
-        let _ = local_storage.set_item("pinepods_restore_server", &server);
+        let _ = local_storage.set_item("castaway_restore_active", &active);
+        let _ = local_storage.set_item("castaway_restore_server", &server);
     }
 
     // Clear Tauri credentials if running in Tauri

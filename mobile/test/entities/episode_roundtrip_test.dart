@@ -5,8 +5,8 @@
 //     identity) while == did not, violating the equals/hashCode contract.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/chapter.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/chapter.dart';
+import 'package:castaway_mobile/entities/episode.dart';
 
 Episode _episode({
   int? id,

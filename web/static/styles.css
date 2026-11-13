@@ -6884,7 +6884,7 @@ input:checked + .notification-toggle-slider:before {
 }
 
 /* ============================================================
-   PINEPODS DESIGN SYSTEM v2.0
+   CASTAWAY DESIGN SYSTEM v2.0
    Modern tokens + component CSS. Appended after existing styles
    so new rules win where class names match.
    ============================================================ */
@@ -9453,7 +9453,7 @@ body.search-takeover-open .drawer-icon { display: none; }
 
 /* ============================================================
    PODCAST DETAIL — immersive banner header (desktop)
-   Adapted from the Pinepods Design System "Variant A" exploration.
+   Adapted from the Castaway Design System "Variant A" exploration.
    All colors resolve to the existing theme variables so every
    theme keeps working; fonts inherit the app default.
    ============================================================ */
@@ -9717,7 +9717,7 @@ body.search-takeover-open .drawer-icon { display: none; }
 
 /* ============================================================
    EPISODE DETAIL (/episode) — hero + panes (desktop)
-   Adapted from the Pinepods Design System "EpisodeScreen".
+   Adapted from the Castaway Design System "EpisodeScreen".
    Colors resolve to existing theme variables; fonts inherit.
    ============================================================ */
 .ep-hero {

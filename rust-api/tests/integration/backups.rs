@@ -6,8 +6,8 @@ use std::sync::Arc;
 use crate::harness::files::{assert_gone, BackupEnv};
 use crate::harness::*;
 
-const BOUNDARY: &str = "pinepodstestboundary";
-const MULTIPART: &str = "multipart/form-data; boundary=pinepodstestboundary";
+const BOUNDARY: &str = "castawaytestboundary";
+const MULTIPART: &str = "multipart/form-data; boundary=castawaytestboundary";
 
 fn upload(filename: &str, content: &[u8]) -> Vec<u8> {
     let mut body = format!(
@@ -276,13 +276,13 @@ async fn a_due_schedule_writes_a_backup_once() {
     make_due(&app).await;
     let state = Arc::new(app.state.clone());
 
-    pinepods_api::services::scheduler::run_backup_job(state.clone()).await.unwrap();
+    castaway_api::services::scheduler::run_backup_job(state.clone()).await.unwrap();
     assert_eq!(scheduled_files(&backups).len(), 1);
     let path = backups.dir().join(&scheduled_files(&backups)[0]);
     assert!(std::fs::metadata(path).unwrap().len() > 0);
 
     tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
-    pinepods_api::services::scheduler::run_backup_job(state).await.unwrap();
+    castaway_api::services::scheduler::run_backup_job(state).await.unwrap();
     assert_eq!(scheduled_files(&backups).len(), 1, "not due again until the next occurrence");
 }
 
@@ -294,7 +294,7 @@ async fn a_disabled_schedule_does_nothing() {
     assert_eq!(schedule(&app, &admin, "0 0 2 * * *", false, None).await, 200);
     make_due(&app).await;
 
-    pinepods_api::services::scheduler::run_backup_job(Arc::new(app.state.clone())).await.unwrap();
+    castaway_api::services::scheduler::run_backup_job(Arc::new(app.state.clone())).await.unwrap();
     assert!(scheduled_files(&backups).is_empty());
 }
 
@@ -311,7 +311,7 @@ async fn retention_removes_old_scheduled_backups_but_not_manual_ones() {
     std::fs::write(backups.dir().join("manual_backup_old.sql"), "-- manual").unwrap();
     make_due(&app).await;
 
-    pinepods_api::services::scheduler::run_backup_job(Arc::new(app.state.clone())).await.unwrap();
+    castaway_api::services::scheduler::run_backup_job(Arc::new(app.state.clone())).await.unwrap();
 
     let left = scheduled_files(&backups);
     assert_eq!(left.len(), 2, "{left:?}");
@@ -346,7 +346,7 @@ enum RestoreBlocker {
 
 impl RestoreBlocker {
     async fn hold(app: &TestApp) -> RestoreBlocker {
-        use pinepods_api::database::DatabasePool;
+        use castaway_api::database::DatabasePool;
         use sqlx::Executor;
         match app.db() {
             DatabasePool::Postgres(pool) => {

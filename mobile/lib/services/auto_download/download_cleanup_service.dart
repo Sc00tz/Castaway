@@ -2,15 +2,15 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/core/download_cleanup.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/services/global_services.dart';
-import 'package:pinepods_mobile/services/logging/app_logger.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/utils/local_download_utils.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/core/download_cleanup.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/services/global_services.dart';
+import 'package:castaway_mobile/services/logging/app_logger.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/utils/local_download_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -63,7 +63,7 @@ class DownloadCleanupService {
   }
 
   /// Remember when a download started and which podcast it belongs to.
-  static Future<void> recordDownload(PinepodsEpisode episode) async {
+  static Future<void> recordDownload(CastawayEpisode episode) async {
     final prefs = await SharedPreferences.getInstance();
     final info = _readMap(prefs, _infoKey);
     info[LocalDownloadUtils.generateEpisodeGuid(episode)] = {
@@ -82,14 +82,14 @@ class DownloadCleanupService {
 
   static Future<void> run({
     required BuildContext context,
-    PinepodsService? pinepodsService,
+    CastawayService? castawayService,
     int? userId,
     bool force = false,
   }) async {
     if (_running || !context.mounted) return;
     _running = true;
     try {
-      await _run(context, pinepodsService, userId, force);
+      await _run(context, castawayService, userId, force);
     } catch (e) {
       AppLogger().warning('DownloadCleanup', 'Cleanup failed: $e');
     } finally {
@@ -97,7 +97,7 @@ class DownloadCleanupService {
     }
   }
 
-  static Future<void> _run(BuildContext context, PinepodsService? service, int? userId, bool force) async {
+  static Future<void> _run(BuildContext context, CastawayService? service, int? userId, bool force) async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
     final lastRun = DateTime.tryParse(prefs.getString(_lastRunKey) ?? '');
@@ -130,7 +130,7 @@ class DownloadCleanupService {
     final downloads = await podcastBloc.podcastService.repository.findDownloads();
     if (!context.mounted) return;
 
-    // One entry per episode; legacy pinepods_<id>_<ts> duplicates fold into
+    // One entry per episode; legacy castaway_<id>_<ts> duplicates fold into
     // their canonical guid.
     final byGuid = <String, Episode>{};
     for (final ep in downloads) {
@@ -145,7 +145,7 @@ class DownloadCleanupService {
     info.removeWhere((guid, _) => !byGuid.containsKey(guid));
     finishedSeen.removeWhere((guid, _) => !byGuid.containsKey(guid));
 
-    final playingId = GlobalServices.pinepodsAudioService?.currentEpisodeId;
+    final playingId = GlobalServices.castawayAudioService?.currentEpisodeId;
     var serverReachable = anyFinishedRule;
     var serverAnswered = false;
 
@@ -163,7 +163,7 @@ class DownloadCleanupService {
 
       var finished = ep.played;
       if (serverReachable && service != null && userId != null && episodeId > 0) {
-        PinepodsEpisode? meta;
+        CastawayEpisode? meta;
         try {
           meta = await service.getEpisodeMetadata(episodeId, userId,
               isYoutube: record['y'] == true || (ep.pguid?.contains('youtube') ?? false));
@@ -217,7 +217,7 @@ class DownloadCleanupService {
 
   static String _canonicalGuid(String guid) {
     final id = LocalDownloadUtils.episodeIdFromGuid(guid);
-    return id > 0 ? 'pinepods_$id' : guid;
+    return id > 0 ? 'castaway_$id' : guid;
   }
 
   static Map<String, dynamic> _readMap(SharedPreferences prefs, String key) {

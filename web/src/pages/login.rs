@@ -85,7 +85,7 @@ pub fn login() -> Html {
     let _i18n_error_validating_mfa = i18n.t("login.error_validating_mfa").to_string();
     let i18n_language = i18n.t("common.language").to_string();
     let i18n_login = i18n.t("auth.login").to_string();
-    let i18n_pinepods = i18n.t("common.pinepods").to_string();
+    let i18n_castaway = i18n.t("common.castaway").to_string();
     let i18n_password_reset_successfully = i18n.t("login.password_reset_successfully").to_string();
     let i18n_sending_reset_code = i18n.t("login.sending_reset_code").to_string();
     let i18n_please_wait_processing = i18n.t("login.please_wait_processing").to_string();
@@ -1843,7 +1843,7 @@ pub fn login() -> Html {
                         <div class="flex justify-center items-center">
                             <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt="Castaway Logo" />
                         </div>
-                        <h1 class="item_container-text text-xl font-bold mb-2 text-center">{&i18n_pinepods}</h1>
+                        <h1 class="item_container-text text-xl font-bold mb-2 text-center">{&i18n_castaway}</h1>
                         <p class="item_container-text text-center">{ &i18n_tagline }</p>
                         {
                             if !*disable_standard_login {
@@ -2116,7 +2116,7 @@ pub fn login() -> Html {
     let i18n_language_updated = i18n.t("login.language_updated").to_string();
     let i18n_error_validating_mfa = i18n.t("login.error_validating_mfa").to_string();
     let i18n_language = i18n.t("common.language").to_string();
-    let i18n_pinepods = i18n.t("common.pinepods").to_string();
+    let i18n_castaway = i18n.t("common.castaway").to_string();
     let i18n_tagline = i18n.t("login.tagline").to_string();
     let i18n_login_button = i18n.t("login.login_button").to_string();
     let i18n_date_format_julian = i18n.t("login.date_format_julian").to_string();
@@ -3001,7 +3001,7 @@ pub fn login() -> Html {
                     <div class="flex justify-center items-center">
                         <img class="object-scale-down h-20 w-66" src="static/assets/favicon.png" alt="Castaway Logo" />
                     </div>
-                    <h1 class="item_container-text text-xl font-bold mb-2 text-center">{ &i18n_pinepods }</h1>
+                    <h1 class="item_container-text text-xl font-bold mb-2 text-center">{ &i18n_castaway }</h1>
                     <p class="item_container-text text-center">{ &i18n_tagline }</p>
                     <input
                         type="text"
@@ -3062,8 +3062,8 @@ pub fn logout() -> Html {
     // Preserve the restore-in-progress flags. A server restore signs the admin out
     // (it truncates the Sessions table), but RestoreOverlay needs these to survive the
     // sign-out so it can show the overlay and poll after the reload below.
-    let restore_active = local_storage.get_item("pinepods_restore_active").ok().flatten();
-    let restore_server = local_storage.get_item("pinepods_restore_server").ok().flatten();
+    let restore_active = local_storage.get_item("castaway_restore_active").ok().flatten();
+    let restore_server = local_storage.get_item("castaway_restore_server").ok().flatten();
 
     // Clear storages
     local_storage.clear().expect("failed to clear localStorage");
@@ -3079,8 +3079,8 @@ pub fn logout() -> Html {
     }
     // Restore the restore-in-progress flags.
     if let (Some(active), Some(server)) = (restore_active, restore_server) {
-        let _ = local_storage.set_item("pinepods_restore_active", &active);
-        let _ = local_storage.set_item("pinepods_restore_server", &server);
+        let _ = local_storage.set_item("castaway_restore_active", &active);
+        let _ = local_storage.set_item("castaway_restore_server", &server);
     }
 
     // Force a full page reload (not a client-side route push) so that all

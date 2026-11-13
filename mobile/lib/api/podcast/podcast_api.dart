@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
 import 'package:podcast_search/podcast_search.dart' as pslib;
 
 /// A simple wrapper class that interacts with the search API via

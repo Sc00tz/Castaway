@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/core/download_cleanup.dart';
+import 'package:castaway_mobile/core/download_cleanup.dart';
 
 void main() {
   final now = DateTime(2026, 10, 23, 12);

@@ -3,9 +3,9 @@
 // most of the app's data flows through and was previously untested.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/pending_action.dart';
-import 'package:pinepods_mobile/repository/sembast/sembast_repository.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/pending_action.dart';
+import 'package:castaway_mobile/repository/sembast/sembast_repository.dart';
 
 import '../support/factories.dart';
 import '../support/in_memory_repository.dart';
@@ -70,14 +70,14 @@ void main() {
 
   group('episodes', () {
     test('findEpisodesByGuidOrLegacy matches the exact and legacy-suffixed guids only', () async {
-      await repo.saveEpisode(buildEpisode(guid: 'pinepods_12'));
-      await repo.saveEpisode(buildEpisode(guid: 'pinepods_12_1700000000'));
-      await repo.saveEpisode(buildEpisode(guid: 'pinepods_123'));
+      await repo.saveEpisode(buildEpisode(guid: 'castaway_12'));
+      await repo.saveEpisode(buildEpisode(guid: 'castaway_12_1700000000'));
+      await repo.saveEpisode(buildEpisode(guid: 'castaway_123'));
       await repo.saveEpisode(buildEpisode(guid: 'other'));
 
-      final found = await repo.findEpisodesByGuidOrLegacy('pinepods_12');
+      final found = await repo.findEpisodesByGuidOrLegacy('castaway_12');
 
-      expect(found.map((e) => e.guid), unorderedEquals(['pinepods_12', 'pinepods_12_1700000000']));
+      expect(found.map((e) => e.guid), unorderedEquals(['castaway_12', 'castaway_12_1700000000']));
     });
 
     test('saveEpisode round-trips and is findable by guid and id', () async {

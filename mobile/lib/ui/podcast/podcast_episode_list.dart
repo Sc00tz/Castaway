@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/queue_bloc.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/state/queue_event_state.dart';
-import 'package:pinepods_mobile/ui/widgets/episode_tile.dart';
+import 'package:castaway_mobile/bloc/podcast/queue_bloc.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/state/queue_event_state.dart';
+import 'package:castaway_mobile/ui/widgets/episode_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 class PodcastEpisodeList extends StatelessWidget {
   final List<Episode?>? episodes;

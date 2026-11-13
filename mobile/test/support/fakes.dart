@@ -6,10 +6,10 @@
 // before using `any()` with Episode/Podcast arguments.
 
 import 'package:mocktail/mocktail.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/podcast/podcast_service.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/podcast/podcast_service.dart';
 
 import 'factories.dart';
 

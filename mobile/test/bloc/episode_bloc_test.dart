@@ -5,10 +5,10 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pinepods_mobile/bloc/podcast/episode_bloc.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
-import 'package:pinepods_mobile/state/episode_state.dart';
+import 'package:castaway_mobile/bloc/podcast/episode_bloc.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/state/episode_state.dart';
 
 import '../support/factories.dart';
 import '../support/fakes.dart';

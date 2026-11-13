@@ -1,6 +1,6 @@
 # rust-api integration tests
 
-Every test boots the real axum router (`pinepods_api::create_app`) against its **own freshly
+Every test boots the real axum router (`castaway_api::create_app`) against its **own freshly
 migrated PostgreSQL database** plus Valkey, and drives it over HTTP exactly as the
 web and mobile clients do. Nothing is mocked except the outside internet.
 
@@ -16,18 +16,18 @@ scripts/integration-tests.sh --gpodder mock -- gpodder # gpodder protocol tests 
 
 The script starts PostgreSQL and Valkey from `tests/docker-compose.yml` (off-default ports,
 tmpfs storage). CI (`.github/workflows/rust-api-tests.yml`) runs the same thing using service
-containers (`PINEPODS_TEST_EXTERNAL_SERVICES=1`).
+containers (`CASTAWAY_TEST_EXTERNAL_SERVICES=1`).
 
 Useful environment variables:
 
 | Variable | Meaning |
 |---|---|
-| `PINEPODS_TEST_DB_HOST` / `_PORT` / `_USER` / `_PASSWORD` | database server |
-| `PINEPODS_TEST_VALKEY_HOST` / `_PORT` | Valkey server |
-| `PINEPODS_TEST_KEEP_DB` | keep each test's database afterwards for inspection |
-| `PINEPODS_TEST_EXTERNAL_SERVICES` | don't start containers; use the ones above |
-| `PINEPODS_TEST_GPODDER` | gpodder server the protocol tests talk to: `rust` (default), `mock` |
-| `PINEPODS_TEST_LOG` | print the server's logs with this filter (e.g. `warn`); add `-- --nocapture` |
+| `CASTAWAY_TEST_DB_HOST` / `_PORT` / `_USER` / `_PASSWORD` | database server |
+| `CASTAWAY_TEST_VALKEY_HOST` / `_PORT` | Valkey server |
+| `CASTAWAY_TEST_KEEP_DB` | keep each test's database afterwards for inspection |
+| `CASTAWAY_TEST_EXTERNAL_SERVICES` | don't start containers; use the ones above |
+| `CASTAWAY_TEST_GPODDER` | gpodder server the protocol tests talk to: `rust` (default), `mock` |
+| `CASTAWAY_TEST_LOG` | print the server's logs with this filter (e.g. `warn`); add `-- --nocapture` |
 
 ## How it works
 
@@ -103,7 +103,7 @@ Guidelines:
 ## gpodder protocol tests
 
 `gpodder/` checks the gpodder sync server over real HTTP, the way AntennaPod and other
-clients use it. `PINEPODS_TEST_GPODDER` picks the server:
+clients use it. `CASTAWAY_TEST_GPODDER` picks the server:
 
 - `rust` (default): the rust-api router on a real socket.
 - `mock`: the in-memory reference server in `harness/mock_gpodder.rs`. It follows the

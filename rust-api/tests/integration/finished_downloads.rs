@@ -1,14 +1,14 @@
 //! Finished episodes' server downloads can be deleted automatically, and a new download links
 //! another user's copy of the episode instead of fetching it again.
 
-use pinepods_api::services::audio_processing;
+use castaway_api::services::audio_processing;
 use serde_json::{json, Value};
 
 use crate::harness::*;
 
 fn scratch_dir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let dir = std::env::temp_dir().join(format!("pinepods-ad-downloads-{}-{nanos}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("castaway-ad-downloads-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -35,7 +35,7 @@ async fn has_download(app: &TestApp, user: &TestUser, episode: i32) -> bool {
 }
 
 async fn finish(app: &TestApp, user: &TestUser, episode: i32, at: &str) {
-    app.db().mark_episode_completed(episode, user.id, false, pinepods_api::services::sync::SyncOrigin::Unlogged).await.unwrap();
+    app.db().mark_episode_completed(episode, user.id, false, castaway_api::services::sync::SyncOrigin::Unlogged).await.unwrap();
     exec(app, &format!(r#"UPDATE "UserEpisodeState" SET CompletedAt = '{at}' WHERE UserID = {} AND EpisodeID = {episode}"#, user.id)).await;
 }
 

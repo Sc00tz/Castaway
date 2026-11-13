@@ -7,7 +7,7 @@
 // convert them to the device-local timezone before any comparison, and compare
 // calendar dates (not rolling 24h windows) so "Today" snaps to local midnight.
 
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Parse an episode pubdate string into a device-local [DateTime].
 ///

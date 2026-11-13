@@ -4,10 +4,10 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:logging/logging.dart';
-import 'package:pinepods_mobile/entities/pending_action.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/entities/pending_action.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
 
 /// Durable "outbox" for episode interactions (progress, completion, save,
 /// queue, history). Every interaction for a locally-playable episode is written
@@ -21,7 +21,7 @@ class OfflineActionQueue {
   final log = Logger('OfflineActionQueue');
 
   final Repository repository;
-  final PinepodsService pinepodsService;
+  final CastawayService castawayService;
   final SettingsService settingsService;
 
   /// Drop an item after the server has refused it this many times. Only
@@ -41,7 +41,7 @@ class OfflineActionQueue {
 
   OfflineActionQueue({
     required this.repository,
-    required this.pinepodsService,
+    required this.castawayService,
     required this.settingsService,
   });
 
@@ -180,8 +180,8 @@ class OfflineActionQueue {
       return;
     }
 
-    final server = settingsService.pinepodsServer;
-    final apiKey = settingsService.pinepodsApiKey;
+    final server = settingsService.castawayServer;
+    final apiKey = settingsService.castawayApiKey;
     if (server == null || apiKey == null) {
       // Not logged in / no credentials — nothing we can send yet.
       return;
@@ -189,7 +189,7 @@ class OfflineActionQueue {
 
     _flushing = true;
     try {
-      pinepodsService.setCredentials(server, apiKey);
+      castawayService.setCredentials(server, apiKey);
       do {
         _flushRequested = false;
         if (!await _drain(server)) break; // unreachable: wait for the next trigger
@@ -209,7 +209,7 @@ class OfflineActionQueue {
           await repository.deletePendingAction(action.id!);
         }
       } catch (e) {
-        if (!await pinepodsService.verifyPinepodsInstance(server)) {
+        if (!await castawayService.verifyCastawayInstance(server)) {
           log.fine('Server unreachable - keeping ${action.type.name} queued: $e');
           return false;
         }
@@ -236,7 +236,7 @@ class OfflineActionQueue {
       case PendingActionType.recordPosition:
         // Sent with the time the position was taken, so a late upload can't
         // overwrite newer progress made since (on any device).
-        sent = await pinepodsService.recordListenDuration(
+        sent = await castawayService.recordListenDuration(
           a.episodeId,
           a.userId,
           a.position ?? 0,
@@ -244,17 +244,17 @@ class OfflineActionQueue {
           recordedAt: a.createdAt,
         );
       case PendingActionType.addHistory:
-        sent = await pinepodsService.addHistory(a.episodeId, a.position ?? 0, a.userId, a.isYoutube);
+        sent = await castawayService.addHistory(a.episodeId, a.position ?? 0, a.userId, a.isYoutube);
       case PendingActionType.markCompleted:
-        sent = await pinepodsService.markEpisodeCompleted(a.episodeId, a.userId, a.isYoutube);
+        sent = await castawayService.markEpisodeCompleted(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.markUncompleted:
-        sent = await pinepodsService.markEpisodeUncompleted(a.episodeId, a.userId, a.isYoutube);
+        sent = await castawayService.markEpisodeUncompleted(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.saveEpisode:
-        sent = await pinepodsService.saveEpisode(a.episodeId, a.userId, a.isYoutube);
+        sent = await castawayService.saveEpisode(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.removeSaved:
-        sent = await pinepodsService.removeSavedEpisode(a.episodeId, a.userId, a.isYoutube);
+        sent = await castawayService.removeSavedEpisode(a.episodeId, a.userId, a.isYoutube);
       case PendingActionType.queue:
-        sent = await pinepodsService.queueEpisode(a.episodeId, a.userId, a.isYoutube);
+        sent = await castawayService.queueEpisode(a.episodeId, a.userId, a.isYoutube);
     }
     if (!sent) {
       throw StateError('${a.type.name} for episode ${a.episodeId} was not accepted');

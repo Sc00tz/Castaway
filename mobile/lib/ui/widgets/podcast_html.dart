@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
-import 'package:pinepods_mobile/ui/widgets/pinepods_widget_factory.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_widget_factory.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// This class is a simple, common wrapper around the flutter_widget_from_html
@@ -25,7 +25,7 @@ class PodcastHtml extends StatelessWidget {
   Widget build(BuildContext context) {
     return HtmlWidget(
       content,
-      factoryBuilder: () => PinepodsWidgetFactory(),
+      factoryBuilder: () => CastawayWidgetFactory(),
       textStyle: TextStyle(
         fontSize: fontSize ?? 16.25,
         height: 1.1,

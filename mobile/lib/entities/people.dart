@@ -2,7 +2,7 @@
 // /api/data/people/* endpoints. These are distinct from [Person] (person.dart),
 // which is the Podcasting 2.0 tag attached to a playing episode.
 
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
 
 const String roleHost = 'host';
 const String roleCoHost = 'co-host';
@@ -173,10 +173,10 @@ class PersonProfile {
   final List<PersonPodcast> podcasts;
 
   /// Library episodes the person is credited on, newest first.
-  final List<PinepodsEpisode> episodes;
+  final List<CastawayEpisode> episodes;
 
   /// Recent episodes from shows outside the library (episode id 0: played by URL).
-  final List<PinepodsEpisode> externalEpisodes;
+  final List<CastawayEpisode> externalEpisodes;
 
   /// True while the server refreshes [externalEpisodes] in the background.
   final bool refreshing;
@@ -190,8 +190,8 @@ class PersonProfile {
   });
 
   factory PersonProfile.fromJson(Map<String, dynamic> json) {
-    List<PinepodsEpisode> episodes(String key) => (json[key] as List<dynamic>? ?? const [])
-        .map((e) => PinepodsEpisode.fromJson(e as Map<String, dynamic>))
+    List<CastawayEpisode> episodes(String key) => (json[key] as List<dynamic>? ?? const [])
+        .map((e) => CastawayEpisode.fromJson(e as Map<String, dynamic>))
         .toList();
     return PersonProfile(
       person: PersonInfo.fromJson(json['person'] as Map<String, dynamic>),

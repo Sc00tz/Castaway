@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
-        package="com.gooseberrydevelopment.pinepods">
+        package="com.sc00tz.castaway">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -77,7 +77,7 @@
 
         <!-- Native audio player service (Media3/ExoPlayer) -->
         <service
-                android:name="com.gooseberrydevelopment.pinepods.audio.PinepodsMediaService"
+                android:name="com.sc00tz.castaway.audio.CastawayMediaService"
                 android:foregroundServiceType="mediaPlayback"
                 android:exported="true">
             <intent-filter>

@@ -4,7 +4,7 @@ import Foundation
 /// Manages remote command center controls for iOS
 /// Handles play/pause from lock screen, headphones, CarPlay, etc.
 class RemoteCommandManager {
-    private weak var player: PinepodsAudioPlayer?
+    private weak var player: CastawayAudioPlayer?
     private let commandCenter = MPRemoteCommandCenter.shared()
 
     // Configurable skip intervals (ms). Kept in sync with the in-app setting
@@ -12,7 +12,7 @@ class RemoteCommandManager {
     private var forwardMs: Int = 30000
     private var backwardMs: Int = 10000
 
-    init(player: PinepodsAudioPlayer) {
+    init(player: CastawayAudioPlayer) {
         self.player = player
         setupRemoteCommands()
     }

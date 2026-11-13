@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/ui/widgets/hide_played.dart';
+import 'package:castaway_mobile/ui/widgets/hide_played.dart';
 
 /// Applies a move the way the queue does (ReorderableList's convention), to check where things
 /// end up in the full list.

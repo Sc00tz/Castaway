@@ -5,14 +5,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:pinepods_mobile/core/utils.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/download/download_manager.dart';
-import 'package:pinepods_mobile/services/download/download_service.dart';
-import 'package:pinepods_mobile/services/podcast/podcast_service.dart';
+import 'package:castaway_mobile/core/utils.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/download/download_manager.dart';
+import 'package:castaway_mobile/services/download/download_service.dart';
+import 'package:castaway_mobile/services/podcast/podcast_service.dart';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';

@@ -193,7 +193,7 @@ pub enum BridgeEvent {
     Notification(InAppNotification),
 }
 
-pub const TASK_EVENTS_CHANNEL: &str = "pinepods:events";
+pub const TASK_EVENTS_CHANNEL: &str = "castaway:events";
 
 /// Durable message TTL backstops (a user can always clear sooner). Non-critical
 /// info/success fade on their own; errors/warnings linger until acknowledged.

@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/audio/native_audio_player_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/audio/native_audio_player_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
 import '../../support/factories.dart';
 
 class MockRepository extends Mock implements Repository {}
@@ -16,7 +16,7 @@ void main() {
     testWidgets('speed persists only when requested: $persist', (tester) async {
       final repository = MockRepository();
       final settings = MockSettings();
-      final episode = buildEpisode(guid: 'pinepods_101', position: 120000);
+      final episode = buildEpisode(guid: 'castaway_101', position: 120000);
       when(() => repository.loadQueue()).thenAnswer((_) async => []);
       when(
         () => repository.saveEpisode(episode),
@@ -44,7 +44,7 @@ void main() {
         if (call.method == 'getPosition') return 0;
         return null;
       });
-      const events = MethodChannel('com.pinepods/audio_events');
+      const events = MethodChannel('com.castaway/audio_events');
       messenger.setMockMethodCallHandler(events, (_) async => null);
       addTearDown(() {
         messenger.setMockMethodCallHandler(

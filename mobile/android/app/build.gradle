@@ -87,7 +87,7 @@ android {
         }
     }
 
-    namespace 'com.gooseberrydevelopment.pinepods'
+    namespace 'com.sc00tz.castaway'
 
     lint {
         abortOnError false

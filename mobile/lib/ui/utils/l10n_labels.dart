@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Label for a "Delete after" choice (0 means never).
 String deleteAfterDaysLabel(BuildContext context, int d) =>

@@ -4,15 +4,15 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/ui/widgets/sleep_selector.dart';
-import 'package:pinepods_mobile/ui/widgets/speed_selector.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/ui/widgets/sleep_selector.dart';
+import 'package:castaway_mobile/ui/widgets/speed_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// Builds a transport control bar for rewind, play and fast-forward.
 /// See [NowPlaying].

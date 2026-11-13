@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import 'package:flutter/widgets.dart';
-import 'package:pinepods_mobile/l10n/app_localizations.dart';
+import 'package:castaway_mobile/l10n/app_localizations.dart';
 
 /// Access to the gen-l10n generated [AppLocalizations].
 ///

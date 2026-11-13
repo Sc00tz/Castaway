@@ -4,10 +4,10 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/bloc/bloc.dart';
-import 'package:pinepods_mobile/bloc/search/search_state_event.dart';
-import 'package:pinepods_mobile/services/podcast/podcast_service.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/bloc/bloc.dart';
+import 'package:castaway_mobile/bloc/search/search_state_event.dart';
+import 'package:castaway_mobile/services/podcast/podcast_service.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:logging/logging.dart';
 import 'package:podcast_search/podcast_search.dart' as pcast;

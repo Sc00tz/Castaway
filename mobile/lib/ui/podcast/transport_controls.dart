@@ -2,25 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/bloc/podcast/episode_bloc.dart';
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/ui/podcast/now_playing.dart';
-import 'package:pinepods_mobile/ui/widgets/action_text.dart';
-import 'package:pinepods_mobile/ui/widgets/download_button.dart';
-import 'package:pinepods_mobile/ui/widgets/play_pause_button.dart';
-import 'package:pinepods_mobile/ui/utils/player_utils.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/bloc/podcast/episode_bloc.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/ui/podcast/now_playing.dart';
+import 'package:castaway_mobile/ui/widgets/action_text.dart';
+import 'package:castaway_mobile/ui/widgets/download_button.dart';
+import 'package:castaway_mobile/ui/widgets/play_pause_button.dart';
+import 'package:castaway_mobile/ui/utils/player_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dialogs/flutter_dialogs.dart';
 import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// Handles the state of the episode transport controls.
 ///

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/user_stats.dart';
+import 'package:castaway_mobile/entities/user_stats.dart';
 
 UserStats _stats({
   int timeListened = 0,

@@ -76,7 +76,7 @@ impl TestApp {
 
     /// True once refresh has stored the podcast's Podcasting 2.0 tags (even if it has none).
     pub async fn feed_tags_stored(&self, podcast_id: i32) -> bool {
-        use pinepods_api::database::DatabasePool;
+        use castaway_api::database::DatabasePool;
         let hash: Option<Option<String>> = match self.db() {
             DatabasePool::Postgres(pool) => sqlx::query_scalar(r#"SELECT podcasting2hash FROM "Podcasts" WHERE podcastid = $1"#)
                 .bind(podcast_id)
@@ -119,7 +119,7 @@ impl TestApp {
 
     /// Run the scheduled feed refresh to completion (what the cron job does).
     pub async fn refresh(&self) {
-        pinepods_api::handlers::refresh::refresh_pods_admin_internal(&self.state)
+        castaway_api::handlers::refresh::refresh_pods_admin_internal(&self.state)
             .await
             .expect("refresh");
     }

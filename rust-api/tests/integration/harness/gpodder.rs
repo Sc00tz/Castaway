@@ -1,6 +1,6 @@
 //! The gpodder protocol under test, spoken over real HTTP.
 //!
-//! Which server answers is chosen by `PINEPODS_TEST_GPODDER`:
+//! Which server answers is chosen by `CASTAWAY_TEST_GPODDER`:
 //!
 //! - `rust` (default): the rust-api router itself, served on a real socket.
 //! - `mock`: the in-memory reference server in [`super::mock_gpodder`]. It has no Castaway
@@ -24,10 +24,10 @@ pub enum Impl {
 
 impl Impl {
     pub fn current() -> Impl {
-        match std::env::var("PINEPODS_TEST_GPODDER").unwrap_or_default().to_lowercase().as_str() {
+        match std::env::var("CASTAWAY_TEST_GPODDER").unwrap_or_default().to_lowercase().as_str() {
             "" | "rust" => Impl::Rust,
             "mock" => Impl::Mock,
-            other => panic!("PINEPODS_TEST_GPODDER={other}: expected rust or mock"),
+            other => panic!("CASTAWAY_TEST_GPODDER={other}: expected rust or mock"),
         }
     }
 }
@@ -74,7 +74,7 @@ impl TestApp {
         }
     }
 
-    /// The rust-api router on a real socket, whatever `PINEPODS_TEST_GPODDER` says.
+    /// The rust-api router on a real socket, whatever `CASTAWAY_TEST_GPODDER` says.
     pub async fn rust_gpodder_server(&self) -> GpodderServer {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -111,7 +111,7 @@ impl TestApp {
     /// Sessions on this test's database sitting inside a transaction they never finished
     /// (Postgres `idle in transaction`, InnoDB transactions of sleeping connections).
     pub async fn abandoned_transactions(&self) -> i64 {
-        use pinepods_api::database::DatabasePool;
+        use castaway_api::database::DatabasePool;
         match self.db() {
             DatabasePool::Postgres(pool) => sqlx::query_scalar(
                 "SELECT COUNT(*) FROM pg_stat_activity \

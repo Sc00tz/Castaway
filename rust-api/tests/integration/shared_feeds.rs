@@ -2,8 +2,8 @@
 //! uploads kept per owner, feeds following address changes, orphan cleanup, and the upgrade
 //! that creates feeds from existing podcasts.
 
-use pinepods_api::handlers::refresh;
-use pinepods_api::services::sync::SyncOrigin;
+use castaway_api::handlers::refresh;
+use castaway_api::services::sync::SyncOrigin;
 
 use crate::harness::*;
 

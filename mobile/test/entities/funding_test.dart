@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/funding.dart';
+import 'package:castaway_mobile/entities/funding.dart';
 
 void main() {
   test('upgrades an http funding URL to https on construction', () {

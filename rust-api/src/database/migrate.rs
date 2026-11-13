@@ -23,6 +23,7 @@ const MIGRATIONS: &[Migration] = &[
     Migration { version: 3, name: "podcast_index_key", sql: include_str!("../../migrations/0003_podcast_index_key.sql") },
     Migration { version: 4, name: "drop_podpeople", sql: include_str!("../../migrations/0004_drop_podpeople.sql") },
     Migration { version: 5, name: "drop_ai", sql: include_str!("../../migrations/0005_drop_ai.sql") },
+    Migration { version: 6, name: "castaway_sync_labels", sql: include_str!("../../migrations/0006_castaway_sync_labels.sql") },
 ];
 
 /// The last migration version of the old Python runner.

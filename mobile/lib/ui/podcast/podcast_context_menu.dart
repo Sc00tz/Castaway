@@ -1,16 +1,16 @@
 // Copyright 2020 Ben Hills and the project contributors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/entities/feed.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/entities/feed.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// This class is responsible for rendering the context menu on the podcast details
 /// page.

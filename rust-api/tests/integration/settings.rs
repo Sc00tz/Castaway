@@ -170,7 +170,7 @@ async fn notification_settings_round_trip_per_platform() {
             "user_id": user.id,
             "platform": "ntfy",
             "enabled": true,
-            "ntfy_topic": "pinepods-test",
+            "ntfy_topic": "castaway-test",
             "ntfy_server_url": "https://ntfy.example.invalid",
         }))
         .send()
@@ -196,7 +196,7 @@ async fn notification_settings_round_trip_per_platform() {
     };
     let ntfy = platform("ntfy");
     assert_eq!(ntfy["enabled"], true);
-    assert_eq!(ntfy["ntfy_topic"], "pinepods-test");
+    assert_eq!(ntfy["ntfy_topic"], "castaway-test");
     assert_eq!(ntfy["ntfy_server_url"], "https://ntfy.example.invalid");
     let gotify = platform("gotify");
     assert_eq!(gotify["enabled"], false);
@@ -313,12 +313,12 @@ async fn ntfy_can_sign_in_with_a_username_and_password() {
 
     let hits = app.fixtures().hits("ntfy/alerts");
     assert_eq!(hits.len(), 1, "{hits:?}");
-    let expected = pinepods_basic("listener", "ntfy-pass");
+    let expected = castaway_basic("listener", "ntfy-pass");
     assert_eq!(hits[0].headers.get("authorization"), Some(&expected));
     assert_eq!(String::from_utf8_lossy(&hits[0].body), "Test notification from Castaway");
 }
 
-fn pinepods_basic(user: &str, password: &str) -> String {
+fn castaway_basic(user: &str, password: &str) -> String {
     crate::harness::app::basic(user, password)
 }
 

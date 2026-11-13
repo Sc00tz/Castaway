@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/pending_action.dart';
+import 'package:castaway_mobile/entities/pending_action.dart';
 
 void main() {
   group('toMap/fromMap', () {

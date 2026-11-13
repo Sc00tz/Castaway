@@ -2,7 +2,7 @@
 //! shows outside the library (from Podcast Index's person search).
 
 use crate::harness::*;
-use pinepods_api::services::people::{external, Endpoints};
+use castaway_api::services::people::{external, Endpoints};
 
 fn person_tag(role: &str, name: &str) -> String {
     format!("    <podcast:person role=\"{role}\">{name}</podcast:person>\n")

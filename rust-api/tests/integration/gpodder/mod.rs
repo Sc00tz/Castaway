@@ -1,6 +1,6 @@
 //! gpodder protocol conformance.
 //!
-//! These tests speak HTTP to whichever gpodder server `PINEPODS_TEST_GPODDER` selects (see
+//! These tests speak HTTP to whichever gpodder server `CASTAWAY_TEST_GPODDER` selects (see
 //! `harness/gpodder.rs`): the rust-api router, or the in-memory reference server that keeps
 //! the tests themselves honest.
 //!

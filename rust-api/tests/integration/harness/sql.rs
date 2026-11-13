@@ -1,7 +1,7 @@
 //! Raw SQL helpers for tests that seed or inspect rows the API doesn't expose (migration
 //! tests, refresh internals).
 
-use pinepods_api::database::DatabasePool;
+use castaway_api::database::DatabasePool;
 
 use super::TestApp;
 

@@ -160,8 +160,8 @@ pub fn restore_server() -> Html {
                         // in-memory state is wiped -- localStorage survives both.
                         if let Some(window) = web_sys::window() {
                             if let Ok(Some(storage)) = window.local_storage() {
-                                let _ = storage.set_item("pinepods_restore_active", "1");
-                                let _ = storage.set_item("pinepods_restore_server", &server_name);
+                                let _ = storage.set_item("castaway_restore_active", "1");
+                                let _ = storage.set_item("castaway_restore_server", &server_name);
                             }
                         }
                         history.push("/sign_out");
@@ -219,9 +219,9 @@ pub fn restore_server() -> Html {
                             // in-memory state is wiped -- localStorage survives both.
                             if let Some(window) = web_sys::window() {
                                 if let Ok(Some(storage)) = window.local_storage() {
-                                    let _ = storage.set_item("pinepods_restore_active", "1");
+                                    let _ = storage.set_item("castaway_restore_active", "1");
                                     let _ =
-                                        storage.set_item("pinepods_restore_server", &server_name);
+                                        storage.set_item("castaway_restore_server", &server_name);
                                 }
                             }
                             history.push("/sign_out");

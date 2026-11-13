@@ -7,10 +7,10 @@
 // pre-existing bug), so leaving it null would break persistence round-trips
 // unrelated to what a test is actually checking.
 
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
 
 Episode buildEpisode({
   String guid = 'episode-guid',
@@ -70,7 +70,7 @@ Podcast buildPodcast({
   );
 }
 
-PinepodsEpisode buildPinepodsEpisode({
+CastawayEpisode buildCastawayEpisode({
   int episodeId = 101,
   String podcastName = 'Some Podcast',
   String episodeTitle = 'Some Episode',
@@ -83,7 +83,7 @@ PinepodsEpisode buildPinepodsEpisode({
   bool downloaded = false,
   bool isYoutube = false,
 }) {
-  return PinepodsEpisode(
+  return CastawayEpisode(
     podcastName: podcastName,
     episodeTitle: episodeTitle,
     episodePubDate: episodePubDate,

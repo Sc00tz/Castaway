@@ -60,11 +60,11 @@ class CertificateManager {
   static final CertificateManager instance = CertificateManager._();
 
   // Secure-storage keys. Byte payloads are stored base64-encoded.
-  static const String _serverCaKey = 'pinepods_server_ca_pem';
-  static const String _serverCaNameKey = 'pinepods_server_ca_name';
-  static const String _clientP12Key = 'pinepods_client_p12';
-  static const String _clientP12PasswordKey = 'pinepods_client_p12_password';
-  static const String _clientCertNameKey = 'pinepods_client_cert_name';
+  static const String _serverCaKey = 'castaway_server_ca_pem';
+  static const String _serverCaNameKey = 'castaway_server_ca_name';
+  static const String _clientP12Key = 'castaway_client_p12';
+  static const String _clientP12PasswordKey = 'castaway_client_p12_password';
+  static const String _clientCertNameKey = 'castaway_client_cert_name';
 
   final Logger _log = Logger('CertificateManager');
   // v10 uses custom ciphers on Android by default (Jetpack Security is

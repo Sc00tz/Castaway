@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
 
 void main() {
   group('TranscriptUrl', () {

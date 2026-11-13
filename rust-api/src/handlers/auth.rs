@@ -1003,7 +1003,7 @@ async fn process_opml_import(
         match get_podcast_values_from_url(podcast_url, &db_pool).await {
             Ok((mut podcast_values, feed_body)) => {
                 podcast_values.user_id = import_request.user_id;
-                match db_pool.add_podcast_with_feed(&podcast_values, 0, None, None, Some(&feed_body), crate::services::sync::SyncOrigin::Pinepods).await {
+                match db_pool.add_podcast_with_feed(&podcast_values, 0, None, None, Some(&feed_body), crate::services::sync::SyncOrigin::Castaway).await {
                     Ok(_) => {
                         tracing::info!("✅ Successfully imported podcast: {}", podcast_url);
                     }
@@ -2261,10 +2261,10 @@ mod tests {
     #[test]
     fn oidc_allowed_hosts_come_from_the_request() {
         let mut headers = HeaderMap::new();
-        headers.insert("host", "pinepods:8040".parse().unwrap());
+        headers.insert("host", "castaway:8040".parse().unwrap());
         headers.insert("x-forwarded-host", "Pods.Example.com, proxy.internal".parse().unwrap());
         let allowed = oidc_allowed_hosts(&headers);
-        assert!(allowed.contains(&"pinepods".to_string()));
+        assert!(allowed.contains(&"castaway".to_string()));
         assert!(allowed.contains(&"pods.example.com".to_string()));
         assert!(!allowed.contains(&"proxy.internal".to_string()));
     }

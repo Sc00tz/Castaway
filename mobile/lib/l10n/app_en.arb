@@ -914,7 +914,7 @@
   "completed": "Completed",
   "smart_playlists": "Smart Playlists",
   "recent_episodes": "Recent Episodes",
-  "welcome_to_pinepods": "Welcome to Castaway",
+  "welcome_to_castaway": "Welcome to Castaway",
   "home_empty_body": "Search for podcasts to follow and they'll show up here.",
   "no_completed_episodes_match_query": "No completed episodes match \"{query}\"",
   "@no_completed_episodes_match_query": {
@@ -1206,7 +1206,7 @@
       }
     }
   },
-  "not_connected_to_pinepods": "Not connected to Castaway server",
+  "not_connected_to_castaway": "Not connected to Castaway server",
   "playlist_created": "Playlist created successfully!",
   "failed_to_create_playlist": "Failed to create playlist",
   "create_playlist_title": "Create Playlist",
@@ -1275,7 +1275,7 @@
   "advanced_certificates": "Advanced: Certificates",
   "advanced_certificates_description": "Custom server CA / client certificate (mTLS)",
   "verify_mfa_code": "Verify MFA Code",
-  "connect_to_pinepods": "Connect to Castaway",
+  "connect_to_castaway": "Connect to Castaway",
   "or_continue_with": "Or continue with",
   "no_server_learn_more": "Don't have a Castaway server? See github.com/Sc00tz/Castaway to set one up.",
   "failed_to_load_stats": "Failed to load stats: {error}",
@@ -1525,8 +1525,8 @@
   "client_certificate_removed": "Client certificate removed (restart to fully apply).",
   "replace": "Replace",
   "fill_in_all_fields": "Please fill in all fields",
-  "pinepods_server": "Castaway Server",
-  "pinepods_connection": "Castaway Connection",
+  "castaway_server": "Castaway Server",
+  "castaway_connection": "Castaway Connection",
   "log_out": "Log Out",
   "connect": "Connect",
   "failed_to_load_server_download_activity": "Failed to load server download activity.",
@@ -1648,7 +1648,7 @@
       }
     }
   },
-  "not_connected_to_a_pinepods_server": "Not connected to a Castaway server",
+  "not_connected_to_a_castaway_server": "Not connected to a Castaway server",
   "find_hosts_and_guests": "Find hosts and guests",
   "nobody_found": "Nobody found. People are added from podcast and episode pages.",
   "not_following_anyone": "Not following anyone yet",
@@ -2013,8 +2013,8 @@
   "sync_external_gpodder": "External gpodder",
   "not_syncing": "Not Syncing",
   "unknown_sync_type": "Unknown sync type",
-  "server_http_not_pinepods": "Server responded with HTTP {status}. This does not look like a Castaway server.",
-  "@server_http_not_pinepods": {
+  "server_http_not_castaway": "Server responded with HTTP {status}. This does not look like a Castaway server.",
+  "@server_http_not_castaway": {
     "placeholders": {
       "status": {
         "type": "int"
@@ -2046,11 +2046,11 @@
     }
   },
   "tls_not_trusted": "The server's TLS certificate isn't trusted. If it uses a private or self-signed certificate, import its CA under Advanced → Certificates. If the server requires a client certificate (mTLS), import that too.",
-  "not_a_pinepods_server": "Reachable, but this does not look like a Castaway server.",
+  "not_a_castaway_server": "Reachable, but this does not look like a Castaway server.",
   "server_too_slow": "The server took too long to respond. Check the address and your connection.",
   "invalid_server_address": "That doesn't look like a valid server address.",
   "authentication_failed_plain": "Authentication failed",
-  "not_a_valid_pinepods_server": "Not a valid Castaway server",
+  "not_a_valid_castaway_server": "Not a valid Castaway server",
   "invalid_mfa_code": "Invalid MFA code",
   "api_key_verification_failed": "API key verification failed",
   "failed_to_get_user_id": "Failed to get user ID",

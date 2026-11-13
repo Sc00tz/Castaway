@@ -1,15 +1,15 @@
 // lib/ui/widgets/paginated_episode_list.dart
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/ui/widgets/pinepods_episode_card.dart';
-import 'package:pinepods_mobile/ui/widgets/episode_tile.dart';
-import 'package:pinepods_mobile/ui/widgets/shimmer_episode_tile.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_episode_card.dart';
+import 'package:castaway_mobile/ui/widgets/episode_tile.dart';
+import 'package:castaway_mobile/ui/widgets/shimmer_episode_tile.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 class PaginatedEpisodeList extends StatefulWidget {
-  final List<dynamic> episodes; // Can be PinepodsEpisode or Episode
+  final List<dynamic> episodes; // Can be CastawayEpisode or Episode
   final bool isServerEpisodes;
   final Function(dynamic episode)? onEpisodeTap;
   final Function(dynamic episode, int globalIndex)? onEpisodeLongPress;
@@ -58,8 +58,8 @@ class _PaginatedEpisodeListState extends State<PaginatedEpisodeList> {
   }
 
   Widget _buildEpisodeWidget(dynamic episode, int globalIndex) {
-    if (widget.isServerEpisodes && episode is PinepodsEpisode) {
-      return PinepodsEpisodeCard(
+    if (widget.isServerEpisodes && episode is CastawayEpisode) {
+      return CastawayEpisodeCard(
         episode: episode,
         onTap: widget.onEpisodeTap != null 
           ? () => widget.onEpisodeTap!(episode)

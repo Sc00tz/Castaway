@@ -12,14 +12,14 @@ on:
       - main
     paths:
       - 'rust-api/**'
-      - 'mobile/lib/services/pinepods/**'
+      - 'mobile/lib/services/castaway/**'
       - 'mobile/lib/entities/**'
       - 'mobile/test/contract/**'
       - '.github/workflows/rust-api-tests.yml'
   pull_request:
     paths:
       - 'rust-api/**'
-      - 'mobile/lib/services/pinepods/**'
+      - 'mobile/lib/services/castaway/**'
       - 'mobile/lib/entities/**'
       - 'mobile/test/contract/**'
       - '.github/workflows/rust-api-tests.yml'
@@ -34,13 +34,13 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: pinepods
+          POSTGRES_USER: castaway
           POSTGRES_PASSWORD: testpass
           POSTGRES_DB: postgres
         ports:
           - 55433:5432
         options: >-
-          --health-cmd "pg_isready -U pinepods"
+          --health-cmd "pg_isready -U castaway"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -79,7 +79,7 @@ jobs:
       - name: Integration tests
         working-directory: rust-api
         env:
-          PINEPODS_TEST_EXTERNAL_SERVICES: "1"
+          CASTAWAY_TEST_EXTERNAL_SERVICES: "1"
         run: scripts/integration-tests.sh
 
       - name: Setup Flutter
@@ -96,5 +96,5 @@ jobs:
       - name: The mobile app's API client against this server
         working-directory: rust-api
         env:
-          PINEPODS_TEST_EXTERNAL_SERVICES: "1"
+          CASTAWAY_TEST_EXTERNAL_SERVICES: "1"
         run: scripts/integration-tests.sh -- -- --ignored mobile_contract

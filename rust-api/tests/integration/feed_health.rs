@@ -104,7 +104,7 @@ async fn wait_for_failure(app: &TestApp, user: &TestUser, url: &str, attempts: i
 /// import lets go of the feed, and a retry in between is (rightly) taken as already importing.
 async fn retry_import(app: &TestApp, user: &TestUser, url: &str, id: i64) {
     eventually(&format!("import of {url} finished"), || async {
-        (!pinepods_api::services::sync::apply::in_flight_adds(user.id).iter().any(|u| u == url)).then_some(())
+        (!castaway_api::services::sync::apply::in_flight_adds(user.id).iter().any(|u| u == url)).then_some(())
     })
     .await;
     app.post(&format!("/api/data/feed_problems/imports/{id}/retry")).key(user).send().await.ok_json();

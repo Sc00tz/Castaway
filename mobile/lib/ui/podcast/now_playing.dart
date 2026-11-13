@@ -12,32 +12,32 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/chapter.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/sleep.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/global_services.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/services/podcast/podcast_service.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/ui/pinepods/podcast_nav.dart';
-import 'package:pinepods_mobile/ui/podcast/person_avatar.dart';
-import 'package:pinepods_mobile/ui/podcast/pinepods_up_next_view.dart';
-import 'package:pinepods_mobile/ui/podcast/playback_error_listener.dart';
-import 'package:pinepods_mobile/ui/podcast/remote_devices_button.dart';
-import 'package:pinepods_mobile/ui/podcast/skip_interval_icon.dart';
-import 'package:pinepods_mobile/ui/tab_navigator.dart';
-import 'package:pinepods_mobile/ui/utils/artwork_colors.dart';
-import 'package:pinepods_mobile/ui/widgets/placeholder_builder.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_html.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_image.dart';
-import 'package:pinepods_mobile/ui/widgets/sleep_selector.dart';
-import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
-import 'package:pinepods_mobile/ui/widgets/speed_selector.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/chapter.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/sleep.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/global_services.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/services/podcast/podcast_service.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/castaway/podcast_nav.dart';
+import 'package:castaway_mobile/ui/podcast/person_avatar.dart';
+import 'package:castaway_mobile/ui/podcast/castaway_up_next_view.dart';
+import 'package:castaway_mobile/ui/podcast/playback_error_listener.dart';
+import 'package:castaway_mobile/ui/podcast/remote_devices_button.dart';
+import 'package:castaway_mobile/ui/podcast/skip_interval_icon.dart';
+import 'package:castaway_mobile/ui/tab_navigator.dart';
+import 'package:castaway_mobile/ui/utils/artwork_colors.dart';
+import 'package:castaway_mobile/ui/widgets/placeholder_builder.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_html.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_image.dart';
+import 'package:castaway_mobile/ui/widgets/sleep_selector.dart';
+import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
+import 'package:castaway_mobile/ui/widgets/speed_selector.dart';
 import 'package:provider/provider.dart';
 
 /// Opens the full-screen player above the app shell. Swipe down to close.
@@ -230,7 +230,7 @@ class _PlayerSurface extends StatelessWidget {
 
 /// Close the player and open the playing episode's podcast in the app.
 void _goToPodcast(BuildContext context, Episode episode) {
-  final podcastId = GlobalServices.pinepodsAudioService?.currentPodcastId;
+  final podcastId = GlobalServices.castawayAudioService?.currentPodcastId;
   Navigator.of(context).maybePop();
   final appContext = tabNavigatorKey.currentContext;
   if (appContext == null) return;
@@ -990,7 +990,7 @@ void _showUpNextSheet(BuildContext context) {
       child: const Column(
         children: [
           _SheetHandle(),
-          Expanded(child: PinepodsUpNextView()),
+          Expanded(child: CastawayUpNextView()),
         ],
       ),
     ),

@@ -1,7 +1,7 @@
 //! An in-memory gpodder v2 + Nextcloud gpoddersync server.
 //!
 //! Two jobs:
-//! - **Reference server** for the protocol tests (`PINEPODS_TEST_GPODDER=mock`): it follows
+//! - **Reference server** for the protocol tests (`CASTAWAY_TEST_GPODDER=mock`): it follows
 //!   the cursor rules below, so the tests are checked against
 //!   something correct while the Rust port doesn't exist yet.
 //! - **Stand-in external server** for the external sync engine: Castaway talks to

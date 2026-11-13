@@ -2,7 +2,7 @@
 //! devices, the external server's test/save/status/run/remove, statistics, and the old
 //! /api/gpodder routes answering in their old shapes on top of it.
 
-use pinepods_api::services::sync::engine_db::TargetKind;
+use castaway_api::services::sync::engine_db::TargetKind;
 
 use crate::harness::gpodder::GpodderClient;
 use crate::harness::mock_gpodder::MockGpodder;
@@ -79,7 +79,7 @@ async fn server_toggle_and_app_passwords() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn devices_can_be_renamed_and_removed_except_pinepods_own() {
+async fn devices_can_be_renamed_and_removed_except_castaway_own() {
     let app = TestApp::new().await;
     let user = app.user("devices").await;
     let other = app.user("devices-other").await;
@@ -225,11 +225,11 @@ async fn target_setup_status_runs_and_removal() {
     let renamed = app
         .put("/api/sync/target")
         .key(&user)
-        .json(&json!({ "kind": "gpodder", "url": mock.base_url, "username": REMOTE_USER, "device_name": "pinepods-home" }))
+        .json(&json!({ "kind": "gpodder", "url": mock.base_url, "username": REMOTE_USER, "device_name": "castaway-home" }))
         .send()
         .await
         .ok_json();
-    assert_eq!(renamed["target"]["device_name"], "pinepods-home", "{renamed}");
+    assert_eq!(renamed["target"]["device_name"], "castaway-home", "{renamed}");
     let t = app.db().sync_targets_for_user(user.id).await.unwrap();
     assert_eq!(app.db().decrypt_password(&t[0].encrypted_secret).await.unwrap(), REMOTE_PASS);
 

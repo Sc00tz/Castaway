@@ -41,7 +41,7 @@ pub fn app_drawer() -> Html {
     // Capture i18n strings before they get moved
     #[cfg(not(feature = "server_build"))]
     let _i18n_local_downloads = i18n.t("app_drawer.local_downloads").to_string();
-    let i18n_pinepods = i18n.t("app_drawer.pinepods").to_string();
+    let i18n_castaway = i18n.t("app_drawer.castaway").to_string();
     let i18n_home = i18n.t("navigation.home").to_string();
     let i18n_feed = i18n.t("app_drawer.feed").to_string();
     let i18n_search_podcasts = i18n.t("navigation.search").to_string();
@@ -237,7 +237,7 @@ pub fn app_drawer() -> Html {
                 // Brand header
                 <div class="sb-brand" style="margin-top: 60px;">
                     <img src="/static/assets/favicon.png" alt="Castaway" />
-                    <span>{&i18n_pinepods}</span>
+                    <span>{&i18n_castaway}</span>
                 </div>
 
                 // User account row

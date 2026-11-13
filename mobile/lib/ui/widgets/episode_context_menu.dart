@@ -1,15 +1,15 @@
 // lib/ui/widgets/episode_context_menu.dart
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/services/global_services.dart';
-import 'package:pinepods_mobile/services/nowplaying/nowplaying_service.dart';
-import 'package:pinepods_mobile/ui/podcast/remote_devices_button.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/ui/pinepods/collection_sheets.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/services/global_services.dart';
+import 'package:castaway_mobile/services/nowplaying/nowplaying_service.dart';
+import 'package:castaway_mobile/ui/podcast/remote_devices_button.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/castaway/collection_sheets.dart';
 
 class EpisodeContextMenu extends StatefulWidget {
-  final PinepodsEpisode episode;
+  final CastawayEpisode episode;
   final VoidCallback? onSave;
   final VoidCallback? onRemoveSaved;
   final VoidCallback? onDownload;
@@ -49,7 +49,7 @@ class EpisodeContextMenu extends StatefulWidget {
 class _EpisodeContextMenuState extends State<EpisodeContextMenu> {
   bool _queueChoicesOpen = false;
 
-  PinepodsEpisode get episode => widget.episode;
+  CastawayEpisode get episode => widget.episode;
   VoidCallback? get onSave => widget.onSave;
   VoidCallback? get onRemoveSaved => widget.onRemoveSaved;
   VoidCallback? get onDownload => widget.onDownload;

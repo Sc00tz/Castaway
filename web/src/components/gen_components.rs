@@ -685,7 +685,7 @@ pub struct AdminSetupData {
 #[function_component(FirstAdminModal)]
 pub fn first_admin_modal(props: &FirstAdminModalProps) -> Html {
     let (i18n, _) = use_translation();
-    let i18n_welcome_to_pinepods = i18n.t("gen_components.welcome_to_pinepods").to_string();
+    let i18n_welcome_to_castaway = i18n.t("gen_components.welcome_to_castaway").to_string();
     let i18n_setup_admin_hint = i18n.t("gen_components.setup_admin_hint").to_string();
     let i18n_full_name = i18n.t("gen_components.full_name").to_string();
     let i18n_username = i18n.t("gen_components.username").to_string();
@@ -741,7 +741,7 @@ pub fn first_admin_modal(props: &FirstAdminModalProps) -> Html {
     html! {
         <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
             <div class="bg-container-background rounded-lg p-8 max-w-md w-full mx-4 shadow-xl">
-                <h2 class="text-2xl font-bold mb-6 text-text-color">{ &i18n_welcome_to_pinepods }</h2>
+                <h2 class="text-2xl font-bold mb-6 text-text-color">{ &i18n_welcome_to_castaway }</h2>
                 <p class="mb-6 text-text-color">{ &i18n_setup_admin_hint }</p>
 
                 <form onsubmit={onsubmit} class="space-y-4">

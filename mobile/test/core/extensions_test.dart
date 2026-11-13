@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/core/extensions.dart';
+import 'package:castaway_mobile/core/extensions.dart';
 
 void main() {
   group('IterableExtensions.chunk', () {
@@ -68,11 +68,11 @@ void main() {
     });
 
     test('leaves .local hostnames over http unchanged', () {
-      expect('http://pinepods.local/api'.forceHttps, 'http://pinepods.local/api');
+      expect('http://castaway.local/api'.forceHttps, 'http://castaway.local/api');
     });
 
     test('is case-insensitive when matching the local-network exceptions', () {
-      expect('http://PINEPODS.LOCAL/api'.forceHttps, 'http://PINEPODS.LOCAL/api');
+      expect('http://CASTAWAY.LOCAL/api'.forceHttps, 'http://CASTAWAY.LOCAL/api');
     });
 
     test('returns an empty string for null', () {

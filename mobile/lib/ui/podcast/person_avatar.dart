@@ -5,10 +5,10 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/entities/person.dart';
+import 'package:castaway_mobile/entities/person.dart';
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/ui/pinepods/people/people_widgets.dart' show openPerson;
+import 'package:castaway_mobile/ui/castaway/people/people_widgets.dart' show openPerson;
 import 'package:url_launcher/url_launcher.dart';
 
 /// This Widget handles rendering of a person avatar.

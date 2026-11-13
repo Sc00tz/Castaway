@@ -149,7 +149,7 @@ async fn adding_a_podcast_downloads_its_feed_once() {
 
 async fn manual_refresh(app: &TestApp, user: &TestUser) -> Vec<Value> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
-    pinepods_api::handlers::refresh::run_refresh_process(user.id, false, tx, app.state.clone())
+    castaway_api::handlers::refresh::run_refresh_process(user.id, false, tx, app.state.clone())
         .await
         .expect("manual refresh");
     let mut messages = Vec::new();

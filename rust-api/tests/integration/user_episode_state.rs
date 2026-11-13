@@ -2,7 +2,7 @@
 //! episodes but not their progress, marking only touches episodes of the caller's feeds, and the
 //! upgrade carries existing completions over.
 
-use pinepods_api::services::sync::SyncOrigin;
+use castaway_api::services::sync::SyncOrigin;
 
 use crate::harness::*;
 

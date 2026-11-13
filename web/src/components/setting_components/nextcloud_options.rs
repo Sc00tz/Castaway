@@ -768,7 +768,7 @@ fn external_section(props: &ExternalProps) -> Html {
                             <div class="settings-row-desc">{ i18n.t("sync_settings.device_name_hint") }</div>
                         </div>
                         <div class="settings-row-control">
-                            <input type="text" class="input" style="width:280px;max-width:60vw;" value={(*device).clone()} oninput={input_setter(device.clone())} placeholder="pinepods" />
+                            <input type="text" class="input" style="width:280px;max-width:60vw;" value={(*device).clone()} oninput={input_setter(device.clone())} placeholder="castaway" />
                         </div>
                     </div>
                 }
@@ -879,7 +879,7 @@ fn stats_panel(props: &StatsProps) -> Html {
     let never = i18n.t("sync_settings.never").to_string();
     let origin_label = |origin: &str, device: Option<&String>| -> String {
         match origin {
-            "pinepods" => "Castaway".to_string(),
+            "castaway" => "Castaway".to_string(),
             "target" => i18n.t("sync_settings.origin_external").to_string(),
             _ => device.cloned().unwrap_or_else(|| i18n.t("sync_settings.origin_app").to_string()),
         }

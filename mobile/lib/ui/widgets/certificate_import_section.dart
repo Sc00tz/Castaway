@@ -6,9 +6,9 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/services/security/certificate_manager.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/security/certificate_manager.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Reusable UI for importing / removing custom TLS certificates:
 ///

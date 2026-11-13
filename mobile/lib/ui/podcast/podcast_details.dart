@@ -4,37 +4,37 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/feed.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
-import 'package:pinepods_mobile/ui/podcast/funding_menu.dart';
-import 'package:pinepods_mobile/ui/podcast/playback_error_listener.dart';
-import 'package:pinepods_mobile/ui/podcast/podcast_context_menu.dart';
-import 'package:pinepods_mobile/ui/podcast/podcast_episode_list.dart';
-import 'package:pinepods_mobile/ui/widgets/action_text.dart';
-import 'package:pinepods_mobile/ui/widgets/delayed_progress_indicator.dart';
-import 'package:pinepods_mobile/ui/widgets/episode_filter_selector.dart';
-import 'package:pinepods_mobile/ui/widgets/episode_sort_selector.dart';
-import 'package:pinepods_mobile/ui/widgets/placeholder_builder.dart';
-import 'package:pinepods_mobile/ui/widgets/platform_back_button.dart';
-import 'package:pinepods_mobile/ui/widgets/platform_progress_indicator.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_html.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_image.dart';
-import 'package:pinepods_mobile/ui/widgets/sync_spinner.dart';
-import 'package:pinepods_mobile/ui/podcast/mini_player.dart';
-import 'package:pinepods_mobile/ui/pinepods/podcast_details.dart';
-import 'package:pinepods_mobile/entities/pinepods_search.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/feed.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/ui/podcast/funding_menu.dart';
+import 'package:castaway_mobile/ui/podcast/playback_error_listener.dart';
+import 'package:castaway_mobile/ui/podcast/podcast_context_menu.dart';
+import 'package:castaway_mobile/ui/podcast/podcast_episode_list.dart';
+import 'package:castaway_mobile/ui/widgets/action_text.dart';
+import 'package:castaway_mobile/ui/widgets/delayed_progress_indicator.dart';
+import 'package:castaway_mobile/ui/widgets/episode_filter_selector.dart';
+import 'package:castaway_mobile/ui/widgets/episode_sort_selector.dart';
+import 'package:castaway_mobile/ui/widgets/placeholder_builder.dart';
+import 'package:castaway_mobile/ui/widgets/platform_back_button.dart';
+import 'package:castaway_mobile/ui/widgets/platform_progress_indicator.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_html.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_image.dart';
+import 'package:castaway_mobile/ui/widgets/sync_spinner.dart';
+import 'package:castaway_mobile/ui/podcast/mini_player.dart';
+import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
+import 'package:castaway_mobile/entities/castaway_search.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dialogs/flutter_dialogs.dart';
 import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// This Widget takes a search result and builds a list of currently available podcasts.
 ///
@@ -859,19 +859,19 @@ class _FollowButtonState extends State<FollowButton> {
     final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     final settings = settingsBloc.currentSettings;
     
-    if (settings.pinepodsServer != null && 
-        settings.pinepodsApiKey != null && 
-        settings.pinepodsUserId != null) {
+    if (settings.castawayServer != null && 
+        settings.castawayApiKey != null && 
+        settings.castawayUserId != null) {
       
       // Check if the podcast is now subscribed to Castaway
-      final pinepodsService = PinepodsService();
-      pinepodsService.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
+      final castawayService = CastawayService();
+      castawayService.setCredentials(settings.castawayServer!, settings.castawayApiKey!);
       
       try {
-        final isSubscribed = await pinepodsService.checkPodcastExists(
+        final isSubscribed = await castawayService.checkPodcastExists(
           widget.podcast.title,
           widget.podcast.url ?? '',
-          settings.pinepodsUserId!
+          settings.castawayUserId!
         );
         
         if (isSubscribed && mounted) {
@@ -883,7 +883,7 @@ class _FollowButtonState extends State<FollowButton> {
           });
           
           // Create unified podcast object for Castaway context
-          final unifiedPodcast = UnifiedPinepodsPodcast(
+          final unifiedPodcast = UnifiedCastawayPodcast(
             id: 0, // Will be fetched by Castaway component
             indexId: 0, // Default for subscribed podcasts
             title: widget.podcast.title,
@@ -904,8 +904,8 @@ class _FollowButtonState extends State<FollowButton> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute<void>(
-              settings: const RouteSettings(name: 'pinepodspodcastdetails'),
-              builder: (context) => PinepodsPodcastDetails(
+              settings: const RouteSettings(name: 'castawaypodcastdetails'),
+              builder: (context) => CastawayPodcastDetails(
                 podcast: unifiedPodcast,
                 isFollowing: true,
               ),

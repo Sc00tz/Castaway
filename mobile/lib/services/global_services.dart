@@ -1,25 +1,25 @@
 // lib/services/global_services.dart
-import 'package:pinepods_mobile/services/nowplaying/nowplaying_service.dart';
-import 'package:pinepods_mobile/services/offline/offline_action_queue.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_audio_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
+import 'package:castaway_mobile/services/nowplaying/nowplaying_service.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
+import 'package:castaway_mobile/services/castaway/castaway_audio_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 
 /// Global service access point for the app
 class GlobalServices {
-  static PinepodsAudioService? _pinepodsAudioService;
-  static PinepodsService? _pinepodsService;
+  static CastawayAudioService? _castawayAudioService;
+  static CastawayService? _castawayService;
   static OfflineActionQueue? _offlineActionQueue;
   static NowPlayingService? _nowPlayingService;
 
-  /// Set the global services (called from PinepodsPodcastApp)
+  /// Set the global services (called from CastawayPodcastApp)
   static void initialize({
-    required PinepodsAudioService pinepodsAudioService,
-    required PinepodsService pinepodsService,
+    required CastawayAudioService castawayAudioService,
+    required CastawayService castawayService,
     OfflineActionQueue? offlineActionQueue,
     NowPlayingService? nowPlayingService,
   }) {
-    _pinepodsAudioService = pinepodsAudioService;
-    _pinepodsService = pinepodsService;
+    _castawayAudioService = castawayAudioService;
+    _castawayService = castawayService;
     _offlineActionQueue = offlineActionQueue;
     _nowPlayingService = nowPlayingService;
   }
@@ -32,19 +32,19 @@ class GlobalServices {
   
   /// Update global service credentials (called when user logs in or settings change)
   static void setCredentials(String server, String apiKey) {
-    _pinepodsService?.setCredentials(server, apiKey);
+    _castawayService?.setCredentials(server, apiKey);
   }
   
-  /// Get the global PinepodsAudioService instance
-  static PinepodsAudioService? get pinepodsAudioService => _pinepodsAudioService;
+  /// Get the global CastawayAudioService instance
+  static CastawayAudioService? get castawayAudioService => _castawayAudioService;
   
-  /// Get the global PinepodsService instance
-  static PinepodsService? get pinepodsService => _pinepodsService;
+  /// Get the global CastawayService instance
+  static CastawayService? get castawayService => _castawayService;
   
   /// Clear services (for testing or cleanup)
   static void clear() {
-    _pinepodsAudioService = null;
-    _pinepodsService = null;
+    _castawayAudioService = null;
+    _castawayService = null;
     _offlineActionQueue = null;
   }
 }

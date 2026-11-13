@@ -5,30 +5,30 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
-import 'package:pinepods_mobile/core/download_presence.dart';
-import 'package:pinepods_mobile/core/utils.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/sleep.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/entities/home_data.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_audio_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/services/global_services.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
-import 'package:pinepods_mobile/state/queue_event_state.dart';
+import 'package:castaway_mobile/core/download_presence.dart';
+import 'package:castaway_mobile/core/utils.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/sleep.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/entities/home_data.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_audio_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/services/global_services.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/state/queue_event_state.dart';
 import 'package:rxdart/rxdart.dart';
 
 class NativeAudioPlayerService extends AudioPlayerService {
-  static const platform = MethodChannel('com.pinepods/audio_player');
-  static const eventChannel = EventChannel('com.pinepods/audio_events');
+  static const platform = MethodChannel('com.castaway/audio_player');
+  static const eventChannel = EventChannel('com.castaway/audio_events');
 
   final log = Logger('NativeAudioPlayerService');
   final Repository repository;
   final SettingsService settingsService;
-  PinepodsAudioService? _pinepodsAudioService;
+  CastawayAudioService? _castawayAudioService;
 
   var _playbackSpeed = 1.0;
   var _trimSilence = false;
@@ -69,7 +69,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
   bool _startIsLocal = false;
 
   /// Whether we've already reported the decoded duration for the current
-  /// episode to the server (see PinepodsAudioService.updateEpisodeDurationIfNeeded).
+  /// episode to the server (see CastawayAudioService.updateEpisodeDurationIfNeeded).
   bool _actualDurationReported = false;
 
   StreamSubscription<int>? _sleepSubscription;
@@ -99,7 +99,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
     _refreshCarBrowseWhenReady();
 
     // Set up native log handler to capture Android/iOS logs
-    const nativeLogChannel = MethodChannel('com.pinepods/native_logs');
+    const nativeLogChannel = MethodChannel('com.castaway/native_logs');
     nativeLogChannel.setMethodCallHandler(_handleNativeLog);
 
     // Defer subscription — on Android, configureFlutterEngine (which registers the
@@ -313,7 +313,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
       // Mirrors the web player; only fires once per episode.
       if (!_actualDurationReported && duration > 0) {
         _actualDurationReported = true;
-        _pinepodsAudioService?.updateEpisodeDurationIfNeeded(duration / 1000.0);
+        _castawayAudioService?.updateEpisodeDurationIfNeeded(duration / 1000.0);
       }
     }
   }
@@ -378,7 +378,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
         if (_sleepEpisodesRemaining <= 0) {
           log.info('Sleep timer triggered - episode count reached');
           // The episode did finish, so record it before stopping.
-          _pinepodsAudioService?.markCurrentEpisodeCompleted();
+          _castawayAudioService?.markCurrentEpisodeCompleted();
           _sleep = Sleep(type: SleepType.none);
           _sleepState.add(_sleep);
           // Don't suppress the stop that follows — we intend to hide the player.
@@ -404,12 +404,12 @@ class NativeAudioPlayerService extends AudioPlayerService {
       //
       // NOTE: we deliberately do NOT gate on the Episode.guid here — Castaway
       // episodes are played with guid == episode URL (see
-      // PinepodsAudioService._convertToEpisode), not "pinepods_<id>". The
-      // PinepodsAudioService knows whether it is tracking an episode and returns
+      // CastawayAudioService._convertToEpisode), not "castaway_<id>". The
+      // CastawayAudioService knows whether it is tracking an episode and returns
       // false (→ stop) when it is not.
-      if (_pinepodsAudioService != null) {
+      if (_castawayAudioService != null) {
         _setPlayingState(AudioState.buffering);
-        final advanced = await _pinepodsAudioService!.handleEpisodeCompleted();
+        final advanced = await _castawayAudioService!.handleEpisodeCompleted();
         if (advanced) {
           // Leave _handlingCompletion set: the next episode's native
           // playing/buffering event clears it (see _handlePlaybackStateEvent),
@@ -437,14 +437,14 @@ class NativeAudioPlayerService extends AudioPlayerService {
 
   @override
   Future<Episode?> findDownloadedEpisode(int episodeId) async {
-    final guid = 'pinepods_$episodeId';
+    final guid = 'castaway_$episodeId';
 
     final direct = await repository.findEpisodeByGuid(guid);
     if (direct != null && direct.downloadState == DownloadState.downloaded) {
       return direct;
     }
 
-    // Legacy 'pinepods_<id>_<timestamp>' guids.
+    // Legacy 'castaway_<id>_<timestamp>' guids.
     final legacy = await repository.findEpisodesByGuidOrLegacy(guid);
     for (final e in legacy) {
       if (e.downloadState == DownloadState.downloaded) return e;
@@ -473,7 +473,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
     _startIsLocal = isLocal;
 
     // The caller has already resolved where to resume (see
-    // PinepodsAudioService._resolveResumePosition).
+    // CastawayAudioService._resolveResumePosition).
     if (!resume) _currentEpisode!.position = 0;
 
     // Update state
@@ -584,9 +584,9 @@ class NativeAudioPlayerService extends AudioPlayerService {
     _stopLocalPositionSaver();
     if (positionMs != null) await _saveLocalPosition(positionMs: positionMs);
 
-    if (_pinepodsAudioService != null) {
+    if (_castawayAudioService != null) {
       try {
-        await _pinepodsAudioService!.onPause();
+        await _castawayAudioService!.onPause();
       } catch (e) {
         log.warning('Failed to sync on stop: $e');
       }
@@ -849,8 +849,8 @@ class NativeAudioPlayerService extends AudioPlayerService {
     _updateEpisodeState();
   }
 
-  void setPinepodsAudioService(PinepodsAudioService? service) {
-    _pinepodsAudioService = service;
+  void setCastawayAudioService(CastawayAudioService? service) {
+    _castawayAudioService = service;
   }
 
   // Private helper methods
@@ -962,12 +962,12 @@ class NativeAudioPlayerService extends AudioPlayerService {
 
   void _performBackgroundSync() async {
     try {
-      if (_pinepodsAudioService != null) {
-        log.info('performBackgroundSync - syncing to server via pinepodsAudioService');
-        await _pinepodsAudioService!.onPause();
+      if (_castawayAudioService != null) {
+        log.info('performBackgroundSync - syncing to server via castawayAudioService');
+        await _castawayAudioService!.onPause();
         log.info('performBackgroundSync - server sync completed');
       } else {
-        log.warning('performBackgroundSync - pinepodsAudioService is null, cannot sync to server');
+        log.warning('performBackgroundSync - castawayAudioService is null, cannot sync to server');
       }
     } catch (e) {
       log.warning('Background sync failed: $e');
@@ -1020,11 +1020,11 @@ class NativeAudioPlayerService extends AudioPlayerService {
 
   /// The shared Castaway client with credentials applied, and the user id, or
   /// null when not connected to a server.
-  ({PinepodsService api, int userId})? _carApi(String what) {
-    final api = GlobalServices.pinepodsService;
-    final server = settingsService.pinepodsServer;
-    final apiKey = settingsService.pinepodsApiKey;
-    final userId = settingsService.pinepodsUserId;
+  ({CastawayService api, int userId})? _carApi(String what) {
+    final api = GlobalServices.castawayService;
+    final server = settingsService.castawayServer;
+    final apiKey = settingsService.castawayApiKey;
+    final userId = settingsService.castawayUserId;
     if (api == null || server == null || apiKey == null || userId == null) {
       log.warning('Not connected to a Castaway server for $what');
       _refreshCarBrowseWhenReady();
@@ -1036,7 +1036,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
 
   Future<List<Map<String, dynamic>>> _carList(
     String what,
-    Future<List<Map<String, dynamic>>> Function(PinepodsService api, int userId) load,
+    Future<List<Map<String, dynamic>>> Function(CastawayService api, int userId) load,
   ) async {
     final car = _carApi(what);
     if (car == null) return [];
@@ -1053,10 +1053,10 @@ class NativeAudioPlayerService extends AudioPlayerService {
   }
 
   bool get _carDataReady =>
-      GlobalServices.pinepodsService != null &&
-      settingsService.pinepodsServer != null &&
-      settingsService.pinepodsApiKey != null &&
-      settingsService.pinepodsUserId != null;
+      GlobalServices.castawayService != null &&
+      settingsService.castawayServer != null &&
+      settingsService.castawayApiKey != null &&
+      settingsService.castawayUserId != null;
 
   /// Once the app can serve car data (services and login loaded at startup),
   /// has Android Auto re-query its lists so ones it got while starting up
@@ -1098,16 +1098,16 @@ class NativeAudioPlayerService extends AudioPlayerService {
       });
 
   Future<List<Map<String, dynamic>>> _getDownloadsForCar() => _carList('Downloads',
-      (api, userId) async => (await api.getServerDownloads(userId)).map(_pinepodsEpisodeToCarMap).toList());
+      (api, userId) async => (await api.getServerDownloads(userId)).map(_castawayEpisodeToCarMap).toList());
 
   Future<List<Map<String, dynamic>>> _getQueueForCar() => _carList('Queue',
-      (api, userId) async => (await api.getQueuedEpisodes(userId)).map(_pinepodsEpisodeToCarMap).toList());
+      (api, userId) async => (await api.getQueuedEpisodes(userId)).map(_castawayEpisodeToCarMap).toList());
 
   Future<List<Map<String, dynamic>>> _getSavedForCar() => _carList('Saved',
-      (api, userId) async => (await api.getSavedEpisodes(userId)).map(_pinepodsEpisodeToCarMap).toList());
+      (api, userId) async => (await api.getSavedEpisodes(userId)).map(_castawayEpisodeToCarMap).toList());
 
   Future<List<Map<String, dynamic>>> _getHistoryForCar() => _carList('History',
-      (api, userId) async => (await api.getUserHistory(userId)).map(_pinepodsEpisodeToCarMap).toList());
+      (api, userId) async => (await api.getUserHistory(userId)).map(_castawayEpisodeToCarMap).toList());
 
   Future<List<Map<String, dynamic>>> _getPodcastsForCar() => _carList('Podcasts', (api, userId) async {
         final podcasts = await api.getUserPodcasts(userId);
@@ -1125,7 +1125,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
       _carList('Podcast $podcastId episodes', (api, userId) async {
         final id = int.tryParse(podcastId);
         if (id == null) return [];
-        return (await api.getPodcastEpisodes(userId, id)).map(_pinepodsEpisodeToCarMap).toList();
+        return (await api.getPodcastEpisodes(userId, id)).map(_castawayEpisodeToCarMap).toList();
       });
 
   Future<List<Map<String, dynamic>>> _getPlaylistsForCar() => _carList('Playlists', (api, userId) async {
@@ -1144,19 +1144,19 @@ class NativeAudioPlayerService extends AudioPlayerService {
       _carList('Playlist $playlistId episodes', (api, userId) async {
         final id = int.tryParse(playlistId);
         if (id == null) return [];
-        return (await api.getPlaylistEpisodes(userId, id)).episodes.map(_pinepodsEpisodeToCarMap).toList();
+        return (await api.getPlaylistEpisodes(userId, id)).episodes.map(_castawayEpisodeToCarMap).toList();
       });
 
   Future<void> _playFromMediaIdForCar(String guid) async {
-    // Car media ids are "pinepods_<episodeId>".
-    final episodeId = guid.startsWith('pinepods_') ? int.tryParse(guid.replaceFirst('pinepods_', '')) : null;
+    // Car media ids are "castaway_<episodeId>".
+    final episodeId = guid.startsWith('castaway_') ? int.tryParse(guid.replaceFirst('castaway_', '')) : null;
     if (episodeId == null) {
       log.warning('Invalid car media id: $guid');
       return;
     }
     final car = _carApi('playback');
-    final pinepodsAudioService = GlobalServices.pinepodsAudioService;
-    if (car == null || pinepodsAudioService == null) return;
+    final castawayAudioService = GlobalServices.castawayAudioService;
+    if (car == null || castawayAudioService == null) return;
 
     try {
       final episode = await car.api.getEpisodeMetadata(episodeId, car.userId);
@@ -1165,7 +1165,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
         return;
       }
       // Play using the SAME method as the app UI
-      await pinepodsAudioService.playPinepodsEpisode(pinepodsEpisode: episode, resume: true);
+      await castawayAudioService.playCastawayEpisode(castawayEpisode: episode, resume: true);
     } catch (e) {
       log.severe('Error playing from media ID: $e');
     }
@@ -1175,15 +1175,15 @@ class NativeAudioPlayerService extends AudioPlayerService {
   Future<Map<String, dynamic>> _searchForCar(String query) async {
     final episodes = await _carList('Search', (api, userId) async {
       final page = await api.searchEpisodes(userId, query, limit: 50);
-      return page.results.map((r) => _pinepodsEpisodeToCarMap(r.toPinepodsEpisode())).toList();
+      return page.results.map((r) => _castawayEpisodeToCarMap(r.toCastawayEpisode())).toList();
     });
     return {'episodes': episodes};
   }
 
-  /// Convert PinepodsEpisode to car map format
-  Map<String, dynamic> _pinepodsEpisodeToCarMap(PinepodsEpisode episode) {
+  /// Convert CastawayEpisode to car map format
+  Map<String, dynamic> _castawayEpisodeToCarMap(CastawayEpisode episode) {
     return {
-      'guid': 'pinepods_${episode.episodeId}',
+      'guid': 'castaway_${episode.episodeId}',
       'title': episode.episodeTitle,
       'podcast': episode.podcastName,
       'imageUrl': episode.episodeArtwork,
@@ -1196,7 +1196,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
   /// Convert HomeEpisode to car map format
   Map<String, dynamic> _homeEpisodeToCarMap(HomeEpisode episode) {
     return {
-      'guid': 'pinepods_${episode.episodeId}',
+      'guid': 'castaway_${episode.episodeId}',
       'title': episode.episodeTitle,
       'podcast': episode.podcastName,
       'imageUrl': episode.episodeArtwork,

@@ -79,7 +79,7 @@ mod tests {
 
     impl EpisodeFile {
         async fn new() -> Self {
-            let path = std::env::temp_dir().join(format!("pinepods-{}.mp3", uuid::Uuid::new_v4()));
+            let path = std::env::temp_dir().join(format!("castaway-{}.mp3", uuid::Uuid::new_v4()));
             tokio::fs::write(&path, b"0123456789").await.unwrap();
             Self(path)
         }

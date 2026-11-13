@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/services/logging/app_logger.dart';
+import 'package:castaway_mobile/services/logging/app_logger.dart';
 
 void main() {
   group('isImageLoadError', () {

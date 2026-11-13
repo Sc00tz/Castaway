@@ -4,8 +4,8 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

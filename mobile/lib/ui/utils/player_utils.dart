@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/ui/podcast/now_playing.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_audio_service.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/ui/podcast/now_playing.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/services/castaway/castaway_audio_service.dart';
 import 'package:provider/provider.dart';
 
 /// If we have the 'show now playing upon play' option set to true, launch
@@ -19,14 +19,14 @@ void optionalShowNowPlaying(BuildContext context, AppSettings settings) {
 }
 
 /// Helper function to play a Castaway episode and automatically show the full screen player if enabled
-Future<void> playPinepodsEpisodeWithOptionalFullScreen(
+Future<void> playCastawayEpisodeWithOptionalFullScreen(
   BuildContext context,
-  PinepodsAudioService audioService,
-  PinepodsEpisode episode, {
+  CastawayAudioService audioService,
+  CastawayEpisode episode, {
   bool resume = true,
 }) async {
-  await audioService.playPinepodsEpisode(
-    pinepodsEpisode: episode,
+  await audioService.playCastawayEpisode(
+    castawayEpisode: episode,
     resume: resume,
   );
   

@@ -43,7 +43,7 @@
     "feed": "Feed",
     "history": "Verlauf",
     "local_downloads": "Lokale Downloads",
-    "pinepods": "Castaway",
+    "castaway": "Castaway",
     "podcasts": "Podcasts",
     "queue": "Warteschlange",
     "saved": "Gespeichert",
@@ -167,8 +167,8 @@
     "ok": "OK",
     "oldest_first": "Älteste zuerst",
     "password": "Passwort",
-    "pinepods": "Castaway",
-    "pinepods_logo": "Castaway Logo",
+    "castaway": "Castaway",
+    "castaway_logo": "Castaway Logo",
     "previous": "Vorheriges",
     "remove": "Entfernen",
     "reset": "Reset",
@@ -609,7 +609,7 @@
     "unknown": "Unbekannt",
     "username": "Benutzername",
     "valid_email_required": "Bitte gib eine gültige E-Mail Addresse an",
-    "welcome_to_pinepods": "",
+    "welcome_to_castaway": "",
     "youtube": "YouTube"
   },
   "history": {
@@ -636,7 +636,7 @@
     "top_podcasts": "Top‑Podcasts",
     "unknown_author": "Unbekannter Autor",
     "welcome_description": "Fange damit an, ein paar Podcasts über die Suchleiste oben hinzuzufügen.",
-    "welcome_to_pinepods": "Willkommen bei Castaway",
+    "welcome_to_castaway": "Willkommen bei Castaway",
     "welcome_hero_subtitle": "",
     "welcome_intro": "",
     "welcome_get_started": "",
@@ -657,7 +657,7 @@
   "internal_error": {
     "clever_quip": "",
     "head_back_home": "",
-    "you_broke_pinepods": ""
+    "you_broke_castaway": ""
   },
   "import_options": {
     "add_them": "Hinzufügen!",

@@ -10,12 +10,12 @@ async fn all_due(app: &TestApp) {
 
 async fn scheduled_refresh(app: &TestApp) {
     all_due(app).await;
-    pinepods_api::handlers::refresh::refresh_due_podcasts(&app.state).await.expect("scheduled refresh");
+    castaway_api::handlers::refresh::refresh_due_podcasts(&app.state).await.expect("scheduled refresh");
 }
 
 async fn refresh_all(app: &TestApp, user: &TestUser) {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
-    pinepods_api::handlers::refresh::run_refresh_process(user.id, false, tx, app.state.clone())
+    castaway_api::handlers::refresh::run_refresh_process(user.id, false, tx, app.state.clone())
         .await
         .expect("refresh all");
     while rx.recv().await.is_some() {}
@@ -96,7 +96,7 @@ struct LocalFolder(std::path::PathBuf);
 
 impl LocalFolder {
     fn new() -> LocalFolder {
-        let dir = std::env::temp_dir().join(format!("pinepods-local-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("castaway-local-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         LocalFolder(dir)
     }
@@ -116,7 +116,7 @@ async fn add_local_podcast(app: &TestApp, user: &TestUser, folder: &LocalFolder)
     let db = app.db();
     let feed_url = format!("local://{}", folder.0.display());
     let pod = db.add_local_podcast("My Recordings", &feed_url, "", "", "", false, user.id).await.unwrap();
-    let candidates = pinepods_api::handlers::local_podcast::scan_local_directory(&folder.0, &Default::default()).unwrap();
+    let candidates = castaway_api::handlers::local_podcast::scan_local_directory(&folder.0, &Default::default()).unwrap();
     db.add_local_episodes(pod, user.id, &candidates).await.unwrap();
     pod
 }

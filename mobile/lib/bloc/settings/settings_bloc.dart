@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/bloc.dart';
-import 'package:pinepods_mobile/core/environment.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/entities/search_providers.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/themes.dart';
+import 'package:castaway_mobile/bloc/bloc.dart';
+import 'package:castaway_mobile/core/environment.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/entities/search_providers.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/themes.dart';
 import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -32,15 +32,15 @@ class SettingsBloc extends Bloc {
   final BehaviorSubject<int> _rewindInterval = BehaviorSubject<int>();
   final BehaviorSubject<int> _autoUpdatePeriod = BehaviorSubject<int>();
   final BehaviorSubject<int> _layoutMode = BehaviorSubject<int>();
-  final BehaviorSubject<String?> _pinepodsServer = BehaviorSubject<String?>();
-  final BehaviorSubject<String?> _pinepodsApiKey = BehaviorSubject<String?>();
-  final BehaviorSubject<int?> _pinepodsUserId = BehaviorSubject<int?>();
-  final BehaviorSubject<String?> _pinepodsUsername = BehaviorSubject<String?>();
-  final BehaviorSubject<String?> _pinepodsEmail = BehaviorSubject<String?>();
+  final BehaviorSubject<String?> _castawayServer = BehaviorSubject<String?>();
+  final BehaviorSubject<String?> _castawayApiKey = BehaviorSubject<String?>();
+  final BehaviorSubject<int?> _castawayUserId = BehaviorSubject<int?>();
+  final BehaviorSubject<String?> _castawayUsername = BehaviorSubject<String?>();
+  final BehaviorSubject<String?> _castawayEmail = BehaviorSubject<String?>();
   final BehaviorSubject<List<String>> _bottomBarOrder = BehaviorSubject<List<String>>();
   final BehaviorSubject<bool> _autoDownloadWifiOnly = BehaviorSubject<bool>();
   final BehaviorSubject<bool> _preferServerDownloadSource = BehaviorSubject<bool>();
-  final BehaviorSubject<bool> _pinepodsUseGravatar = BehaviorSubject<bool>();
+  final BehaviorSubject<bool> _castawayUseGravatar = BehaviorSubject<bool>();
   final BehaviorSubject<int> _autoDownloadQueueCount = BehaviorSubject<int>();
   final BehaviorSubject<bool> _mirrorServerDownloads = BehaviorSubject<bool>();
   final BehaviorSubject<int> _deleteDownloadsAfterDays = BehaviorSubject<int>();
@@ -58,23 +58,23 @@ class SettingsBloc extends Bloc {
   /// Refreshes the account details mirrored from the server: username and email when
   /// missing, and the Gravatar setting every start so a change made elsewhere applies.
   Future<void> _fetchUserDetailsIfNeeded() async {
-    final userId = _currentSettings.pinepodsUserId;
-    if (_currentSettings.pinepodsServer == null || _currentSettings.pinepodsApiKey == null || userId == null) {
+    final userId = _currentSettings.castawayUserId;
+    if (_currentSettings.castawayServer == null || _currentSettings.castawayApiKey == null || userId == null) {
       return;
     }
 
     try {
-      final pinepodsService = PinepodsService();
-      pinepodsService.setCredentials(_currentSettings.pinepodsServer!, _currentSettings.pinepodsApiKey!);
+      final castawayService = CastawayService();
+      castawayService.setCredentials(_currentSettings.castawayServer!, _currentSettings.castawayApiKey!);
 
-      final userDetails = await pinepodsService.getUserDetails(userId);
+      final userDetails = await castawayService.getUserDetails(userId);
       if (userDetails == null) return;
 
-      if (_currentSettings.pinepodsUsername == null || _currentSettings.pinepodsUsername!.isEmpty) {
-        setPinepodsUsername(userDetails['Username'] ?? userDetails['username'] ?? '');
-        setPinepodsEmail(userDetails['Email'] ?? userDetails['email'] ?? '');
+      if (_currentSettings.castawayUsername == null || _currentSettings.castawayUsername!.isEmpty) {
+        setCastawayUsername(userDetails['Username'] ?? userDetails['username'] ?? '');
+        setCastawayEmail(userDetails['Email'] ?? userDetails['email'] ?? '');
       }
-      setPinepodsUseGravatar(userDetails['UseGravatar'] == true);
+      setCastawayUseGravatar(userDetails['UseGravatar'] == true);
     } catch (e) {
       // Silently fail - don't break the app if this fails
       print('Failed to fetch user details on startup: $e');
@@ -107,15 +107,15 @@ class SettingsBloc extends Bloc {
       fastForwardInterval: _settingsService.fastForwardInterval,
       rewindInterval: _settingsService.rewindInterval,
       layout: _settingsService.layoutMode,
-      pinepodsServer: _settingsService.pinepodsServer,
-      pinepodsApiKey: _settingsService.pinepodsApiKey,
-      pinepodsUserId: _settingsService.pinepodsUserId,
-      pinepodsUsername: _settingsService.pinepodsUsername,
-      pinepodsEmail: _settingsService.pinepodsEmail,
+      castawayServer: _settingsService.castawayServer,
+      castawayApiKey: _settingsService.castawayApiKey,
+      castawayUserId: _settingsService.castawayUserId,
+      castawayUsername: _settingsService.castawayUsername,
+      castawayEmail: _settingsService.castawayEmail,
       bottomBarOrder: _settingsService.bottomBarOrder,
       autoDownloadWifiOnly: _settingsService.autoDownloadWifiOnly,
       preferServerDownloadSource: _settingsService.preferServerDownloadSource,
-      pinepodsUseGravatar: _settingsService.pinepodsUseGravatar,
+      castawayUseGravatar: _settingsService.castawayUseGravatar,
       autoDownloadQueueCount: _settingsService.autoDownloadQueueCount,
       mirrorServerDownloads: _settingsService.mirrorServerDownloads,
       deleteDownloadsAfterDays: _settingsService.deleteDownloadsAfterDays,
@@ -227,34 +227,34 @@ class SettingsBloc extends Bloc {
       _settingsService.rewindInterval = seconds;
     });
 
-    _pinepodsServer.listen((server) {
-      _currentSettings = _currentSettings.copyWith(pinepodsServer: server);
+    _castawayServer.listen((server) {
+      _currentSettings = _currentSettings.copyWith(castawayServer: server);
       _settings.add(_currentSettings);
-      _settingsService.pinepodsServer = server;
+      _settingsService.castawayServer = server;
     });
 
-    _pinepodsApiKey.listen((apiKey) {
-      _currentSettings = _currentSettings.copyWith(pinepodsApiKey: apiKey);
+    _castawayApiKey.listen((apiKey) {
+      _currentSettings = _currentSettings.copyWith(castawayApiKey: apiKey);
       _settings.add(_currentSettings);
-      _settingsService.pinepodsApiKey = apiKey;
+      _settingsService.castawayApiKey = apiKey;
     });
 
-    _pinepodsUserId.listen((userId) {
-      _currentSettings = _currentSettings.copyWith(pinepodsUserId: userId);
+    _castawayUserId.listen((userId) {
+      _currentSettings = _currentSettings.copyWith(castawayUserId: userId);
       _settings.add(_currentSettings);
-      _settingsService.pinepodsUserId = userId;
+      _settingsService.castawayUserId = userId;
     });
 
-    _pinepodsUsername.listen((username) {
-      _currentSettings = _currentSettings.copyWith(pinepodsUsername: username);
+    _castawayUsername.listen((username) {
+      _currentSettings = _currentSettings.copyWith(castawayUsername: username);
       _settings.add(_currentSettings);
-      _settingsService.pinepodsUsername = username;
+      _settingsService.castawayUsername = username;
     });
 
-    _pinepodsEmail.listen((email) {
-      _currentSettings = _currentSettings.copyWith(pinepodsEmail: email);
+    _castawayEmail.listen((email) {
+      _currentSettings = _currentSettings.copyWith(castawayEmail: email);
       _settings.add(_currentSettings);
-      _settingsService.pinepodsEmail = email;
+      _settingsService.castawayEmail = email;
     });
 
     _layoutMode.listen((mode) {
@@ -281,10 +281,10 @@ class SettingsBloc extends Bloc {
       _settingsService.preferServerDownloadSource = value;
     });
 
-    _pinepodsUseGravatar.listen((value) {
-      _currentSettings = _currentSettings.copyWith(pinepodsUseGravatar: value);
+    _castawayUseGravatar.listen((value) {
+      _currentSettings = _currentSettings.copyWith(castawayUseGravatar: value);
       _settings.add(_currentSettings);
-      _settingsService.pinepodsUseGravatar = value;
+      _settingsService.castawayUseGravatar = value;
     });
 
     _autoDownloadQueueCount.listen((value) {
@@ -356,15 +356,15 @@ class SettingsBloc extends Bloc {
 
   void Function(int) get layoutMode => _layoutMode.add;
 
-  void Function(String?) get setPinepodsServer => _pinepodsServer.add;
+  void Function(String?) get setCastawayServer => _castawayServer.add;
 
-  void Function(String?) get setPinepodsApiKey => _pinepodsApiKey.add;
+  void Function(String?) get setCastawayApiKey => _castawayApiKey.add;
 
-  void Function(int?) get setPinepodsUserId => _pinepodsUserId.add;
+  void Function(int?) get setCastawayUserId => _castawayUserId.add;
 
-  void Function(String?) get setPinepodsUsername => _pinepodsUsername.add;
+  void Function(String?) get setCastawayUsername => _castawayUsername.add;
 
-  void Function(String?) get setPinepodsEmail => _pinepodsEmail.add;
+  void Function(String?) get setCastawayEmail => _castawayEmail.add;
 
   void Function(List<String>) get setBottomBarOrder => _bottomBarOrder.add;
 
@@ -372,7 +372,7 @@ class SettingsBloc extends Bloc {
 
   void Function(bool) get setPreferServerDownloadSource => _preferServerDownloadSource.add;
 
-  void Function(bool) get setPinepodsUseGravatar => _pinepodsUseGravatar.add;
+  void Function(bool) get setCastawayUseGravatar => _castawayUseGravatar.add;
 
   void Function(int) get setAutoDownloadQueueCount => _autoDownloadQueueCount.add;
 
@@ -393,17 +393,17 @@ class SettingsBloc extends Bloc {
   Future<void> _syncThemeToServer(String theme) async {
     try {
       // Only sync if we have Castaway credentials
-      if (_currentSettings.pinepodsServer != null &&
-          _currentSettings.pinepodsApiKey != null &&
-          _currentSettings.pinepodsUserId != null) {
+      if (_currentSettings.castawayServer != null &&
+          _currentSettings.castawayApiKey != null &&
+          _currentSettings.castawayUserId != null) {
         
-        final pinepodsService = PinepodsService();
-        pinepodsService.setCredentials(
-          _currentSettings.pinepodsServer!,
-          _currentSettings.pinepodsApiKey!,
+        final castawayService = CastawayService();
+        castawayService.setCredentials(
+          _currentSettings.castawayServer!,
+          _currentSettings.castawayApiKey!,
         );
         
-        await pinepodsService.setUserTheme(_currentSettings.pinepodsUserId!, theme);
+        await castawayService.setUserTheme(_currentSettings.castawayUserId!, theme);
         log.info('Theme synced to server: $theme');
       }
     } catch (e) {
@@ -415,17 +415,17 @@ class SettingsBloc extends Bloc {
   Future<void> fetchThemeFromServer() async {
     try {
       // Only fetch if we have Castaway credentials
-      if (_currentSettings.pinepodsServer != null &&
-          _currentSettings.pinepodsApiKey != null &&
-          _currentSettings.pinepodsUserId != null) {
+      if (_currentSettings.castawayServer != null &&
+          _currentSettings.castawayApiKey != null &&
+          _currentSettings.castawayUserId != null) {
         
-        final pinepodsService = PinepodsService();
-        pinepodsService.setCredentials(
-          _currentSettings.pinepodsServer!,
-          _currentSettings.pinepodsApiKey!,
+        final castawayService = CastawayService();
+        castawayService.setCredentials(
+          _currentSettings.castawayServer!,
+          _currentSettings.castawayApiKey!,
         );
         
-        final serverTheme = await pinepodsService.getUserTheme(_currentSettings.pinepodsUserId!);
+        final serverTheme = await castawayService.getUserTheme(_currentSettings.castawayUserId!);
         if (serverTheme != null && serverTheme.isNotEmpty) {
           final theme = ThemeRegistry.normalizeKey(serverTheme);
           // Update local theme without syncing back to server
@@ -459,15 +459,15 @@ class SettingsBloc extends Bloc {
     _rewindInterval.close();
     _autoUpdatePeriod.close();
     _layoutMode.close();
-    _pinepodsServer.close();
-    _pinepodsApiKey.close();
-    _pinepodsUserId.close();
-    _pinepodsUsername.close();
-    _pinepodsEmail.close();
+    _castawayServer.close();
+    _castawayApiKey.close();
+    _castawayUserId.close();
+    _castawayUsername.close();
+    _castawayEmail.close();
     _bottomBarOrder.close();
     _autoDownloadWifiOnly.close();
     _preferServerDownloadSource.close();
-    _pinepodsUseGravatar.close();
+    _castawayUseGravatar.close();
     _autoDownloadQueueCount.close();
     _mirrorServerDownloads.close();
     _deleteDownloadsAfterDays.close();

@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use tokio::signal;
 use tracing::{debug, error, info, warn};
 
-use pinepods_api::{
+use castaway_api::{
     config::Config,
     create_app,
     database::DatabasePool,

@@ -2,7 +2,7 @@
 // Icon names shared with the web app's icon picker (collections and playlists
 // store a Phosphor class name such as `ph-bookmark-simple`).
 import 'package:flutter/widgets.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 const Map<String, IconData> kCollectionIcons = {
   'ph-bookmark-simple': PhosphorIconsRegular.bookmarkSimple,

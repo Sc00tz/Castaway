@@ -11,7 +11,7 @@ use yew::prelude::*;
 /// probe (see `call_restore_status`), which stays responsive throughout.
 ///
 /// Polling is event-driven: it only runs when the restore trigger
-/// (`setting_components::restore_server`) has set the `pinepods_restore_active` flag in
+/// (`setting_components::restore_server`) has set the `castaway_restore_active` flag in
 /// localStorage. When idle (the normal case) this component does nothing at all -- no
 /// interval, no requests -- so `/restore_status` is never hit outside an actual restore.
 /// The flag survives the sign-out that a restore forces (see `LogOut`, which preserves it
@@ -27,13 +27,13 @@ pub fn restore_overlay() -> Html {
     let server_url = use_state(|| -> Option<String> {
         let storage = web_sys::window()?.local_storage().ok().flatten()?;
         if storage
-            .get_item("pinepods_restore_active")
+            .get_item("castaway_restore_active")
             .ok()
             .flatten()
             .as_deref()
             == Some("1")
         {
-            storage.get_item("pinepods_restore_server").ok().flatten()
+            storage.get_item("castaway_restore_server").ok().flatten()
         } else {
             None
         }
@@ -116,8 +116,8 @@ pub fn restore_overlay() -> Html {
 fn finish_restore() {
     if let Some(window) = web_sys::window() {
         if let Ok(Some(storage)) = window.local_storage() {
-            let _ = storage.remove_item("pinepods_restore_active");
-            let _ = storage.remove_item("pinepods_restore_server");
+            let _ = storage.remove_item("castaway_restore_active");
+            let _ = storage.remove_item("castaway_restore_server");
         }
         let _ = window.location().reload();
     }

@@ -17,7 +17,7 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* PinepodsAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* PinepodsAudioPlayer.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* CastawayAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* CastawayAudioPlayer.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F4 /* AudioPlayerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F5 /* AudioPlayerPlugin.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F6 /* NowPlayingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F7 /* NowPlayingManager.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F8 /* RemoteCommandManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F9 /* RemoteCommandManager.swift */; };
@@ -59,7 +59,7 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A1B2C3D4E5F6A7B8C9D0E1F3 /* PinepodsAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinepodsAudioPlayer.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F3 /* CastawayAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastawayAudioPlayer.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F5 /* AudioPlayerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerPlugin.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F7 /* NowPlayingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F9 /* RemoteCommandManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteCommandManager.swift; sourceTree = "<group>"; };
@@ -156,7 +156,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1FA /* Audio */ = {
 			isa = PBXGroup;
 			children = (
-				A1B2C3D4E5F6A7B8C9D0E1F3 /* PinepodsAudioPlayer.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F3 /* CastawayAudioPlayer.swift */,
 				B942319B4AEC40BAA46D76C2 /* PlaybackIntent.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F5 /* AudioPlayerPlugin.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F7 /* NowPlayingManager.swift */,
@@ -332,7 +332,7 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* PinepodsAudioPlayer.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* CastawayAudioPlayer.swift in Sources */,
 				B942319B4AEC40BAA46D76C1 /* PlaybackIntent.swift in Sources */,
 				A1B2C3D4E5F6A7B8C9D0E1F4 /* AudioPlayerPlugin.swift in Sources */,
 				A1B2C3D4E5F6A7B8C9D0E1F6 /* NowPlayingManager.swift in Sources */,

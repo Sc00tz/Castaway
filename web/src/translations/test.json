@@ -43,7 +43,7 @@
     "feed": "ZZTEST-FEED-ZZTEST",
     "history": "ZZTEST-HISTORY-ZZTEST",
     "local_downloads": "ZZTEST-LOCAL-DOWNLOADS-ZZTEST",
-    "pinepods": "ZZTEST-PINEPODS-ZZTEST",
+    "castaway": "ZZTEST-CASTAWAY-ZZTEST",
     "podcasts": "ZZTEST-PODCASTS-ZZTEST",
     "queue": "ZZTEST-QUEUE-ZZTEST",
     "saved": "ZZTEST-SAVED-ZZTEST",
@@ -167,8 +167,8 @@
     "ok": "ZZTEST-OK-ZZTEST",
     "oldest_first": "ZZTEST-OLDEST-FIRST-ZZTEST",
     "password": "ZZTEST-PASSWORD-ZZTEST",
-    "pinepods": "ZZTEST-PINEPODS-ZZTEST",
-    "pinepods_logo": "ZZTEST-PINEPODS-LOGO-ZZTEST",
+    "castaway": "ZZTEST-CASTAWAY-ZZTEST",
+    "castaway_logo": "ZZTEST-CASTAWAY-LOGO-ZZTEST",
     "previous": "ZZTEST-PREVIOUS-ZZTEST",
     "remove": "ZZTEST-REMOVE-ZZTEST",
     "reset": "ZZTEST-RESET-ZZTEST",
@@ -609,7 +609,7 @@
     "unknown": "ZZTEST-UNKNOWN-ZZTEST",
     "username": "ZZTEST-USERNAME-ZZTEST",
     "valid_email_required": "ZZTEST-VALID-EMAIL-REQUIRED-ZZTEST",
-    "welcome_to_pinepods": "",
+    "welcome_to_castaway": "",
     "youtube": "ZZTEST-YOUTUBE-ZZTEST"
   },
   "history": {
@@ -636,7 +636,7 @@
     "top_podcasts": "ZZTEST-TOP-PODCASTS-ZZTEST",
     "unknown_author": "ZZTEST-UNKNOWN-AUTHOR-ZZTEST",
     "welcome_description": "ZZTEST-WELCOME-DESCRIPTION-ZZTEST",
-    "welcome_to_pinepods": "ZZTEST-WELCOME-TO-PINEPODS-ZZTEST",
+    "welcome_to_castaway": "ZZTEST-WELCOME-TO-CASTAWAY-ZZTEST",
     "welcome_hero_subtitle": "",
     "welcome_intro": "",
     "welcome_get_started": "",
@@ -657,7 +657,7 @@
   "internal_error": {
     "clever_quip": "",
     "head_back_home": "",
-    "you_broke_pinepods": ""
+    "you_broke_castaway": ""
   },
   "import_options": {
     "add_them": "ZZTEST-ADD-THEM-ZZTEST",

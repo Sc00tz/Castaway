@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

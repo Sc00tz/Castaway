@@ -7,9 +7,9 @@
 // test them.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/core/download_presence.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
+import 'package:castaway_mobile/core/download_presence.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
 
 Episode _episode({
   required String guid,
@@ -30,8 +30,8 @@ Episode _episode({
 void main() {
   group('findStaleDownloadRecords', () {
     test('matches a downloaded episode pointing at the given filepath/filename', () {
-      final target = _episode(guid: 'pinepods_101');
-      final other = _episode(guid: 'pinepods_202', filepath: '/other', filename: 'other.mp3');
+      final target = _episode(guid: 'castaway_101');
+      final other = _episode(guid: 'castaway_202', filepath: '/other', filename: 'other.mp3');
 
       final result = findStaleDownloadRecords(
         [target, other],
@@ -43,8 +43,8 @@ void main() {
     });
 
     test('matches every duplicate/legacy-guid record for the same dead file', () {
-      final first = _episode(guid: 'pinepods_101');
-      final legacyDuplicate = _episode(guid: 'pinepods_101_1699999999');
+      final first = _episode(guid: 'castaway_101');
+      final legacyDuplicate = _episode(guid: 'castaway_101_1699999999');
 
       final result = findStaleDownloadRecords(
         [first, legacyDuplicate],
@@ -57,7 +57,7 @@ void main() {
     });
 
     test('ignores episodes that are not marked downloaded even with a matching path', () {
-      final notDownloaded = _episode(guid: 'pinepods_101', downloadState: DownloadState.none);
+      final notDownloaded = _episode(guid: 'castaway_101', downloadState: DownloadState.none);
 
       final result = findStaleDownloadRecords(
         [notDownloaded],
@@ -69,7 +69,7 @@ void main() {
     });
 
     test('returns nothing when filepath or filename is null rather than mass-matching', () {
-      final withNullPath = _episode(guid: 'pinepods_101', filepath: null, filename: null);
+      final withNullPath = _episode(guid: 'castaway_101', filepath: null, filename: null);
 
       final result = findStaleDownloadRecords(
         [withNullPath],
@@ -83,7 +83,7 @@ void main() {
 
   group('resolveDownloadPresence', () {
     test('is downloaded when the single matching row is present on disk', () {
-      final row = _episode(guid: 'pinepods_101');
+      final row = _episode(guid: 'castaway_101');
 
       final result = resolveDownloadPresence([row], {row: true});
 
@@ -92,7 +92,7 @@ void main() {
     });
 
     test('is not downloaded and flags the row as stale when its file is missing', () {
-      final row = _episode(guid: 'pinepods_101');
+      final row = _episode(guid: 'castaway_101');
 
       final result = resolveDownloadPresence([row], {row: false});
 
@@ -101,8 +101,8 @@ void main() {
     });
 
     test('is downloaded if any duplicate/legacy-guid row is present, even if another is stale', () {
-      final missing = _episode(guid: 'pinepods_101');
-      final present = _episode(guid: 'pinepods_101_1699999999');
+      final missing = _episode(guid: 'castaway_101');
+      final present = _episode(guid: 'castaway_101_1699999999');
 
       final result = resolveDownloadPresence(
         [missing, present],
@@ -116,7 +116,7 @@ void main() {
     });
 
     test('ignores rows that are not marked downloaded', () {
-      final notDownloaded = _episode(guid: 'pinepods_101', downloadState: DownloadState.none);
+      final notDownloaded = _episode(guid: 'castaway_101', downloadState: DownloadState.none);
 
       final result = resolveDownloadPresence([notDownloaded], {});
 
@@ -127,7 +127,7 @@ void main() {
     test('treats a downloaded row missing from the presence map as stale', () {
       // Defensive case: a caller that forgot to check a downloaded row
       // should not silently count it as present.
-      final row = _episode(guid: 'pinepods_101');
+      final row = _episode(guid: 'castaway_101');
 
       final result = resolveDownloadPresence([row], {});
 
@@ -138,7 +138,7 @@ void main() {
 
   group('clearDownloadState', () {
     test('resets downloadState, percentage, filepath, and filename', () {
-      final episode = _episode(guid: 'pinepods_101');
+      final episode = _episode(guid: 'castaway_101');
 
       clearDownloadState(episode);
 

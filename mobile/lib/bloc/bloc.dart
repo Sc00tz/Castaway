@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// Base class for all BLoCs to give each a hook into the mobile

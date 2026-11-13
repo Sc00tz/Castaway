@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
-import 'package:pinepods_mobile/ui/widgets/platform_progress_indicator.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_list.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/ui/widgets/platform_progress_indicator.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_list.dart';
 import 'package:flutter/material.dart';
 import 'package:podcast_search/podcast_search.dart' as search;
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 class SearchResults extends StatelessWidget {
   final Stream<BlocState> data;

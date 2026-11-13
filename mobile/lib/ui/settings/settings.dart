@@ -2,34 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/core/download_cleanup.dart';
-import 'package:pinepods_mobile/core/utils.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/settings/episode_refresh.dart';
-import 'package:pinepods_mobile/ui/settings/search_provider.dart';
-import 'package:pinepods_mobile/ui/settings/queue_position_setting.dart';
-import 'package:pinepods_mobile/ui/settings/server_download_defaults.dart';
-import 'package:pinepods_mobile/ui/settings/settings_section_label.dart';
-import 'package:pinepods_mobile/ui/settings/bottom_bar_order.dart';
-import 'package:pinepods_mobile/ui/widgets/action_text.dart';
-import 'package:pinepods_mobile/ui/widgets/certificate_import_section.dart';
-import 'package:pinepods_mobile/ui/settings/pinepods_login.dart';
-import 'package:pinepods_mobile/ui/debug/debug_logs_page.dart';
-import 'package:pinepods_mobile/ui/themes.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/core/download_cleanup.dart';
+import 'package:castaway_mobile/core/utils.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/settings/episode_refresh.dart';
+import 'package:castaway_mobile/ui/settings/search_provider.dart';
+import 'package:castaway_mobile/ui/settings/queue_position_setting.dart';
+import 'package:castaway_mobile/ui/settings/server_download_defaults.dart';
+import 'package:castaway_mobile/ui/settings/settings_section_label.dart';
+import 'package:castaway_mobile/ui/settings/bottom_bar_order.dart';
+import 'package:castaway_mobile/ui/widgets/action_text.dart';
+import 'package:castaway_mobile/ui/widgets/certificate_import_section.dart';
+import 'package:castaway_mobile/ui/settings/castaway_login.dart';
+import 'package:castaway_mobile/ui/debug/debug_logs_page.dart';
+import 'package:castaway_mobile/ui/themes.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dialogs/flutter_dialogs.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/ui/utils/l10n_labels.dart';
-import 'package:pinepods_mobile/l10n/app_locale.dart';
-import 'package:pinepods_mobile/services/language/account_language.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/utils/l10n_labels.dart';
+import 'package:castaway_mobile/l10n/app_locale.dart';
+import 'package:castaway_mobile/services/language/account_language.dart';
 
 /// This is the settings page and allows the user to select various
 /// options for the app.
@@ -84,14 +84,14 @@ class _SettingsState extends State<Settings> {
                   ),
                 ),
               ),
-              if (snapshot.data!.pinepodsUserId != null)
+              if (snapshot.data!.castawayUserId != null)
                 MergeSemantics(
                   child: ListTile(
                     leading: const Icon(PhosphorIconsRegular.userCircle),
                     title: Text(L.of(context)!.show_my_gravatar),
                     subtitle: Text(L.of(context)!.show_my_gravatar_description),
                     trailing: Switch.adaptive(
-                      value: snapshot.data!.pinepodsUseGravatar,
+                      value: snapshot.data!.castawayUseGravatar,
                       onChanged: (value) => _setUseGravatar(settingsBloc, snapshot.data!, value),
                     ),
                   ),
@@ -380,7 +380,7 @@ class _SettingsState extends State<Settings> {
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: CertificateImportSection(),
               ),
-              const PinepodsLoginWidget(),
+              const CastawayLoginWidget(),
               const _WebAppInfoWidget(),
             ],
           );
@@ -394,9 +394,9 @@ class _SettingsState extends State<Settings> {
   /// language setting. Empty means follow the device language.
   Future<void> _setLanguage(SettingsBloc settingsBloc, AppSettings settings, String code) async {
     settingsBloc.setLanguage(code);
-    final server = settings.pinepodsServer;
-    final apiKey = settings.pinepodsApiKey;
-    final userId = settings.pinepodsUserId;
+    final server = settings.castawayServer;
+    final apiKey = settings.castawayApiKey;
+    final userId = settings.castawayUserId;
     if (server == null || apiKey == null || userId == null) return;
     await AccountLanguage.save(
       server: server,
@@ -407,11 +407,11 @@ class _SettingsState extends State<Settings> {
   }
 
   Future<void> _setUseGravatar(SettingsBloc settingsBloc, AppSettings settings, bool value) async {
-    final previous = settings.pinepodsUseGravatar;
-    settingsBloc.setPinepodsUseGravatar(value);
-    final service = PinepodsService()..setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
-    if (!await service.setUseGravatar(settings.pinepodsUserId!, value)) {
-      settingsBloc.setPinepodsUseGravatar(previous);
+    final previous = settings.castawayUseGravatar;
+    settingsBloc.setCastawayUseGravatar(value);
+    final service = CastawayService()..setCredentials(settings.castawayServer!, settings.castawayApiKey!);
+    if (!await service.setUseGravatar(settings.castawayUserId!, value)) {
+      settingsBloc.setCastawayUseGravatar(previous);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(L.of(context)!.could_not_update_gravatar)));
       }
@@ -560,7 +560,7 @@ class _WebAppInfoWidget extends StatelessWidget {
     return Consumer<SettingsBloc>(
       builder: (context, settingsBloc, child) {
         final settings = settingsBloc.currentSettings;
-        final serverUrl = settings.pinepodsServer;
+        final serverUrl = settings.castawayServer;
 
         // Only show if user is connected to a server
         if (serverUrl == null || serverUrl.isEmpty) {

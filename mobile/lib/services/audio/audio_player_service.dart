@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/sleep.dart';
-import 'package:pinepods_mobile/state/queue_event_state.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/sleep.dart';
+import 'package:castaway_mobile/state/queue_event_state.dart';
 import 'package:rxdart/rxdart.dart';
 
 enum AudioState {

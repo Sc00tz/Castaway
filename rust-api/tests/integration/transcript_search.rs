@@ -3,7 +3,7 @@
 
 use crate::harness::sql;
 use crate::harness::*;
-use pinepods_api::services::feed_transcripts;
+use castaway_api::services::feed_transcripts;
 
 const VTT: &str = "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nWelcome to the show.\n\n00:01:30.000 --> 00:01:35.000\n<v Host>Today: Kubernetes networking.</v>\n";
 const SRT: &str = "1\n00:00:02,000 --> 00:00:05,000\nNothing about containers here\n";

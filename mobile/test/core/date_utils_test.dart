@@ -5,7 +5,7 @@
 // offset, so it's worth pinning down precisely.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/core/date_utils.dart';
+import 'package:castaway_mobile/core/date_utils.dart';
 
 void main() {
   group('parseEpisodePubDateLocal', () {

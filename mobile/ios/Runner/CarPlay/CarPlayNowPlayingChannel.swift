@@ -6,7 +6,7 @@ import MediaPlayer
 /// Allows Flutter to trigger pushing the native CPNowPlayingTemplate.shared
 class CarPlayNowPlayingChannel: NSObject, FlutterPlugin {
 
-    static let channelName = "com.pinepods/carplay_now_playing"
+    static let channelName = "com.castaway/carplay_now_playing"
 
     static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(

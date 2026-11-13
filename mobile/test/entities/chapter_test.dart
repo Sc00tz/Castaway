@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/chapter.dart';
+import 'package:castaway_mobile/entities/chapter.dart';
 
 void main() {
   group('construction', () {

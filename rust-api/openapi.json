@@ -17884,7 +17884,7 @@
           },
           "origin": {
             "type": "string",
-            "description": "`pinepods`, `client` (an app on the Castaway server) or `target` (the external server)."
+            "description": "`castaway`, `client` (an app on the Castaway server) or `target` (the external server)."
           }
         }
       },

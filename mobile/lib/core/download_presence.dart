@@ -1,5 +1,5 @@
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
 
 /// Pure helpers for repairing/checking download records against files that
 /// may no longer be present on disk. Shared by the playback path
@@ -9,7 +9,7 @@ import 'package:pinepods_mobile/entities/episode.dart';
 /// "Downloaded" badge) so both call the same logic instead of duplicating it.
 ///
 /// There can be more than one matching row per episode (legacy
-/// 'pinepods_<id>_<timestamp>' guids mean the same download can have
+/// 'castaway_<id>_<timestamp>' guids mean the same download can have
 /// duplicate rows - see LocalDownloadUtils.deleteLocalDownload, which already
 /// handles this).
 
@@ -18,8 +18,8 @@ import 'package:pinepods_mobile/entities/episode.dart';
 ///
 /// The episode actually asked to play is sometimes a transient playback
 /// wrapper rather than the real repository row for its download (its guid is
-/// the stream URL, not 'pinepods_<id>' - see the "transient playback record"
-/// comment in PinepodsAudioService._convertToEpisode), so matching by
+/// the stream URL, not 'castaway_<id>' - see the "transient playback record"
+/// comment in CastawayAudioService._convertToEpisode), so matching by
 /// filepath/filename - which *is* copied through faithfully - finds the real
 /// record(s) regardless of which object triggered the check.
 List<Episode> findStaleDownloadRecords(

@@ -29,7 +29,7 @@ async fn add_provider_with(app: &TestApp, userinfo: serde_json::Value, role_rest
         Fixture::new("application/json", r#"{"access_token":"fixture-token","token_type":"Bearer"}"#),
     );
     let userinfo_url = fx.serve("idp/userinfo", Fixture::new("application/json", userinfo.to_string()));
-    let client_id = format!("pinepods-{}", fx.namespace);
+    let client_id = format!("castaway-{}", fx.namespace);
     let mut provider = json!({
         "provider_name": "Fixture IdP",
         "client_id": client_id,

@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
 
 class DownloadProgress {
   final String id;

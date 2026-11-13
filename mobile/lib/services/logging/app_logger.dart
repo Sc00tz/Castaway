@@ -96,7 +96,7 @@ class AppLogger {
 
   static const int maxLogEntries = 1000; // Keep last 1000 log entries in memory
   static const int maxSessionFiles = 5; // Keep last 5 session log files
-  static const String crashLogFileName = 'pinepods_last_crash.txt';
+  static const String crashLogFileName = 'castaway_last_crash.txt';
   
   final Queue<LogEntry> _logs = Queue<LogEntry>();
   DeviceInfo? _deviceInfo;

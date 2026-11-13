@@ -237,7 +237,7 @@ fn welcome_home() -> Html {
     let tip_search_desc = i18n.t("home.welcome_tip_search_desc").to_string();
     let tip_feed_title = i18n.t("home.welcome_tip_feed_title").to_string();
     let tip_feed_desc = i18n.t("home.welcome_tip_feed_desc").to_string();
-    let welcome_title = i18n.t("home.welcome_to_pinepods").to_string();
+    let welcome_title = i18n.t("home.welcome_to_castaway").to_string();
     let open_podcasts = i18n.t("home.welcome_open_podcasts").to_string();
 
     html! {
@@ -328,7 +328,7 @@ pub fn home() -> Html {
     let i18n_no_playlists_available = i18n.t("home.no_playlists_available").to_string();
     let i18n_recent_episodes = i18n.t("home.recent_episodes").to_string();
     let i18n_no_recent_episodes = i18n.t("home.no_recent_episodes").to_string();
-    let i18n_welcome_to_pinepods = i18n.t("home.welcome_to_pinepods").to_string();
+    let i18n_welcome_to_castaway = i18n.t("home.welcome_to_castaway").to_string();
     let i18n_welcome_description = i18n.t("home.welcome_description").to_string();
     let i18n_no_description_provided = i18n.t("home.no_description_provided").to_string();
     let i18n_unknown_author = i18n.t("home.unknown_author").to_string();
@@ -611,7 +611,7 @@ pub fn home() -> Html {
                     }
                 } else {
                     { empty_message(
-                        &i18n_welcome_to_pinepods,
+                        &i18n_welcome_to_castaway,
                         &i18n_welcome_description
                     )}
                 }

@@ -6,9 +6,9 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
 
-import 'package:pinepods_mobile/core/environment.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/services/download/download_manager.dart';
+import 'package:castaway_mobile/core/environment.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/services/download/download_manager.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:logging/logging.dart';
 

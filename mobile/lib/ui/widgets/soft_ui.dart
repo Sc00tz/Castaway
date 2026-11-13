@@ -1,7 +1,7 @@
 // lib/ui/widgets/soft_ui.dart
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Neutral foreground for secondary controls. Taken from the body text colour
 /// rather than colorScheme.onSurface, which some themes set to their accent.

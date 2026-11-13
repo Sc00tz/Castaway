@@ -235,8 +235,8 @@ impl Config {
         };
 
         let security = SecurityConfig {
-            api_key_header: "pinepods_api".to_string(),
-            jwt_secret: "pinepods-default-secret".to_string(),
+            api_key_header: "castaway_api".to_string(),
+            jwt_secret: "castaway-default-secret".to_string(),
             password_salt_rounds: 12,
         };
 

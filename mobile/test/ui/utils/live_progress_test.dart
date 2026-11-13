@@ -3,7 +3,7 @@
 // be tested without any widget/Provider/audio stream scaffolding.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/ui/utils/live_progress.dart';
+import 'package:castaway_mobile/ui/utils/live_progress.dart';
 
 void main() {
   group('formatDuration', () {

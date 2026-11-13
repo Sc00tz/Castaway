@@ -9,7 +9,7 @@ use super::env;
 /// Point the server's data and web directories at a fresh sandbox holding the real
 /// translations. Resolved, because the local-media path checks compare resolved paths.
 pub fn install_sandbox() {
-    let base = std::env::temp_dir().join(format!("pinepods-files-{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("castaway-files-{}", std::process::id()));
     let data = base.join("data");
     let web = base.join("web");
     let translations = web.join("static/translations");

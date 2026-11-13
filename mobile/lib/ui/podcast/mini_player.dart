@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/ui/podcast/now_playing.dart';
-import 'package:pinepods_mobile/ui/podcast/skip_interval_icon.dart';
-import 'package:pinepods_mobile/ui/widgets/placeholder_builder.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_image.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/ui/podcast/now_playing.dart';
+import 'package:castaway_mobile/ui/podcast/skip_interval_icon.dart';
+import 'package:castaway_mobile/ui/widgets/placeholder_builder.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// Displays a mini podcast player widget if a podcast is playing or paused.
 ///

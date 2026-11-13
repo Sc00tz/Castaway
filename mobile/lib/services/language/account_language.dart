@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
-import 'package:pinepods_mobile/l10n/app_locale.dart';
+import 'package:castaway_mobile/l10n/app_locale.dart';
 
 /// Reads and writes the account's UI language on the Castaway server — the
 /// same preference the web app uses.

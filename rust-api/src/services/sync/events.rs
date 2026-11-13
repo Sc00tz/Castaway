@@ -17,7 +17,7 @@ pub use super::db::EpisodeEvent;
 /// Whether a write by `origin` for `user_id` should be logged: Castaway's own changes, for users
 /// who sync. Check this before starting work that only exists for the event.
 pub async fn should_log(db: &DatabasePool, user_id: i32, origin: SyncOrigin) -> bool {
-    origin == SyncOrigin::Pinepods && sync_enabled(db, user_id).await
+    origin == SyncOrigin::Castaway && sync_enabled(db, user_id).await
 }
 
 fn settle(pool: &DatabasePool, user_id: i32, what: &str, result: AppResult<bool>) {

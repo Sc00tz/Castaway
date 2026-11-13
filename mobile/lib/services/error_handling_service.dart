@@ -1,7 +1,7 @@
 // lib/services/error_handling_service.dart
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Service for handling and categorizing errors, especially server connection issues
 class ErrorHandlingService {

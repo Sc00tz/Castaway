@@ -1,6 +1,6 @@
 // lib/entities/home_data.dart
 
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
 
 class HomePodcast {
   final int podcastId;
@@ -145,7 +145,7 @@ class HomeEpisode {
         downloaded: downloaded,
       );
 
-  PinepodsEpisode toPinepodsEpisode() => PinepodsEpisode(
+  CastawayEpisode toCastawayEpisode() => CastawayEpisode(
         podcastName: podcastName,
         episodeTitle: episodeTitle,
         episodePubDate: episodePubDate,

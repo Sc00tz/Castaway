@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:pinepods_mobile/bloc/podcast/episode_bloc.dart';
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/podcast/queue_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/state/queue_event_state.dart';
-import 'package:pinepods_mobile/ui/podcast/episode_details.dart';
-import 'package:pinepods_mobile/ui/podcast/transport_controls.dart';
-import 'package:pinepods_mobile/ui/widgets/action_text.dart';
-import 'package:pinepods_mobile/ui/widgets/tile_image.dart';
-import 'package:pinepods_mobile/ui/utils/player_utils.dart';
+import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
+import 'package:castaway_mobile/bloc/podcast/episode_bloc.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/podcast/queue_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/state/queue_event_state.dart';
+import 'package:castaway_mobile/ui/podcast/episode_details.dart';
+import 'package:castaway_mobile/ui/podcast/transport_controls.dart';
+import 'package:castaway_mobile/ui/widgets/action_text.dart';
+import 'package:castaway_mobile/ui/widgets/tile_image.dart';
+import 'package:castaway_mobile/ui/utils/player_utils.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ import 'package:flutter_dialogs/flutter_dialogs.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// This class builds a tile for each episode in the podcast feed.
 class EpisodeTile extends StatelessWidget {

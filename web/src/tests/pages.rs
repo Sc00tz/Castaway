@@ -29,7 +29,7 @@ use crate::pages::settings::Settings;
 use crate::pages::user_stats::UserStats;
 use crate::requests::login_requests::{GetUserDetails, LoginServerRequest};
 
-const SERVER: &str = "http://pinepods.test";
+const SERVER: &str = "http://castaway.test";
 
 #[derive(Clone, PartialEq)]
 enum Page {

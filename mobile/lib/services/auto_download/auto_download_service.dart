@@ -1,12 +1,12 @@
 // lib/services/auto_download/auto_download_service.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/services/network/network_status.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/ui/utils/local_download_utils.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/services/network/network_status.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/ui/utils/local_download_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AutoDownloadService {
@@ -16,7 +16,7 @@ class AutoDownloadService {
   /// Called on app launch after auth. Fire-and-forget — does not block startup.
   static Future<void> checkAndDownloadNewEpisodes({
     required BuildContext context,
-    required PinepodsService pinepodsService,
+    required CastawayService castawayService,
     required int userId,
   }) async {
     // Respect the WiFi-only preference for automatic downloads.
@@ -30,7 +30,7 @@ class AutoDownloadService {
 
     List<Podcast> podcasts;
     try {
-      podcasts = await pinepodsService.getUserPodcasts(userId);
+      podcasts = await castawayService.getUserPodcasts(userId);
     } catch (_) {
       return;
     }
@@ -47,7 +47,7 @@ class AutoDownloadService {
 
       await _processOnePodcast(
         context: context,
-        pinepodsService: pinepodsService,
+        castawayService: castawayService,
         userId: userId,
         podcastId: podcastId,
         prefs: prefs,
@@ -57,7 +57,7 @@ class AutoDownloadService {
 
   static Future<void> _processOnePodcast({
     required BuildContext context,
-    required PinepodsService pinepodsService,
+    required CastawayService castawayService,
     required int userId,
     required int podcastId,
     required SharedPreferences prefs,
@@ -72,9 +72,9 @@ class AutoDownloadService {
     // First run — just record the timestamp, don't download the back-catalog
     if (lastCheck == null) return;
 
-    List<PinepodsEpisode> episodes;
+    List<CastawayEpisode> episodes;
     try {
-      episodes = await pinepodsService.getPodcastEpisodes(userId, podcastId);
+      episodes = await castawayService.getPodcastEpisodes(userId, podcastId);
     } catch (_) {
       return;
     }

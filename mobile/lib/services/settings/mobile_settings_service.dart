@@ -4,9 +4,9 @@
 
 import 'dart:math';
 
-import 'package:pinepods_mobile/core/environment.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/core/environment.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,68 +40,68 @@ class MobileSettingsService extends SettingsService {
   }
 
   @override
-  String? get pinepodsServer => _sharedPreferences.getString('pinepods_server');
+  String? get castawayServer => _sharedPreferences.getString('castaway_server');
 
   @override
-  set pinepodsServer(String? value) {
+  set castawayServer(String? value) {
     if (value == null) {
-      _sharedPreferences.remove('pinepods_server');
+      _sharedPreferences.remove('castaway_server');
     } else {
-      _sharedPreferences.setString('pinepods_server', value);
+      _sharedPreferences.setString('castaway_server', value);
     }
-    settingsNotifier.sink.add('pinepods_server');
+    settingsNotifier.sink.add('castaway_server');
   }
 
   @override
-  String? get pinepodsApiKey => _sharedPreferences.getString('pinepods_api_key');
+  String? get castawayApiKey => _sharedPreferences.getString('castaway_api_key');
 
   @override
-  set pinepodsApiKey(String? value) {
+  set castawayApiKey(String? value) {
     if (value == null) {
-      _sharedPreferences.remove('pinepods_api_key');
+      _sharedPreferences.remove('castaway_api_key');
     } else {
-      _sharedPreferences.setString('pinepods_api_key', value);
+      _sharedPreferences.setString('castaway_api_key', value);
     }
-    settingsNotifier.sink.add('pinepods_api_key');
+    settingsNotifier.sink.add('castaway_api_key');
   }
 
   @override
-  int? get pinepodsUserId => _sharedPreferences.getInt('pinepods_user_id');
+  int? get castawayUserId => _sharedPreferences.getInt('castaway_user_id');
 
   @override
-  set pinepodsUserId(int? value) {
+  set castawayUserId(int? value) {
     if (value == null) {
-      _sharedPreferences.remove('pinepods_user_id');
+      _sharedPreferences.remove('castaway_user_id');
     } else {
-      _sharedPreferences.setInt('pinepods_user_id', value);
+      _sharedPreferences.setInt('castaway_user_id', value);
     }
-    settingsNotifier.sink.add('pinepods_user_id');
+    settingsNotifier.sink.add('castaway_user_id');
   }
 
   @override
-  String? get pinepodsUsername => _sharedPreferences.getString('pinepods_username');
+  String? get castawayUsername => _sharedPreferences.getString('castaway_username');
 
   @override
-  set pinepodsUsername(String? value) {
+  set castawayUsername(String? value) {
     if (value == null) {
-      _sharedPreferences.remove('pinepods_username');
+      _sharedPreferences.remove('castaway_username');
     } else {
-      _sharedPreferences.setString('pinepods_username', value);
+      _sharedPreferences.setString('castaway_username', value);
     }
-    settingsNotifier.sink.add('pinepods_username');
+    settingsNotifier.sink.add('castaway_username');
   }
 
   @override
-  String? get pinepodsEmail => _sharedPreferences.getString('pinepods_email');
+  String? get castawayEmail => _sharedPreferences.getString('castaway_email');
 
   @override
-  set pinepodsEmail(String? value) {
+  set castawayEmail(String? value) {
     if (value == null) {
-      _sharedPreferences.remove('pinepods_email');
+      _sharedPreferences.remove('castaway_email');
     } else {
-      _sharedPreferences.setString('pinepods_email', value);
+      _sharedPreferences.setString('castaway_email', value);
     }
-    settingsNotifier.sink.add('pinepods_email');
+    settingsNotifier.sink.add('castaway_email');
   }
 
   @override
@@ -310,12 +310,12 @@ class MobileSettingsService extends SettingsService {
   }
 
   @override
-  bool get pinepodsUseGravatar => _sharedPreferences.getBool('pinepods_use_gravatar') ?? false;
+  bool get castawayUseGravatar => _sharedPreferences.getBool('castaway_use_gravatar') ?? false;
 
   @override
-  set pinepodsUseGravatar(bool value) {
-    _sharedPreferences.setBool('pinepods_use_gravatar', value);
-    settingsNotifier.sink.add('pinepods_use_gravatar');
+  set castawayUseGravatar(bool value) {
+    _sharedPreferences.setBool('castaway_use_gravatar', value);
+    settingsNotifier.sink.add('castaway_use_gravatar');
   }
 
   @override

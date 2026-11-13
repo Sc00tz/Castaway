@@ -30,7 +30,7 @@ pub type Overrides<'a> = &'a dyn Fn(&str) -> Option<Value>;
 
 impl Spec {
     pub fn load() -> Spec {
-        let (_, api) = pinepods_api::openapi_router().split_for_parts();
+        let (_, api) = castaway_api::openapi_router().split_for_parts();
         Spec { doc: serde_json::to_value(&api).expect("serialize spec") }
     }
 
@@ -202,8 +202,8 @@ impl Spec {
         if content.contains_key("multipart/form-data") {
             // An empty, well-formed multipart body: enough to get past the extractor.
             return Some((
-                b"--pinepodsboundary--\r\n".to_vec(),
-                "multipart/form-data; boundary=pinepodsboundary",
+                b"--castawayboundary--\r\n".to_vec(),
+                "multipart/form-data; boundary=castawayboundary",
             ));
         }
         if content.contains_key("text/plain") {

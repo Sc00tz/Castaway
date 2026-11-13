@@ -4,11 +4,11 @@
 
 import 'dart:async';
 
-import 'package:pinepods_mobile/bloc/bloc.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/podcast/podcast_service.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/bloc/bloc.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/podcast/podcast_service.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
 import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
 

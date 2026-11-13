@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
 
 void main() {
   group('sensibleDefaults', () {
@@ -11,8 +11,8 @@ void main() {
       expect(settings.playbackSpeed, 1.0);
       expect(settings.autoUpdateEpisodePeriod, -1);
       expect(settings.showFunding, isTrue);
-      expect(settings.pinepodsServer, isNull);
-      expect(settings.pinepodsUserId, isNull);
+      expect(settings.castawayServer, isNull);
+      expect(settings.castawayUserId, isNull);
       expect(settings.bottomBarOrder, isNotEmpty);
     });
   });
@@ -21,10 +21,10 @@ void main() {
     test('overrides only the specified fields, keeping the rest', () {
       final base = AppSettings.sensibleDefaults();
 
-      final updated = base.copyWith(theme: 'Light', pinepodsUserId: 42);
+      final updated = base.copyWith(theme: 'Light', castawayUserId: 42);
 
       expect(updated.theme, 'Light');
-      expect(updated.pinepodsUserId, 42);
+      expect(updated.castawayUserId, 42);
       // Untouched fields carry over from the original.
       expect(updated.searchProvider, base.searchProvider);
       expect(updated.playbackSpeed, base.playbackSpeed);
@@ -36,7 +36,7 @@ void main() {
       final copy = base.copyWith();
 
       expect(copy.theme, base.theme);
-      expect(copy.pinepodsServer, base.pinepodsServer);
+      expect(copy.castawayServer, base.castawayServer);
       expect(copy.bottomBarOrder, base.bottomBarOrder);
     });
   });

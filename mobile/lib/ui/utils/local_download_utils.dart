@@ -2,17 +2,17 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/core/download_presence.dart';
-import 'package:pinepods_mobile/core/utils.dart';
-import 'package:pinepods_mobile/entities/pinepods_episode.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/repository/repository.dart';
-import 'package:pinepods_mobile/services/auto_download/download_cleanup_service.dart';
-import 'package:pinepods_mobile/services/logging/app_logger.dart';
-import 'package:pinepods_mobile/bloc/podcast/podcast_bloc.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/core/download_presence.dart';
+import 'package:castaway_mobile/core/utils.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/repository/repository.dart';
+import 'package:castaway_mobile/services/auto_download/download_cleanup_service.dart';
+import 'package:castaway_mobile/services/logging/app_logger.dart';
+import 'package:castaway_mobile/bloc/podcast/podcast_bloc.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
 import 'package:provider/provider.dart';
 
 /// Utility class for managing local downloads of Castaway episodes
@@ -20,23 +20,23 @@ class LocalDownloadUtils {
   static final Map<String, bool> _localDownloadStatusCache = {};
 
   /// Generate consistent GUID for Castaway episodes for local downloads
-  static String generateEpisodeGuid(PinepodsEpisode episode) {
-    return 'pinepods_${episode.episodeId}';
+  static String generateEpisodeGuid(CastawayEpisode episode) {
+    return 'castaway_${episode.episodeId}';
   }
 
   /// Parse the server episode id out of a local-download guid. Handles both the
-  /// canonical `pinepods_<id>` format and the legacy `pinepods_<id>_<ts>` one.
+  /// canonical `castaway_<id>` format and the legacy `castaway_<id>_<ts>` one.
   static int episodeIdFromGuid(String guid) {
-    if (!guid.startsWith('pinepods_')) return 0;
-    final rest = guid.substring('pinepods_'.length);
+    if (!guid.startsWith('castaway_')) return 0;
+    final rest = guid.substring('castaway_'.length);
     return int.tryParse(rest.split('_').first) ?? 0;
   }
 
-  /// Convert a stored local-download [Episode] back into a [PinepodsEpisode] so
+  /// Convert a stored local-download [Episode] back into a [CastawayEpisode] so
   /// it can be rendered and played through the same widgets/path as every other
   /// (server) episode. The reverse of [localDownloadEpisode]'s conversion.
-  static PinepodsEpisode toPinepodsEpisode(Episode episode) {
-    return PinepodsEpisode(
+  static CastawayEpisode toCastawayEpisode(Episode episode) {
+    return CastawayEpisode(
       podcastName: episode.podcast ?? 'Unknown Podcast', // i18n-ignore
       episodeTitle: episode.title ?? '',
       episodePubDate: episode.publicationDate?.toIso8601String() ?? '',
@@ -69,7 +69,7 @@ class LocalDownloadUtils {
   /// Check if episode is downloaded locally with caching
   static Future<bool> isEpisodeDownloadedLocally(
     BuildContext context, 
-    PinepodsEpisode episode
+    CastawayEpisode episode
   ) async {
     final guid = generateEpisodeGuid(episode);
     final logger = AppLogger();
@@ -109,14 +109,14 @@ class LocalDownloadUtils {
   /// returns the server's stream endpoint so we mirror the server copy instead
   /// of re-fetching from the original feed. Returns null to fall back to the
   /// episode's original content URL.
-  static String? resolveServerDownloadUrl(AppSettings settings, PinepodsEpisode episode) {
+  static String? resolveServerDownloadUrl(AppSettings settings, CastawayEpisode episode) {
     if (!settings.preferServerDownloadSource) return null;
     if (!episode.downloaded) return null;
     if (episode.episodeId <= 0) return null;
 
-    final server = settings.pinepodsServer;
-    final apiKey = settings.pinepodsApiKey;
-    final userId = settings.pinepodsUserId;
+    final server = settings.castawayServer;
+    final apiKey = settings.castawayApiKey;
+    final userId = settings.castawayUserId;
     if (server == null || server.isEmpty || apiKey == null || apiKey.isEmpty || userId == null) {
       return null;
     }
@@ -175,7 +175,7 @@ class LocalDownloadUtils {
   }
 
   /// Update local download status cache
-  static void updateLocalDownloadStatus(PinepodsEpisode episode, bool isDownloaded) {
+  static void updateLocalDownloadStatus(CastawayEpisode episode, bool isDownloaded) {
     final guid = generateEpisodeGuid(episode);
     _localDownloadStatusCache[guid] = isDownloaded;
   }
@@ -184,7 +184,7 @@ class LocalDownloadUtils {
   /// be matched against the store in one read instead of one per episode.
   static Future<Map<int, List<Episode>>> localEpisodesById(Repository repository) async {
     final byId = <int, List<Episode>>{};
-    for (final ep in await repository.findPinepodsEpisodes()) {
+    for (final ep in await repository.findCastawayEpisodes()) {
       final id = episodeIdFromGuid(ep.guid);
       if (id != 0) (byId[id] ??= []).add(ep);
     }
@@ -194,7 +194,7 @@ class LocalDownloadUtils {
   /// Proactively load local download status for a list of episodes
   static Future<void> loadLocalDownloadStatuses(
     BuildContext context, 
-    List<PinepodsEpisode> episodes
+    List<CastawayEpisode> episodes
   ) async {
     final logger = AppLogger();
     logger.debug('LocalDownload', 'Loading local download statuses for ${episodes.length} episodes');
@@ -223,15 +223,15 @@ class LocalDownloadUtils {
   /// Download episode locally
   static Future<bool> localDownloadEpisode(
     BuildContext context, 
-    PinepodsEpisode episode
+    CastawayEpisode episode
   ) async {
     final logger = AppLogger();
     
     try {
-      // Convert PinepodsEpisode to Episode for local download
+      // Convert CastawayEpisode to Episode for local download
       final localEpisode = Episode(
         guid: generateEpisodeGuid(episode),
-        pguid: 'pinepods_${episode.podcastName.replaceAll(' ', '_').toLowerCase()}',
+        pguid: 'castaway_${episode.podcastName.replaceAll(' ', '_').toLowerCase()}',
         podcast: episode.podcastName,
         title: episode.episodeTitle,
         description: episode.episodeDescription,
@@ -305,7 +305,7 @@ class LocalDownloadUtils {
   /// Delete local download(s) for episode
   static Future<int> deleteLocalDownload(
     BuildContext context, 
-    PinepodsEpisode episode
+    CastawayEpisode episode
   ) async {
     final logger = AppLogger();
     
@@ -338,10 +338,10 @@ class LocalDownloadUtils {
     }
   }
 
-  /// Delete local download(s) for a raw local-download [guid] (`pinepods_<id>`),
-  /// including legacy `pinepods_<id>_<ts>` duplicates. Used by automatic
+  /// Delete local download(s) for a raw local-download [guid] (`castaway_<id>`),
+  /// including legacy `castaway_<id>_<ts>` duplicates. Used by automatic
   /// download managers (queue/mirror) that only have the guid, not a full
-  /// [PinepodsEpisode]. Returns the number of episode records deleted.
+  /// [CastawayEpisode]. Returns the number of episode records deleted.
   static Future<int> deleteLocalDownloadByGuid(
     BuildContext context,
     String guid,

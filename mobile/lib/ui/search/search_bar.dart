@@ -1,13 +1,13 @@
 // Copyright 2020 Ben Hills and the project contributors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/ui/widgets/search_slide_route.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/widgets/search_slide_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'search.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 class SearchBar extends StatefulWidget {
   const SearchBar({super.key});

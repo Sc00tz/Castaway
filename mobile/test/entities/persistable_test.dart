@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/persistable.dart';
+import 'package:castaway_mobile/entities/persistable.dart';
 
 void main() {
   group('empty', () {

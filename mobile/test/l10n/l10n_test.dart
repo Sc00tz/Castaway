@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/l10n/app_locale.dart';
-import 'package:pinepods_mobile/l10n/app_localizations.dart';
+import 'package:castaway_mobile/l10n/app_locale.dart';
+import 'package:castaway_mobile/l10n/app_localizations.dart';
 
 Map<String, dynamic> _readArb(File f) => jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
 

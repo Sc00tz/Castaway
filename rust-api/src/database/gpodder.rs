@@ -237,7 +237,7 @@ impl DatabasePool {
     // keeps its settings ("both"). The user's current listening state is published to the sync
     // log so clients get it on their first sync.
     pub async fn set_gpodder_internal_sync(&self, user_id: i32) -> AppResult<serde_json::Value> {
-        let device_name = self.sync_ensure_pinepods_device(user_id).await?;
+        let device_name = self.sync_ensure_castaway_device(user_id).await?;
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Users" SET gpodderserverenabled = TRUE, defaultgpodderdevice = $1 WHERE userid = $2"#)

@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn discovery_url_from_issuer() {
         assert_eq!(
-            discovery_document_url("https://auth.example.com/application/o/pinepods/").unwrap(),
-            "https://auth.example.com/application/o/pinepods/.well-known/openid-configuration"
+            discovery_document_url("https://auth.example.com/application/o/castaway/").unwrap(),
+            "https://auth.example.com/application/o/castaway/.well-known/openid-configuration"
         );
         assert_eq!(
             discovery_document_url("https://id.example.com/.well-known/openid-configuration").unwrap(),
@@ -98,8 +98,8 @@ mod tests {
             Some("https://pods.example.com:12345/api/auth/callback")
         );
         assert_eq!(
-            validate_redirect_uri("https://example.com/pinepods/api/auth/callback").as_deref(),
-            Some("https://example.com/pinepods/api/auth/callback")
+            validate_redirect_uri("https://example.com/castaway/api/auth/callback").as_deref(),
+            Some("https://example.com/castaway/api/auth/callback")
         );
         assert!(validate_redirect_uri("https://evil.example.com/steal").is_none());
         assert!(validate_redirect_uri("castaway://auth/callback").is_none());

@@ -1,8 +1,8 @@
 // lib/ui/auth/auth_wrapper.dart
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/entities/app_settings.dart';
-import 'package:pinepods_mobile/ui/auth/pinepods_startup_login.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/ui/auth/castaway_startup_login.dart';
 import 'package:provider/provider.dart';
 
 class AuthWrapper extends StatefulWidget {
@@ -39,10 +39,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
             final settings = snapshot.data!;
 
             // Check if Castaway server is configured
-            final hasServer = settings.pinepodsServer != null &&
-                settings.pinepodsServer!.isNotEmpty;
-            final hasApiKey = settings.pinepodsApiKey != null &&
-                settings.pinepodsApiKey!.isNotEmpty;
+            final hasServer = settings.castawayServer != null &&
+                settings.castawayServer!.isNotEmpty;
+            final hasApiKey = settings.castawayApiKey != null &&
+                settings.castawayApiKey!.isNotEmpty;
 
             if (hasServer && hasApiKey) {
               // User is logged in, fetch theme from server if not already done
@@ -61,7 +61,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
               _hasInitializedTheme = false;
               
               // Show startup login
-              return PinepodsStartupLogin(
+              return CastawayStartupLogin(
                 onLoginSuccess: () {
                   // Force rebuild to check auth state again
                   // The StreamBuilder will automatically rebuild when settings change
@@ -104,10 +104,10 @@ class _AuthCheckerState extends State<AuthChecker> {
     final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
     final settings = settingsBloc.currentSettings;
 
-    final hasServer = settings.pinepodsServer != null &&
-        settings.pinepodsServer!.isNotEmpty;
-    final hasApiKey = settings.pinepodsApiKey != null &&
-        settings.pinepodsApiKey!.isNotEmpty;
+    final hasServer = settings.castawayServer != null &&
+        settings.castawayServer!.isNotEmpty;
+    final hasApiKey = settings.castawayApiKey != null &&
+        settings.castawayApiKey!.isNotEmpty;
 
     setState(() {
       _isAuthenticated = hasServer && hasApiKey;
@@ -135,7 +135,7 @@ class _AuthCheckerState extends State<AuthChecker> {
       return widget.authenticatedChild;
     } else {
       return widget.unauthenticatedChild ??
-          PinepodsStartupLogin(onLoginSuccess: _onLoginSuccess);
+          CastawayStartupLogin(onLoginSuccess: _onLoginSuccess);
     }
   }
 }

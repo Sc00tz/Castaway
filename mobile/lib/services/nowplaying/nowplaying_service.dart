@@ -19,10 +19,10 @@ import 'package:logging/logging.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as ws_status;
 
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_audio_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_audio_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// Mirror of the server's `NowPlayingSnapshot` (see rust-api models.rs).
 class NowPlayingDevice {
@@ -105,20 +105,20 @@ class NowPlayingDevice {
 class NowPlayingService {
   NowPlayingService({
     required AudioPlayerService audioPlayerService,
-    required PinepodsService pinepodsService,
-    required PinepodsAudioService pinepodsAudioService,
+    required CastawayService castawayService,
+    required CastawayAudioService castawayAudioService,
   })  : _audioPlayerService = audioPlayerService,
-        _pinepodsService = pinepodsService,
-        _pinepodsAudioService = pinepodsAudioService;
+        _castawayService = castawayService,
+        _castawayAudioService = castawayAudioService;
 
   final log = Logger('NowPlayingService');
 
   final AudioPlayerService _audioPlayerService;
-  final PinepodsService _pinepodsService;
-  final PinepodsAudioService _pinepodsAudioService;
+  final CastawayService _castawayService;
+  final CastawayAudioService _castawayAudioService;
 
   static const _storage = FlutterSecureStorage();
-  static const _deviceIdKey = 'pinepods_device_id';
+  static const _deviceIdKey = 'castaway_device_id';
 
   /// The user's other active devices (this device is excluded by the server).
   final ValueNotifier<List<NowPlayingDevice>> devices =
@@ -581,8 +581,8 @@ class NowPlayingService {
     final userId = _userId;
     if (server == null || apiKey == null || userId == null) return;
 
-    _pinepodsService.setCredentials(server, apiKey);
-    final episode = await _pinepodsService.getEpisodeMetadata(
+    _castawayService.setCredentials(server, apiKey);
+    final episode = await _castawayService.getEpisodeMetadata(
       episodeId,
       userId,
       isYoutube: isYoutube,
@@ -594,8 +594,8 @@ class NowPlayingService {
     final resumeAt = (positionSec != null && positionSec.isFinite && positionSec > 0)
         ? episode.withListenDuration(positionSec.round())
         : episode;
-    await _pinepodsAudioService.playPinepodsEpisode(
-      pinepodsEpisode: resumeAt,
+    await _castawayAudioService.playCastawayEpisode(
+      castawayEpisode: resumeAt,
       resume: true,
     );
   }

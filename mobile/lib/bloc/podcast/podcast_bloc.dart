@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/bloc/bloc.dart';
-import 'package:pinepods_mobile/entities/downloadable.dart';
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/feed.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/download/download_service.dart';
-import 'package:pinepods_mobile/services/download/mobile_download_service.dart';
-import 'package:pinepods_mobile/services/podcast/podcast_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/entities/pinepods_search.dart';
-import 'package:pinepods_mobile/state/bloc_state.dart';
+import 'package:castaway_mobile/bloc/bloc.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/feed.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/download/download_service.dart';
+import 'package:castaway_mobile/services/download/mobile_download_service.dart';
+import 'package:castaway_mobile/services/podcast/podcast_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/entities/castaway_search.dart';
+import 'package:castaway_mobile/state/bloc_state.dart';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
@@ -318,15 +318,15 @@ class PodcastBloc extends Bloc {
               try {
                 final settings = settingsService.settings;
                 if (settings != null &&
-                    settings.pinepodsServer != null && 
-                    settings.pinepodsApiKey != null && 
-                    settings.pinepodsUserId != null) {
+                    settings.castawayServer != null && 
+                    settings.castawayApiKey != null && 
+                    settings.castawayUserId != null) {
                   
                   // Also add to Castaway server
-                  final pinepodsService = PinepodsService();
-                  pinepodsService.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
+                  final castawayService = CastawayService();
+                  castawayService.setCredentials(settings.castawayServer!, settings.castawayApiKey!);
                   
-                  final unifiedPodcast = UnifiedPinepodsPodcast(
+                  final unifiedPodcast = UnifiedCastawayPodcast(
                     id: 0,
                     indexId: 0,
                     title: _podcast!.title,
@@ -343,7 +343,7 @@ class PodcastBloc extends Bloc {
                     episodeCount: 0,
                   );
                   
-                  await pinepodsService.addPodcast(unifiedPodcast, settings.pinepodsUserId!);
+                  await castawayService.addPodcast(unifiedPodcast, settings.castawayUserId!);
                   log.fine('Added podcast to Castaway server');
                 }
               } catch (e) {

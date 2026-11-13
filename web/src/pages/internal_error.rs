@@ -11,7 +11,7 @@ pub struct InternalErrorProps {
 #[function_component(InternalError)]
 pub fn internal_error(props: &InternalErrorProps) -> Html {
     let (i18n, _) = use_translation();
-    let i18n_you_broke_pinepods = i18n.t("internal_error.you_broke_pinepods").to_string();
+    let i18n_you_broke_castaway = i18n.t("internal_error.you_broke_castaway").to_string();
     let i18n_clever_quip = i18n.t("internal_error.clever_quip").to_string();
     let i18n_head_back_home = i18n.t("internal_error.head_back_home").to_string();
     let on_home_click = Callback::from(|e: MouseEvent| {
@@ -28,7 +28,7 @@ pub fn internal_error(props: &InternalErrorProps) -> Html {
                 </div>
 
                 <h1 class="text-3xl font-bold item_container-text">
-                    { &i18n_you_broke_pinepods }
+                    { &i18n_you_broke_castaway }
                 </h1>
 
                 <p class="text-lg item_container-text opacity-80">

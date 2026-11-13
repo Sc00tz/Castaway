@@ -4,9 +4,9 @@
 
 import 'dart:io';
 
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 /// Simple widget for rendering either the standard Android close or iOS Back button.
 class PlatformBackButton extends StatelessWidget {

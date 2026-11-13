@@ -104,7 +104,7 @@ pub struct GpodderStatsAction {
     pub timestamp: i64,
     pub position: Option<i32>,
     pub device: Option<String>,
-    /// `client`, `pinepods` or `target:<id>`.
+    /// `client`, `castaway` or `target:<id>`.
     pub origin: String,
 }
 
@@ -715,12 +715,12 @@ impl DatabasePool {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
                 crate::services::sync::db::pg_lock_targets_shared(&mut tx, user_id).await?;
-                let device = crate::services::sync::db::pg_pinepods_device(&mut tx, user_id).await?;
+                let device = crate::services::sync::db::pg_castaway_device(&mut tx, user_id).await?;
                 let n = q::query(
                     r#"INSERT INTO "GpodderSyncEpisodeActions"
                          (userid, deviceid, podcasturl, episodeurl, action, timestamp, serverts, started, position, total, guid, episodeid, origin)
                        SELECT $1, $2, s.feedurl, s.episodeurl, 'play', s.ts, n.t, 0, s.pos, GREATEST(COALESCE(NULLIF(s.duration, 0), s.pos), s.pos),
-                              s.guid, s.episodeid, 'pinepods'
+                              s.guid, s.episodeid, 'castaway'
                        FROM (
                            SELECT p.feedurl, e.episodeurl, NULLIF(e.episodeguid, '') AS guid, e.episodeid, e.episodeduration AS duration,
                                   CASE WHEN COALESCE((SELECT ues.completed FROM "UserEpisodeState" ues WHERE ues.episodeid = e.episodeid AND ues.userid = p.userid), FALSE) AND COALESCE(e.episodeduration, 0) > 0
@@ -736,7 +736,7 @@ impl DatabasePool {
                        ) s, (SELECT FLOOR(EXTRACT(EPOCH FROM CLOCK_TIMESTAMP()))::BIGINT AS t) n
                        WHERE s.pos > 0
                          AND NOT EXISTS (SELECT 1 FROM "GpodderSyncEpisodeActions" a
-                                         WHERE a.userid = $1 AND a.episodeid = s.episodeid AND a.origin = 'pinepods' AND a.timestamp >= s.ts)"#,
+                                         WHERE a.userid = $1 AND a.episodeid = s.episodeid AND a.origin = 'castaway' AND a.timestamp >= s.ts)"#,
                 )
                 .bind(user_id)
                 .bind(device)

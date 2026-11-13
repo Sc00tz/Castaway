@@ -6,31 +6,31 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pinepods_mobile/repository/sembast/sembast_repository.dart';
-import 'package:pinepods_mobile/services/offline/offline_action_queue.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/repository/sembast/sembast_repository.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
 
 import '../../support/in_memory_repository.dart';
 
-class MockPinepodsService extends Mock implements PinepodsService {}
+class MockCastawayService extends Mock implements CastawayService {}
 
 class MockSettingsService extends Mock implements SettingsService {}
 
 void main() {
-  late MockPinepodsService api;
+  late MockCastawayService api;
   late SembastRepository repository;
   late OfflineActionQueue queue;
 
   setUpAll(() => registerFallbackValue(DateTime(2000)));
 
   setUp(() {
-    api = MockPinepodsService();
+    api = MockCastawayService();
     final settings = MockSettingsService();
-    when(() => settings.pinepodsServer).thenReturn('https://pods.test');
-    when(() => settings.pinepodsApiKey).thenReturn('key');
+    when(() => settings.castawayServer).thenReturn('https://pods.test');
+    when(() => settings.castawayApiKey).thenReturn('key');
     repository = newInMemoryRepository();
-    queue = OfflineActionQueue(repository: repository, pinepodsService: api, settingsService: settings);
+    queue = OfflineActionQueue(repository: repository, castawayService: api, settingsService: settings);
     addTearDown(queue.dispose);
   });
 
@@ -40,7 +40,7 @@ void main() {
   }
 
   void serverReachable(bool reachable) {
-    when(() => api.verifyPinepodsInstance(any())).thenAnswer((_) async => reachable);
+    when(() => api.verifyCastawayInstance(any())).thenAnswer((_) async => reachable);
   }
 
   Future<int?> retries() async {

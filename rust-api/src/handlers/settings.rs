@@ -1792,7 +1792,7 @@ async fn backup_server_streaming(
             // Extract connection details from DATABASE_URL or config
             let host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
             let port = std::env::var("DB_PORT").unwrap_or_else(|_| "5432".to_string());
-            let database = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods".to_string());
+            let database = std::env::var("DB_NAME").unwrap_or_else(|_| "castaway".to_string());
             let username = std::env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
             
             // Use pg_dump with data-only options (no schema)
@@ -2806,7 +2806,7 @@ pub async fn add_custom_podcast(
         request.username.as_deref(),
         request.password.as_deref(),
         Some(&feed_body),
-        crate::services::sync::SyncOrigin::Pinepods,
+        crate::services::sync::SyncOrigin::Castaway,
     ).await?;
 
     // Get complete podcast details for response

@@ -4,7 +4,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
-import 'package:pinepods_mobile/services/pinepods/login_service.dart';
+import 'package:castaway_mobile/services/castaway/login_service.dart';
 
 /// App-wide online/offline state used to drive the offline experience (#935):
 /// falling back to the local Downloads library and playing on-device episodes
@@ -27,7 +27,7 @@ class ConnectivityService extends ChangeNotifier {
 
   /// The reachability probe is deliberately short so the offline UI appears
   /// promptly instead of waiting out the 15-20s timeouts on the normal API
-  /// calls. [PinepodsLoginService.checkServer] has its own longer internal timeout, so
+  /// calls. [CastawayLoginService.checkServer] has its own longer internal timeout, so
   /// we wrap it to cap the wait.
   static const Duration _probeTimeout = Duration(seconds: 3);
 
@@ -48,7 +48,7 @@ class ConnectivityService extends ChangeNotifier {
   bool get isOffline => !_isOnline || !_serverReachable;
 
   /// Wire up the service. [serverUrlProvider] returns the current server URL
-  /// (e.g. `settingsBloc.currentSettings.pinepodsServer`) so the probe always
+  /// (e.g. `settingsBloc.currentSettings.castawayServer`) so the probe always
   /// targets the live configuration. Safe to call more than once; the
   /// connectivity subscription is only created on the first call. Returns the
   /// first reachability probe so callers can await the initial state.
@@ -83,8 +83,8 @@ class ConnectivityService extends ChangeNotifier {
       if (url != null && url.isNotEmpty) {
         try {
           final result =
-              await PinepodsLoginService.checkServer(url).timeout(_probeTimeout);
-          reachable = result.isPinepods;
+              await CastawayLoginService.checkServer(url).timeout(_probeTimeout);
+          reachable = result.isCastaway;
         } catch (e) {
           _log.fine('server reachability probe failed: $e');
           reachable = false;

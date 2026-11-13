@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:pinepods_mobile/entities/people.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
+import 'package:castaway_mobile/entities/people.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 
 Map<String, dynamic> _credited(String name, {int id = 1}) => {
       'id': id,
@@ -57,9 +57,9 @@ void main() {
     });
   });
 
-  group('PinepodsService people', () {
-    PinepodsService service(MockClientHandler handler) =>
-        PinepodsService(client: MockClient(handler))..setCredentials('https://pods.example.com', 'key');
+  group('CastawayService people', () {
+    CastawayService service(MockClientHandler handler) =>
+        CastawayService(client: MockClient(handler))..setCredentials('https://pods.example.com', 'key');
 
     test('podcast people come from the people endpoint', () async {
       Uri? url;

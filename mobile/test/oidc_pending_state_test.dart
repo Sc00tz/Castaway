@@ -2,7 +2,7 @@
 // or arriving with no login in progress, would sign it into someone else's account.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/services/pinepods/oidc_service.dart';
+import 'package:castaway_mobile/services/castaway/oidc_service.dart';
 
 void main() {
   setUp(OidcService.clearPendingState);

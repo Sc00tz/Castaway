@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/app_settings.dart';
+import 'package:castaway_mobile/entities/app_settings.dart';
 
 abstract class SettingsService {
   AppSettings? get settings;
@@ -84,8 +84,8 @@ abstract class SettingsService {
   bool get preferServerDownloadSource;
   set preferServerDownloadSource(bool value);
 
-  bool get pinepodsUseGravatar;
-  set pinepodsUseGravatar(bool value);
+  bool get castawayUseGravatar;
+  set castawayUseGravatar(bool value);
 
   /// Number of leading queue episodes to keep downloaded locally. 0 disables the
   /// feature.
@@ -115,20 +115,20 @@ abstract class SettingsService {
 
   Stream<String> get settingsListener;
 
-  String? get pinepodsServer;
-  set pinepodsServer(String? value);
+  String? get castawayServer;
+  set castawayServer(String? value);
 
-  String? get pinepodsApiKey;
-  set pinepodsApiKey(String? value);
+  String? get castawayApiKey;
+  set castawayApiKey(String? value);
 
-  int? get pinepodsUserId;
-  set pinepodsUserId(int? value);
+  int? get castawayUserId;
+  set castawayUserId(int? value);
 
-  String? get pinepodsUsername;
-  set pinepodsUsername(String? value);
+  String? get castawayUsername;
+  set castawayUsername(String? value);
 
-  String? get pinepodsEmail;
-  set pinepodsEmail(String? value);
+  String? get castawayEmail;
+  set castawayEmail(String? value);
 
   List<String> get bottomBarOrder;
   set bottomBarOrder(List<String> value);

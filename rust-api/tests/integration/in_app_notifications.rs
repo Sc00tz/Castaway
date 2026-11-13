@@ -1,6 +1,6 @@
 //! In-app notifications: kept in the database, listed, marked read, dismissed and cleared.
 
-use pinepods_api::services::task_manager::MsgSeverity;
+use castaway_api::services::task_manager::MsgSeverity;
 
 use crate::harness::*;
 

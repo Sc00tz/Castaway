@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/ui/podcast/person_avatar.dart';
-import 'package:pinepods_mobile/ui/podcast/transport_controls.dart';
-import 'package:pinepods_mobile/ui/widgets/episode_tile.dart';
-import 'package:pinepods_mobile/ui/widgets/podcast_html.dart';
-import 'package:pinepods_mobile/ui/widgets/tile_image.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/ui/podcast/person_avatar.dart';
+import 'package:castaway_mobile/ui/podcast/transport_controls.dart';
+import 'package:castaway_mobile/ui/widgets/episode_tile.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_html.dart';
+import 'package:castaway_mobile/ui/widgets/tile_image.dart';
 import 'package:flutter/material.dart';
 
 /// This class renders the more info widget that is accessed from the 'more'

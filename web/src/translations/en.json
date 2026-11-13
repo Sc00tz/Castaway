@@ -43,7 +43,7 @@
     "feed": "Feed",
     "history": "History",
     "local_downloads": "Local Downloads",
-    "pinepods": "Castaway",
+    "castaway": "Castaway",
     "podcasts": "Podcasts",
     "queue": "Queue",
     "saved": "Saved",
@@ -168,8 +168,8 @@
     "ok": "OK",
     "oldest_first": "Oldest First",
     "password": "Password",
-    "pinepods": "Castaway",
-    "pinepods_logo": "Castaway Logo",
+    "castaway": "Castaway",
+    "castaway_logo": "Castaway Logo",
     "previous": "Previous",
     "remove": "Remove",
     "reset": "Reset",
@@ -622,7 +622,7 @@
     "unknown": "Unknown",
     "username": "Username",
     "valid_email_required": "Please enter a valid email address",
-    "welcome_to_pinepods": "Welcome to Castaway",
+    "welcome_to_castaway": "Welcome to Castaway",
     "youtube": "YouTube"
   },
   "history": {
@@ -649,7 +649,7 @@
     "top_podcasts": "Top Podcasts",
     "unknown_author": "Unknown Author",
     "welcome_description": "Start by adding some podcasts using the search bar above.",
-    "welcome_to_pinepods": "Welcome to Castaway",
+    "welcome_to_castaway": "Welcome to Castaway",
     "welcome_hero_subtitle": "Your self-hosted home for podcasts",
     "welcome_intro": "Castaway is a self-hosted, forever-free podcast manager. Subscribe to any feed, sync your progress across devices, download episodes for offline listening, and keep your entire library in one place — all on infrastructure you control.",
     "welcome_get_started": "Get Started",
@@ -670,7 +670,7 @@
   "internal_error": {
     "clever_quip": "There's supposed to be a clever quip here, but you probably broke that, too.",
     "head_back_home": "Head back home",
-    "you_broke_pinepods": "You broke Castaway"
+    "you_broke_castaway": "You broke Castaway"
   },
   "import_options": {
     "add_them": "Add them!",

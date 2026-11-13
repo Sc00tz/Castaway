@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/services/security/certificate_manager.dart';
+import 'package:castaway_mobile/services/security/certificate_manager.dart';
 
 // Throwaway self-signed cert (CN=test) + PKCS#12 (password: testpass),
 // generated only for this test.

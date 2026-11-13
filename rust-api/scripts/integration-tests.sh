@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --gpodder)
       case "${2:-}" in
-        rust|mock) export PINEPODS_TEST_GPODDER="$2" ;;
+        rust|mock) export CASTAWAY_TEST_GPODDER="$2" ;;
         *) echo "unknown --gpodder '${2:-}' (rust | mock)" >&2; exit 2 ;;
       esac
       shift 2 ;;
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Containers are only started if the caller hasn't pointed us at their own (CI uses services).
-if [[ -z "${PINEPODS_TEST_EXTERNAL_SERVICES:-}" ]]; then
+if [[ -z "${CASTAWAY_TEST_EXTERNAL_SERVICES:-}" ]]; then
   "${COMPOSE[@]}" up -d --wait
 fi
 
@@ -69,7 +69,7 @@ SHIM
   done
   export PATH="$PATH:$dir"
 }
-if [[ -z "${PINEPODS_TEST_EXTERNAL_SERVICES:-}" ]]; then
+if [[ -z "${CASTAWAY_TEST_EXTERNAL_SERVICES:-}" ]]; then
   install_db_tool_shims
 fi
 

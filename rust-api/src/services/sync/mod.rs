@@ -33,8 +33,8 @@ pub use resolver::{resolve, ResolveKey};
 /// Where a change came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncOrigin {
-    /// Made in Castaway itself (web/mobile UI, API, auto-complete). Logged as `pinepods`.
-    Pinepods,
+    /// Made in Castaway itself (web/mobile UI, API, auto-complete). Logged as `castaway`.
+    Castaway,
     /// Uploaded by a gpodder client of the Castaway server; already in the log.
     Client,
     /// Pulled from an external sync target (`SyncTargets.TargetID`). Logged by apply.
@@ -48,7 +48,7 @@ impl SyncOrigin {
     /// The `Origin` column value for rows this origin writes to the log.
     pub fn log_value(self) -> Option<String> {
         match self {
-            SyncOrigin::Pinepods => Some("pinepods".into()),
+            SyncOrigin::Castaway => Some("castaway".into()),
             SyncOrigin::Client => Some("client".into()),
             SyncOrigin::Target(id) => Some(format!("target:{id}")),
             SyncOrigin::Unlogged => None,
@@ -56,11 +56,11 @@ impl SyncOrigin {
     }
 }
 
-/// The pinepods device: `GpodderDevices.SystemRole` value and preferred name/caption/type.
-pub const PINEPODS_ROLE: &str = "pinepods";
-pub const PINEPODS_DEVICE_NAME: &str = "castaway";
-pub const PINEPODS_DEVICE_CAPTION: &str = "Castaway";
-pub const PINEPODS_DEVICE_TYPE: &str = "server";
+/// The castaway device: `GpodderDevices.SystemRole` value and preferred name/caption/type.
+pub const CASTAWAY_ROLE: &str = "castaway";
+pub const CASTAWAY_DEVICE_NAME: &str = "castaway";
+pub const CASTAWAY_DEVICE_CAPTION: &str = "Castaway";
+pub const CASTAWAY_DEVICE_TYPE: &str = "server";
 
 /// Feeds that can be shared with other devices: http(s), no stored credentials. YouTube
 /// channels are stored with an https channel URL but aren't feeds, so they're left out too.
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn origin_log_values() {
-        assert_eq!(SyncOrigin::Pinepods.log_value().as_deref(), Some("pinepods"));
+        assert_eq!(SyncOrigin::Castaway.log_value().as_deref(), Some("castaway"));
         assert_eq!(SyncOrigin::Target(7).log_value().as_deref(), Some("target:7"));
         assert_eq!(SyncOrigin::Unlogged.log_value(), None);
     }

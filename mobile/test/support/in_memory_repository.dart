@@ -6,7 +6,7 @@
 // the constructor's fire-and-forget startup cleanup, which would otherwise race
 // with the test body.
 
-import 'package:pinepods_mobile/repository/sembast/sembast_repository.dart';
+import 'package:castaway_mobile/repository/sembast/sembast_repository.dart';
 import 'package:sembast/sembast_memory.dart';
 
 SembastRepository newInMemoryRepository({bool cleanup = false}) {

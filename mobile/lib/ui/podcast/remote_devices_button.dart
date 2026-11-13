@@ -7,10 +7,10 @@
 
 import 'package:flutter/material.dart';
 
-import 'package:pinepods_mobile/services/global_services.dart';
-import 'package:pinepods_mobile/services/nowplaying/nowplaying_service.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/services/global_services.dart';
+import 'package:castaway_mobile/services/nowplaying/nowplaying_service.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 String _fmtTime(double secs) {
   if (secs.isNaN || secs.isInfinite || secs < 0) return '00:00';

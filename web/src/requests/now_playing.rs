@@ -144,7 +144,7 @@ thread_local! {
     static NP_PENDING_HANDOFF: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
-const DEVICE_ID_KEY: &str = "pinepods_device_id";
+const DEVICE_ID_KEY: &str = "castaway_device_id";
 
 /// Stable per-TAB device id. Each tab is its own player, so the id lives in
 /// sessionStorage: it survives reloads of the tab but isn't shared with other tabs

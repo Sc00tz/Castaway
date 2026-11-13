@@ -7,9 +7,9 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pinepods_mobile/services/audio/audio_player_service.dart';
-import 'package:pinepods_mobile/services/audio/native_audio_player_service.dart';
-import 'package:pinepods_mobile/services/settings/settings_service.dart';
+import 'package:castaway_mobile/services/audio/audio_player_service.dart';
+import 'package:castaway_mobile/services/audio/native_audio_player_service.dart';
+import 'package:castaway_mobile/services/settings/settings_service.dart';
 
 import '../../support/factories.dart';
 import '../../support/in_memory_repository.dart';
@@ -53,7 +53,7 @@ void main() {
     when(() => settings.volumeBoost).thenReturn(false);
     when(() => settings.fastForwardInterval).thenReturn(30);
     when(() => settings.rewindInterval).thenReturn(10);
-    when(() => settings.pinepodsUserId).thenReturn(null);
+    when(() => settings.castawayUserId).thenReturn(null);
 
     service = NativeAudioPlayerService(repository: newInMemoryRepository(), settingsService: settings);
     await pumpEventQueue();

@@ -5,13 +5,13 @@
 // after a number of days. Each podcast's "Server downloads" sheet can override
 // them. Hidden until signed in to a server.
 import 'package:flutter/material.dart';
-import 'package:pinepods_mobile/bloc/settings/settings_bloc.dart';
-import 'package:pinepods_mobile/core/download_cleanup.dart';
-import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
+import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
+import 'package:castaway_mobile/core/download_cleanup.dart';
+import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:provider/provider.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/ui/utils/l10n_labels.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/utils/l10n_labels.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 class ServerDownloadDefaults extends StatefulWidget {
   const ServerDownloadDefaults({super.key});
@@ -21,7 +21,7 @@ class ServerDownloadDefaults extends StatefulWidget {
 }
 
 class _ServerDownloadDefaultsState extends State<ServerDownloadDefaults> {
-  final PinepodsService _service = PinepodsService();
+  final CastawayService _service = CastawayService();
   int? _userId;
   bool _loaded = false;
   bool _deleteWhenFinished = false;
@@ -36,13 +36,13 @@ class _ServerDownloadDefaultsState extends State<ServerDownloadDefaults> {
   Future<void> _load() async {
     final settings =
         Provider.of<SettingsBloc>(context, listen: false).currentSettings;
-    if (settings.pinepodsServer == null ||
-        settings.pinepodsApiKey == null ||
-        settings.pinepodsUserId == null) {
+    if (settings.castawayServer == null ||
+        settings.castawayApiKey == null ||
+        settings.castawayUserId == null) {
       return;
     }
-    _service.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
-    _userId = settings.pinepodsUserId!;
+    _service.setCredentials(settings.castawayServer!, settings.castawayApiKey!);
+    _userId = settings.castawayUserId!;
     try {
       final finished = await _service.getAutoDeleteOnComplete(_userId!);
       final days = await _service.getAutoDeleteDays(_userId!);

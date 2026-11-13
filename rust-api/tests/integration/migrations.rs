@@ -53,7 +53,7 @@ async fn a_fresh_database_gets_the_schema_and_its_own_secrets() {
     let a = ScratchDb::new("fresh_a").await;
     let b = ScratchDb::new("fresh_b").await;
     for db in [&a, &b] {
-        pinepods_api::database::migrate::run(&db.pool).await.unwrap();
+        castaway_api::database::migrate::run(&db.pool).await.unwrap();
         assert_eq!(db.versions().await, all_versions());
         assert_eq!(db.count("Playlists").await, 7, "the system playlists are seeded");
         let user: String = sqlx::query_scalar(r#"SELECT username FROM "Users" WHERE userid = 1"#).fetch_one(&db.pool).await.unwrap();
@@ -73,7 +73,7 @@ async fn a_fresh_database_gets_the_schema_and_its_own_secrets() {
     assert!(fernet::Fernet::new(&ka.1).is_some(), "the encryption key is a valid Fernet key");
 
     // Starting again changes nothing.
-    pinepods_api::database::migrate::run(&a.pool).await.unwrap();
+    castaway_api::database::migrate::run(&a.pool).await.unwrap();
     assert_eq!(a.versions().await, all_versions());
     assert_eq!(a.count("Playlists").await, 7);
     a.drop().await;
@@ -87,16 +87,23 @@ async fn a_current_pinepods_database_is_adopted_without_reseeding() {
     sqlx::raw_sql(
         r#"CREATE TABLE schema_migrations (version VARCHAR(10) PRIMARY KEY, name TEXT, checksum VARCHAR(64));
            INSERT INTO schema_migrations (version, name, checksum) VALUES ('117', 'x', 'x'), ('118', 'y', 'y');
-           INSERT INTO "Users" (fullname, username, email, hashed_pw, isadmin) VALUES ('Old Admin', 'oldadmin', 'a@b.c', 'x', TRUE);"#,
+           INSERT INTO "Users" (fullname, username, email, hashed_pw, isadmin) VALUES ('Old Admin', 'oldadmin', 'a@b.c', 'x', TRUE);
+           INSERT INTO "GpodderDevices" (userid, devicename, systemrole)
+             SELECT userid, 'pinepods', 'pinepods' FROM "Users" WHERE username = 'oldadmin';
+           INSERT INTO "GpodderSyncEpisodeActions" (userid, podcasturl, episodeurl, action, "timestamp", serverts, origin)
+             SELECT userid, 'https://a/feed', 'https://a/1.mp3', 'play', 1, 1, 'pinepods' FROM "Users" WHERE username = 'oldadmin';"#,
     )
     .execute(&db.pool)
     .await
     .unwrap();
 
-    pinepods_api::database::migrate::run(&db.pool).await.unwrap();
+    castaway_api::database::migrate::run(&db.pool).await.unwrap();
     assert_eq!(db.versions().await, all_versions(), "the baseline is adopted, later migrations run");
     assert_eq!(db.count("Users").await, 1, "the existing data is kept and nothing is seeded on top");
     assert_eq!(db.count("Playlists").await, 0);
+    let role: String = sqlx::query_scalar(r#"SELECT systemrole FROM "GpodderDevices""#).fetch_one(&db.pool).await.unwrap();
+    let origin: String = sqlx::query_scalar(r#"SELECT origin FROM "GpodderSyncEpisodeActions""#).fetch_one(&db.pool).await.unwrap();
+    assert_eq!((role.as_str(), origin.as_str()), ("castaway", "castaway"), "the server's own sync labels are renamed");
     db.drop().await;
 }
 
@@ -111,7 +118,7 @@ async fn an_older_pinepods_database_is_refused() {
     .await
     .unwrap();
 
-    let err = pinepods_api::database::migrate::run(&db.pool).await.unwrap_err();
+    let err = castaway_api::database::migrate::run(&db.pool).await.unwrap_err();
     assert!(format!("{err:?}").contains("older PinePods version"), "{err:?}");
     let tables: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM castaway_migrations").fetch_one(&db.pool).await.unwrap();
     assert_eq!(tables, 0, "nothing is recorded");

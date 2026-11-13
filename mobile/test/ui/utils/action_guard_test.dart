@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/ui/utils/action_guard.dart';
+import 'package:castaway_mobile/ui/utils/action_guard.dart';
 
 void main() {
   group('ActionGuard', () {

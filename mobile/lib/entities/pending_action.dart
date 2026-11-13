@@ -1,10 +1,10 @@
 // lib/entities/pending_action.dart
 
-import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 
 /// The kind of server interaction a [PendingAction] represents.
 ///
-/// These map 1:1 onto the relevant PinepodsService calls so the offline queue
+/// These map 1:1 onto the relevant CastawayService calls so the offline queue
 /// can dispatch each action when connectivity is restored.
 enum PendingActionType {
   recordPosition,

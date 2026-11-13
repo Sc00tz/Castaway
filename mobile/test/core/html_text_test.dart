@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/core/html_text.dart';
+import 'package:castaway_mobile/core/html_text.dart';
 
 void main() {
   group('htmlToPlainText', () {

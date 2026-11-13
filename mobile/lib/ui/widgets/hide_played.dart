@@ -4,9 +4,9 @@
 // its own choice between launches.
 
 import 'package:flutter/widgets.dart';
-import 'package:pinepods_mobile/l10n/L.dart';
-import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
-import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
+import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
+import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 mixin HidePlayed<T extends StatefulWidget> on State<T> {

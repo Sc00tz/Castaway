@@ -7,11 +7,11 @@ import CarPlay
 /// Flutter plugin that bridges native iOS audio playback to Flutter
 /// Uses MethodChannel for commands and EventChannel for playback state updates
 public class AudioPlayerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
-    private static let METHOD_CHANNEL = "com.pinepods/audio_player"
-    private static let EVENT_CHANNEL = "com.pinepods/audio_events"
+    private static let METHOD_CHANNEL = "com.castaway/audio_player"
+    private static let EVENT_CHANNEL = "com.castaway/audio_events"
 
     private var eventSink: FlutterEventSink?
-    private var audioPlayer: PinepodsAudioPlayer?
+    private var audioPlayer: CastawayAudioPlayer?
     private var isInitialized = false
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -34,7 +34,7 @@ public class AudioPlayerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
         // But use a very short delay and ensure initialization completes.
         DispatchQueue.main.async {
             NSLog("[AudioPlayerPlugin] Initializing audio player on main thread...")
-            instance.audioPlayer = PinepodsAudioPlayer(eventSink: instance.eventSink)
+            instance.audioPlayer = CastawayAudioPlayer(eventSink: instance.eventSink)
             instance.isInitialized = true
             NSLog("[AudioPlayerPlugin] Audio player initialized successfully")
         }
@@ -185,7 +185,7 @@ public class AudioPlayerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
         }
     }
 
-    private func handlePlayEpisode(_ call: FlutterMethodCall, player: PinepodsAudioPlayer, result: @escaping FlutterResult) {
+    private func handlePlayEpisode(_ call: FlutterMethodCall, player: CastawayAudioPlayer, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
               let url = args["url"] as? String else {
             result(FlutterError(code: "INVALID_ARGS", message: "URL required", details: nil))

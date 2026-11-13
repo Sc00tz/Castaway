@@ -85,7 +85,7 @@ async fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {
 }
 
 fn get_project_dirs() -> Result<ProjectDirs, String> {
-    ProjectDirs::from("com", "gooseberrydevelopment", "pinepods")
+    ProjectDirs::from("com", "sc00tz", "castaway")
         .ok_or_else(|| "Cannot determine project directories".to_string())
 }
 

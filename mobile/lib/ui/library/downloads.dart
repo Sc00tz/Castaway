@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/ui/pinepods/downloads.dart';
+import 'package:castaway_mobile/ui/castaway/downloads.dart';
 import 'package:flutter/material.dart';
 
 /// Displays a list of currently downloaded podcast episodes.
@@ -14,6 +14,6 @@ class Downloads extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const PinepodsDownloads();
+    return const CastawayDownloads();
   }
 }

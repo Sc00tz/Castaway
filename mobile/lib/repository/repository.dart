@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/entities/episode.dart';
-import 'package:pinepods_mobile/entities/pending_action.dart';
-import 'package:pinepods_mobile/entities/podcast.dart';
-import 'package:pinepods_mobile/entities/transcript.dart';
-import 'package:pinepods_mobile/state/episode_state.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/pending_action.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/transcript.dart';
+import 'package:castaway_mobile/state/episode_state.dart';
 
 /// An abstract class that represent the actions supported by the chosen
 /// database or storage implementation.
@@ -28,9 +28,9 @@ abstract class Repository {
   /// Episodes
   Future<List<Episode>> findAllEpisodes();
 
-  /// Rows saved from the Castaway server (guid `pinepods_<id>`), unsorted.
+  /// Rows saved from the Castaway server (guid `castaway_<id>`), unsorted.
   /// Cheaper than [findAllEpisodes] when only those rows matter.
-  Future<List<Episode>> findPinepodsEpisodes();
+  Future<List<Episode>> findCastawayEpisodes();
 
   Future<Episode?> findEpisodeById(int id);
 

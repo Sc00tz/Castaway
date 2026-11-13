@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/ui/themes.dart';
+import 'package:castaway_mobile/ui/themes.dart';
 
 void main() {
   group('ThemeRegistry.normalizeKey', () {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pinepods_mobile/core/extensions.dart';
+import 'package:castaway_mobile/core/extensions.dart';
 import 'package:flutter/foundation.dart';
 
 enum TranscriptFormat {

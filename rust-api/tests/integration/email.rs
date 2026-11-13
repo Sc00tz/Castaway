@@ -7,7 +7,7 @@ fn test_email(port: u16) -> Value {
     json!({
         "server_name": "127.0.0.1",
         "server_port": port.to_string(),
-        "from_email": "pinepods@example.test",
+        "from_email": "castaway@example.test",
         "encryption": "none",
         "auth_required": false,
         "email_username": "",
@@ -24,7 +24,7 @@ async fn save_settings(app: &TestApp, port: u16) {
         .json(&json!({ "email_settings": {
             "server_name": "127.0.0.1",
             "server_port": port.to_string(),
-            "from_email": "pinepods@example.test",
+            "from_email": "castaway@example.test",
             "send_mode": "SMTP",
             "encryption": "none",
             "auth_required": false,
@@ -52,7 +52,7 @@ async fn the_test_email_reaches_the_recipient() {
 
     let sent = smtp.sent();
     assert_eq!(sent.len(), 1);
-    assert_eq!(sent[0].from, "pinepods@example.test");
+    assert_eq!(sent[0].from, "castaway@example.test");
     assert_eq!(sent[0].to, ["listener@example.test"]);
     assert_eq!(sent[0].header("Subject").as_deref(), Some("Castaway - Test Email"));
     let html = sent[0].body();
@@ -128,7 +128,7 @@ async fn saved_settings_send_mail_and_keep_the_password_private() {
         .json(&json!({ "email_settings": {
             "server_name": "127.0.0.1",
             "server_port": smtp.port.to_string(),
-            "from_email": "pinepods@example.test",
+            "from_email": "castaway@example.test",
             "send_mode": "SMTP",
             "encryption": "none",
             "auth_required": true,

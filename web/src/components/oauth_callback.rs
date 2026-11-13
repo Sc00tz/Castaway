@@ -14,7 +14,7 @@ use yew_router::history::{BrowserHistory, History};
 use yewdux::prelude::*;
 
 /// Session-storage key for the OIDC `state` of a login started in this browser.
-pub const OIDC_STATE_KEY: &str = "pinepods_oidc_state";
+pub const OIDC_STATE_KEY: &str = "castaway_oidc_state";
 
 /// Whether this callback finishes a login this browser started. A link carrying someone else's
 /// API key has no matching state, so it can't sign this browser into their account.

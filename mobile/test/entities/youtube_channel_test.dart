@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/youtube_channel.dart';
+import 'package:castaway_mobile/entities/youtube_channel.dart';
 
 void main() {
   group('YouTubeChannelResult.fromJson', () {

@@ -4,11 +4,11 @@
 
 import 'dart:io';
 
-import 'package:pinepods_mobile/services/settings/mobile_settings_service.dart';
-import 'package:pinepods_mobile/services/logging/app_logger.dart';
-import 'package:pinepods_mobile/services/security/certificate_manager.dart';
-import 'package:pinepods_mobile/ui/pinepods_podcast_app.dart';
-import 'package:pinepods_mobile/ui/widgets/restart_widget.dart';
+import 'package:castaway_mobile/services/settings/mobile_settings_service.dart';
+import 'package:castaway_mobile/services/logging/app_logger.dart';
+import 'package:castaway_mobile/services/security/certificate_manager.dart';
+import 'package:castaway_mobile/ui/castaway_podcast_app.dart';
+import 'package:castaway_mobile/ui/widgets/restart_widget.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -67,7 +67,7 @@ void main() async {
 
 
   runApp(RestartWidget(
-    child: PinepodsPodcastApp(
+    child: CastawayPodcastApp(
       mobileSettingsService: mobileSettingsService,
       certificateAuthorityBytes: certificateAuthorityBytes,
     ),

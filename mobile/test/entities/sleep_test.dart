@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pinepods_mobile/entities/sleep.dart';
+import 'package:castaway_mobile/entities/sleep.dart';
 
 void main() {
   group('equality', () {

@@ -1,0 +1,3680 @@
+// Create this file at lib/services/castaway/castaway_service.dart
+
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:castaway_mobile/services/castaway/login_service.dart';
+import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/castaway_episode.dart';
+import 'package:castaway_mobile/entities/castaway_collection.dart';
+import 'package:castaway_mobile/entities/castaway_search.dart';
+import 'package:castaway_mobile/entities/user_stats.dart';
+import 'package:castaway_mobile/entities/home_data.dart';
+import 'package:castaway_mobile/entities/people.dart';
+import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/youtube_channel.dart';
+
+/// Debug-only logger: in release builds this compiles out, so request URLs and
+/// other diagnostics never reach the device console in production.
+void _devLog(Object? message) {
+  if (kDebugMode) {
+    print(message);
+  }
+}
+
+Object? _decodeJson(String body) => jsonDecode(body);
+
+class CastawayService {
+  String? _server;
+  String? _apiKey;
+
+  /// Shared by default across every CastawayService instance (widgets each
+  /// construct their own `CastawayService()`) so requests reuse keep-alive
+  /// connections instead of paying a fresh TCP+TLS handshake per call - which
+  /// is what happens with the top-level http.get/post/put functions, since
+  /// each of those creates and immediately closes its own client.
+  static final http.Client _sharedClient = http.Client();
+  static const Duration _defaultTimeout = Duration(seconds: 15);
+
+  final http.Client _client;
+  final Duration _timeout;
+
+  /// [client] and [timeout] are only ever overridden in tests - production
+  /// code always uses the no-arg constructor, sharing [_sharedClient]. Not
+  /// annotated @visibleForTesting since (unlike a dedicated named
+  /// constructor) that would also flag the plain `CastawayService()` calls
+  /// used throughout the app.
+  CastawayService({http.Client? client, Duration? timeout})
+      : _client = client ?? _sharedClient,
+        _timeout = timeout ?? _defaultTimeout;
+
+  Future<http.Response> _get(Uri url, {Map<String, String>? headers}) {
+    return _client.get(url, headers: headers).timeout(_timeout);
+  }
+
+  Future<http.Response> _post(Uri url, {Map<String, String>? headers, Object? body}) {
+    return _client.post(url, headers: headers, body: body).timeout(_timeout);
+  }
+
+  Future<http.Response> _put(Uri url, {Map<String, String>? headers, Object? body}) {
+    return _client.put(url, headers: headers, body: body).timeout(_timeout);
+  }
+
+  Future<http.Response> _delete(Uri url, {Map<String, String>? headers, Object? body}) {
+    return _client.delete(url, headers: headers, body: body).timeout(_timeout);
+  }
+
+  // Method to initialize with existing credentials
+  void initializeWithCredentials(String server, String apiKey) {
+    _server = server;
+    _apiKey = apiKey;
+  }
+
+  String get apiKey => _apiKey ?? '';
+
+  Future<bool> verifyCastawayInstance(String serverUrl) async {
+    // Normalize the URL by removing trailing slashes
+    final normalizedUrl = serverUrl.trim().replaceAll(RegExp(r'/$'), '');
+
+    try {
+      var response = await _get(Uri.parse('$normalizedUrl/api/castaway_check'));
+      // Servers before 0.10.2 answer at the old address.
+      if (response.statusCode == 404) {
+        response = await _get(Uri.parse('$normalizedUrl${CastawayLoginService.legacyCheckPath}'));
+      }
+
+      if (response.statusCode == 200) {
+        return CastawayLoginService.isCastawayCheck(jsonDecode(response.body));
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error verifying Castaway instance: $e');
+      return false;
+    }
+  }
+
+  Future<bool> login(String serverUrl, String username, String password) async {
+    // Normalize the URL by removing trailing slashes
+    final normalizedUrl = serverUrl.trim().replaceAll(RegExp(r'/$'), '');
+    _server = normalizedUrl;
+
+    // Create Basic Auth header
+    final credentials = base64Encode(utf8.encode('$username:$password'));
+    final authHeader = 'Basic $credentials';
+
+    final url = Uri.parse('$normalizedUrl/api/data/get_key');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Authorization': authHeader},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _apiKey = data['retrieved_key'];
+
+        // Verify the API key
+        return await verifyApiKey();
+      }
+      return false;
+    } catch (e) {
+      _devLog('Login error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> verifyApiKey() async {
+    if (_server == null || _apiKey == null) {
+      return false;
+    }
+
+    final url = Uri.parse('$_server/api/data/verify_key');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] == 'success';
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error verifying API key: $e');
+      return false;
+    }
+  }
+
+  // Add method to fetch podcasts from Castaway
+  Future<List<Map<String, dynamic>>> fetchPodcasts() async {
+    if (_server == null || _apiKey == null) {
+      return [];
+    }
+
+    // This endpoint would need to be implemented in your Castaway backend
+    final url = Uri.parse('$_server/api/data/podcasts');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List;
+        return data.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      _devLog('Error fetching podcasts: $e');
+      return [];
+    }
+  }
+
+  // Get user's subscribed podcasts using return_pods endpoint
+  Future<List<Podcast>> getUserPodcasts(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/return_pods/$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> podsData = data['pods'] ?? [];
+
+        List<Podcast> podcasts = [];
+        for (var podData in podsData) {
+          // Store episode count in the podcast for display purposes
+          // Don't create placeholder episodes - that's wasteful and causes memory issues
+          final episodeCount = podData['episodecount'] ?? 0;
+
+          podcasts.add(
+            Podcast(
+              id: podData['podcastid'],
+              title: podData['podcastname'] ?? '',
+              description: podData['description'] ?? '',
+              imageUrl: podData['artworkurl'] ?? '',
+              thumbImageUrl: podData['artworkurl'] ?? '',
+              url: podData['feedurl'] ?? '',
+              link: podData['websiteurl'] ?? '',
+              copyright: podData['author'] ?? '',
+              guid: podData['feedurl'] ?? '',
+              isFavorite: podData['is_favorite'] ?? false,
+              // Empty episodes list - episodes are loaded separately when needed
+              episodes: [],
+              // Store episode count for display (if Podcast model supports it)
+              // Otherwise the count can be fetched when viewing the podcast
+            ),
+          );
+        }
+
+        return podcasts;
+      } else {
+        throw Exception('Failed to get user podcasts: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user podcasts: $e');
+      rethrow;
+    }
+  }
+
+  // Get user's subscribed podcasts with categories for filtering
+  Future<Map<String, dynamic>> getUserPodcastsWithCategories(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/return_pods/$userId');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> podsData = data['pods'] ?? [];
+
+        List<Podcast> podcasts = [];
+        Map<int, List<String>> podcastCategories = {};
+
+        for (var podData in podsData) {
+          final podcastId = podData['podcastid'] as int;
+
+          // Parse categories
+          List<String> categories = [];
+          if (podData['categories'] != null) {
+            if (podData['categories'] is Map) {
+              categories = (podData['categories'] as Map)
+                  .values
+                  .map((v) => v.toString().trim())
+                  .where((c) => c.isNotEmpty)
+                  .toList();
+            } else if (podData['categories'] is String) {
+              categories = (podData['categories'] as String)
+                  .split(',')
+                  .map((c) => c.trim())
+                  .where((c) => c.isNotEmpty)
+                  .toList();
+            }
+          }
+          podcastCategories[podcastId] = categories;
+
+          podcasts.add(
+            Podcast(
+              id: podcastId,
+              title: podData['podcastname'] ?? '',
+              description: podData['description'] ?? '',
+              imageUrl: podData['artworkurl'] ?? '',
+              thumbImageUrl: podData['artworkurl'] ?? '',
+              url: podData['feedurl'] ?? '',
+              link: podData['websiteurl'] ?? '',
+              copyright: podData['author'] ?? '',
+              guid: podData['feedurl'] ?? '',
+              isFavorite: podData['is_favorite'] ?? false,
+              episodes: [],
+            ),
+          );
+        }
+
+        return {
+          'podcasts': podcasts,
+          'categories': podcastCategories,
+        };
+      } else {
+        throw Exception('Failed to get user podcasts: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user podcasts with categories: $e');
+      rethrow;
+    }
+  }
+
+  // Get recent episodes (last 30 days)
+  Future<EpisodePage> getRecentEpisodes(int userId, {int limit = 50, int offset = 0}) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated - server or API key missing');
+    }
+
+    final url = Uri.parse('$_server/api/data/return_episodes/$userId').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      },
+    );
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is Map && data['episodes'] != null) {
+          final episodesList = data['episodes'] as List;
+          final episodes = episodesList
+              .map((episode) => CastawayEpisode.fromJson(episode))
+              .toList();
+          final total = (data['total'] as num?)?.toInt() ?? episodes.length;
+          return EpisodePage(episodes: episodes, total: total);
+        } else if (data is List) {
+          final episodes = data
+              .map((episode) => CastawayEpisode.fromJson(episode))
+              .toList();
+          return EpisodePage(episodes: episodes, total: episodes.length);
+        } else {
+          return EpisodePage(episodes: [], total: 0);
+        }
+      } else {
+        throw Exception(
+          'Failed to fetch recent episodes: ${response.statusCode} ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error fetching recent episodes: $e');
+      throw Exception('Error fetching recent episodes: $e');
+    }
+  }
+
+  // Set credentials (used when user logs in)
+  void setCredentials(String server, String apiKey) {
+    _server = server.trim().replaceAll(RegExp(r'/$'), '');
+    _apiKey = apiKey;
+  }
+
+  // Check if user is authenticated
+  bool get isAuthenticated => _server != null && _apiKey != null;
+
+  // Get server URL
+  String? get server => _server;
+
+  // Check if episode exists in database
+  Future<bool> checkEpisodeInDb(
+    int userId,
+    String episodeTitle,
+    String episodeUrl,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/check_episode_in_db');
+
+    try {
+      final requestBody = jsonEncode({
+        'user_id': userId,
+        'episode_title': episodeTitle,
+        'episode_url': episodeUrl,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error checking episode in DB: $e');
+      return false;
+    }
+  }
+
+  // Get episode ID from title and URL
+  Future<int> getEpisodeId(
+    int userId,
+    String episodeTitle,
+    String episodeUrl,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/get_episode_id_ep_name?user_id=$userId&episode_url=${Uri.encodeComponent(episodeUrl)}&episode_title=${Uri.encodeComponent(episodeTitle)}&is_youtube=$isYoutube',
+    );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        // Parse the response as a plain integer
+        final episodeId = int.tryParse(response.body.trim()) ?? 0;
+        return episodeId;
+      }
+      return 0;
+    } catch (e) {
+      _devLog('Error getting episode ID: $e');
+      return 0;
+    }
+  }
+
+  // Add episode to history
+  Future<bool> addHistory(
+    int episodeId,
+    double episodePos,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/record_podcast_history');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'episode_pos': episodePos,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      // History API response received
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error adding history: $e');
+      return false;
+    }
+  }
+
+  // Queue episode
+  /// Add an episode to the queue. When [playingEpisodeId] is provided, the server
+  /// inserts the new episode directly under the currently-playing item ("play
+  /// next"); otherwise it goes to the top of the queue.
+  Future<bool> queueEpisode(
+    int episodeId,
+    int userId,
+    bool isYoutube, {
+    int? playingEpisodeId,
+    bool? playingIsYoutube,
+    /// 'top' or 'bottom'; null uses the user's default.
+    String? position,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/queue_pod');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+        if (playingEpisodeId != null) 'playing_episode_id': playingEpisodeId,
+        if (playingIsYoutube != null) 'playing_is_youtube': playingIsYoutube,
+        if (position != null) 'position': position,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      // Queue API response received
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error queueing episode: $e');
+      return false;
+    }
+  }
+
+  /// Move an episode to the top of the queue (position 1), inserting it if it
+  /// isn't queued yet. Used when a device starts playing so the currently-playing
+  /// episode is always the queue anchor.
+  Future<bool> moveQueueEpisodeToTop(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/queue_bump');
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'episode_id': episodeId,
+          'user_id': userId,
+          'is_youtube': isYoutube,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error moving episode to top of queue: $e');
+      return false;
+    }
+  }
+
+  // Increment played count
+  Future<bool> incrementPlayed(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/increment_played/$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _put(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog(
+        'Increment played response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error incrementing played: $e');
+      return false;
+    }
+  }
+
+  // Toggle a podcast's favorite status (podcast-level favorite, matching web).
+  Future<bool> togglePodcastFavorite(
+    int podcastId,
+    int userId,
+    bool isFavorite,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/podcast/toggle_favorite');
+    final requestBody = jsonEncode({
+      'user_id': userId,
+      'podcast_id': podcastId,
+      'is_favorite': isFavorite,
+    });
+
+    try {
+      final response = await http.put(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error toggling podcast favorite: $e');
+      return false;
+    }
+  }
+
+  // Read a podcast's feed again now and take its current details (name,
+  // artwork, author, description, website). [resetEdits] also drops the
+  // user's own edits to them. Throws with the server's message on failure.
+  Future<void> refreshPodcastDetails(int podcastId, {bool resetEdits = false}) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/refresh_podcast_details');
+    // Reading a slow feed can take longer than an ordinary request.
+    final response = await _client
+        .post(
+          url,
+          headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+          body: jsonEncode({'podcast_id': podcastId, 'reset_edits': resetEdits}),
+        )
+        .timeout(const Duration(seconds: 90));
+    if (response.statusCode != 200) {
+      String message = 'HTTP ${response.statusCode}';
+      try {
+        message = (jsonDecode(response.body) as Map<String, dynamic>)['message'] as String? ?? message;
+      } catch (_) {}
+      throw Exception(message);
+    }
+  }
+
+  // Check one podcast for new episodes now: its feed, YouTube channel or
+  // local folder. Returns how many episodes it added (YouTube channels
+  // report none; reload the list). Throws with the server's reason when the
+  // check failed or the host asked Castaway to wait.
+  Future<int> refreshPodcast(int podcastId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse('$_server/api/data/podcast/$podcastId/refresh');
+    final response = await _client
+        .post(url, headers: {'Api-Key': _apiKey!})
+        .timeout(const Duration(seconds: 90));
+    final body = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception(body['detail'] ?? body['message'] ?? 'HTTP ${response.statusCode}');
+    }
+    if (body['status'] != 'refreshed') {
+      throw Exception(body['detail'] ?? body['status']);
+    }
+    return (body['new_episodes'] as List?)?.length ?? 0;
+  }
+
+  // Whether the scheduled refresh and Refresh all check this podcast.
+  Future<bool> getAutoRefresh(int podcastId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse('$_server/api/data/podcast/$podcastId/auto_refresh');
+    final response = await _client.get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode}');
+    }
+    return (jsonDecode(response.body) as Map<String, dynamic>)['auto_refresh'] as bool? ?? true;
+  }
+
+  Future<void> setAutoRefresh(int podcastId, bool enabled) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse('$_server/api/data/podcast/$podcastId/auto_refresh');
+    final response = await _client.put(
+      url,
+      headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      body: jsonEncode({'auto_refresh': enabled}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode}');
+    }
+  }
+
+  // Get a podcast's favorite status.
+  Future<bool> getPodcastFavoriteStatus(int podcastId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/podcast/favorite_status');
+    final requestBody = jsonEncode({
+      'user_id': userId,
+      'podcast_id': podcastId,
+    });
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['is_favorite'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error getting podcast favorite status: $e');
+      return false;
+    }
+  }
+
+  // Get podcast ID from episode
+  Future<int> getPodcastIdFromEpisode(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/get_podcast_id_from_ep/$episodeId',
+    );
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['podcast_id'] ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      _devLog('Error getting podcast ID: $e');
+      return 0;
+    }
+  }
+
+  // Get play episode details (playback speed, skip times)
+  Future<PlayEpisodeDetails> getPlayEpisodeDetails(
+    int userId,
+    int podcastId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_play_episode_details');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'user_id': userId,
+        'podcast_id': podcastId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Play episode details response: ${response.statusCode} - ${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return PlayEpisodeDetails(
+          playbackSpeed: (data['playback_speed'] as num?)?.toDouble() ?? 1.0,
+          startSkip: data['start_skip'] ?? 0,
+          endSkip: data['end_skip'] ?? 0,
+          playbackSpeedCustomized: data['playback_speed_customized'] as bool? ?? false,
+        );
+      }
+      return PlayEpisodeDetails(playbackSpeed: 1.0, startSkip: 0, endSkip: 0);
+    } catch (e) {
+      _devLog('Error getting play episode details: $e');
+      return PlayEpisodeDetails(playbackSpeed: 1.0, startSkip: 0, endSkip: 0);
+    }
+  }
+
+  // Get per-podcast silence-trim settings (#727). Returns (enabled, threshold).
+  Future<SilenceTrimSettings> getSilenceTrim(int userId, int podcastId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse(
+      '$_server/api/data/get_silence_trim?podcast_id=$podcastId&user_id=$userId',
+    );
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return SilenceTrimSettings(
+          enabled: data['enabled'] == true,
+          threshold: data['threshold'] ?? 2,
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting silence trim: $e');
+    }
+    return const SilenceTrimSettings(enabled: false, threshold: 2);
+  }
+
+  // Get auto-skip segments (silence #727) for an episode, in seconds.
+  Future<List<SkipSegment>> getEpisodeSkipSegments(int episodeId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse(
+      '$_server/api/data/episode_skip_segments?episode_id=$episodeId&user_id=$userId',
+    );
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final segments = (data['segments'] as List?) ?? [];
+        return segments
+            .map((s) => SkipSegment(
+                  segmentId: (s['segment_id'] as num?)?.toInt() ?? 0,
+                  kind: s['kind'] ?? '',
+                  startTime: (s['start_time'] as num?)?.toDouble() ?? 0.0,
+                  endTime: (s['end_time'] as num?)?.toDouble() ?? 0.0,
+                  source: s['source'] as String?,
+                ))
+            .toList();
+      }
+    } catch (e) {
+      _devLog('Error getting skip segments: $e');
+    }
+    return const [];
+  }
+
+  // --- Server downloads: auto-download + retention ---------------------
+  // These are the server's settings (what the server downloads and keeps),
+  // separate from the app's own on-device auto-download.
+
+  Future<Map<String, dynamic>?> _postJson(
+      String path, Map<String, dynamic> body) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    try {
+      final response = await http.post(
+        Uri.parse('$_server/api/data/$path'),
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data is Map<String, dynamic> ? data : <String, dynamic>{};
+      }
+      _devLog('POST $path failed: ${response.statusCode}');
+    } catch (e) {
+      _devLog('Error calling $path: $e');
+    }
+    return null;
+  }
+
+  Future<bool> getServerAutoDownload(int userId, int podcastId) async {
+    final data = await _postJson('get_auto_download_status',
+        {'podcast_id': podcastId, 'user_id': userId});
+    return data?['auto_download'] == true;
+  }
+
+  Future<bool> setServerAutoDownload(
+          int userId, int podcastId, bool enabled) async =>
+      await _postJson('enable_auto_download', {
+        'podcast_id': podcastId,
+        'user_id': userId,
+        'auto_download': enabled,
+      }) !=
+      null;
+
+  /// Delete a server download once its episode is finished. Without
+  /// [podcastId] this is the user's default; with one it is the podcast's
+  /// effective value and whether it overrides the default.
+  Future<({bool enabled, bool customized})> getAutoDeleteOnComplete(
+      int userId,
+      {int? podcastId}) async {
+    final data = await _postJson('get_auto_delete_on_complete',
+        {'user_id': userId, 'podcast_id': podcastId});
+    return (
+      enabled: data?['enabled'] == true,
+      customized: data?['customized'] == true,
+    );
+  }
+
+  Future<bool> setUseGravatar(int userId, bool enabled) async =>
+      await _postJson('user/set_use_gravatar', {'user_id': userId, 'enabled': enabled}) != null;
+
+  Future<bool> setAutoDeleteOnCompleteDefault(int userId, bool enabled) async =>
+      await _postJson('user/set_auto_delete_on_complete',
+          {'user_id': userId, 'enabled': enabled}) !=
+      null;
+
+  /// [enabled] null goes back to the user's default.
+  Future<bool> setPodcastAutoDeleteOnComplete(
+          int userId, int podcastId, bool? enabled) async =>
+      await _postJson('podcast/set_auto_delete_on_complete', {
+        'user_id': userId,
+        'podcast_id': podcastId,
+        'enabled': enabled,
+      }) !=
+      null;
+
+  /// Delete server downloads older than this many days (0 = keep). Without
+  /// [podcastId] this is the user's default; with one, the podcast's value and
+  /// whether it overrides the default.
+  Future<({int days, bool customized})> getAutoDeleteDays(int userId,
+      {int? podcastId}) async {
+    final data = await _postJson('get_auto_download_delete_days',
+        {'user_id': userId, 'podcast_id': podcastId});
+    return (
+      days: (data?['days'] as num?)?.toInt() ?? 0,
+      customized: data?['customized'] == true,
+    );
+  }
+
+  Future<bool> setAutoDeleteDaysDefault(int userId, int days) async =>
+      await _postJson('user/set_auto_download_delete_days',
+          {'user_id': userId, 'days': days}) !=
+      null;
+
+  Future<bool> setPodcastAutoDeleteDays(
+          int userId, int podcastId, int days) async =>
+      await _postJson('podcast/set_auto_download_delete_days',
+          {'user_id': userId, 'podcast_id': podcastId, 'days': days}) !=
+      null;
+
+  Future<bool> clearPodcastAutoDeleteDays(int userId, int podcastId) async =>
+      await _postJson('clear_podcast_auto_download_delete_days',
+          {'user_id': userId, 'podcast_id': podcastId}) !=
+      null;
+
+  // Record listen duration for episode
+  /// Save where the user is in an episode. [recordedAt] is when the player
+  /// took the position: the server keeps the most recently recorded position,
+  /// so an upload that arrives late (offline, retried) can't undo newer
+  /// progress. Omitted means now.
+  ///
+  /// Returns false when the server couldn't be reached or refused the update.
+  Future<bool> recordListenDuration(
+    int episodeId,
+    int userId,
+    double listenDuration,
+    bool isYoutube, {
+    DateTime? recordedAt,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/record_listen_duration');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'listen_duration': listenDuration,
+        'is_youtube': isYoutube,
+        'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Record listen duration response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error recording listen duration: $e');
+      return false;
+    }
+  }
+
+  // Update the stored duration for an episode. Mirrors the web frontend, which
+  // corrects the episode duration to the real decoded length the first time an
+  // episode is played (feeds frequently ship missing/zero itunes:duration).
+  Future<bool> updateEpisodeDuration(
+    int episodeId,
+    int newDuration,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/update_episode_duration');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'new_duration': newDuration,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Update episode duration response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error updating episode duration: $e');
+      return false;
+    }
+  }
+
+  // Increment listen time for user stats
+  Future<bool> incrementListenTime(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/increment_listen_time/$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _put(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog(
+        'Increment listen time response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error incrementing listen time: $e');
+      return false;
+    }
+  }
+
+  // Save episode
+  Future<bool> saveEpisode(int episodeId, int userId, bool isYoutube) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/save_episode');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      // Save episode API response received
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error saving episode: $e');
+      return false;
+    }
+  }
+
+  // Remove saved episode
+  Future<bool> removeSavedEpisode(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/remove_saved_episode');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Remove saved episode response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error removing saved episode: $e');
+      return false;
+    }
+  }
+
+  // Download episode to server
+  Future<bool> downloadEpisode(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/download_podcast');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Download episode response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error downloading episode: $e');
+      return false;
+    }
+  }
+
+  /// Create a public share link for an episode. Returns the share `url_key`
+  /// (append to `<server>/shared_episode/<url_key>` for the shareable URL).
+  Future<String> createShareLink(int episodeId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/share_episode/$episodeId');
+    _devLog('Making API call to: $url');
+
+    final response = await http.post(
+      url,
+      headers: {'Api-Key': _apiKey!},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final urlKey = data['url_key'];
+      if (urlKey == null || (urlKey is String && urlKey.isEmpty)) {
+        throw Exception('Server did not return a share link');
+      }
+      return urlKey.toString();
+    } else {
+      throw Exception('Failed to create share link: ${response.statusCode}');
+    }
+  }
+
+  Future<List<DownloadTask>> getDownloadActivity(int userId) async {
+    if (_server == null || _apiKey == null) return [];
+    final url = Uri.parse('$_server/api/tasks/user/$userId');
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List;
+        return data
+            .cast<Map<String, dynamic>>()
+            .map(DownloadTask.fromJson)
+            .where((t) => t.taskType == 'download_episode' || t.taskType == 'podcast_download' || t.taskType == 'download_all_episodes')
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Delete downloaded episode from server
+  Future<bool> deleteEpisode(int episodeId, int userId, bool isYoutube) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/delete_episode');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Delete episode response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error deleting episode: $e');
+      return false;
+    }
+  }
+
+  // Mark episode as completed
+  Future<bool> markEpisodeCompleted(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/mark_episode_completed');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Mark completed response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error marking episode completed: $e');
+      return false;
+    }
+  }
+
+  // Mark episode as uncompleted
+  Future<bool> markEpisodeUncompleted(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/mark_episode_uncompleted');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Mark uncompleted response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error marking episode uncompleted: $e');
+      return false;
+    }
+  }
+
+  // Remove episode from queue
+  Future<bool> removeQueuedEpisode(
+    int episodeId,
+    int userId,
+    bool isYoutube,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/remove_queued_pod');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      _devLog(
+        'Remove queued response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error removing queued episode: $e');
+      return false;
+    }
+  }
+
+  // Get user history
+  Future<List<CastawayEpisode>> getUserHistory(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/user_history/$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      // User history API response received
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final episodesList = data['data'] as List<dynamic>? ?? [];
+
+        return episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved: episodeData['saved'] ?? false,
+            queued: episodeData['queued'] ?? false,
+            downloaded: episodeData['downloaded'] ?? false,
+            isYoutube: episodeData['is_youtube'] ?? false,
+            listenDate: episodeData['listendate'],
+          );
+        }).toList();
+      } else {
+        throw Exception('Failed to load user history: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user history: $e');
+      rethrow;
+    }
+  }
+
+  // Get user history with pagination support
+  Future<EpisodePage> getUserHistoryPaged(
+    int userId, {
+    int limit = 50,
+    int offset = 0,
+    String sortBy = 'date',
+    String sortOrder = 'desc',
+    String filter = 'all',
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/user_history/$userId').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+        'filter': filter,
+      },
+    );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final total = (data['total'] as num?)?.toInt() ?? 0;
+        final episodesList = data['data'] as List<dynamic>? ?? [];
+
+        final episodes = episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved: episodeData['saved'] ?? false,
+            queued: episodeData['queued'] ?? false,
+            downloaded: episodeData['downloaded'] ?? false,
+            isYoutube: episodeData['is_youtube'] ?? false,
+            listenDate: episodeData['listendate'],
+          );
+        }).toList();
+
+        return EpisodePage(episodes: episodes, total: total);
+      } else {
+        throw Exception('Failed to load user history: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting paged user history: $e');
+      rethrow;
+    }
+  }
+
+  // Get queued episodes
+  Future<List<CastawayEpisode>> getQueuedEpisodes(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/get_queued_episodes?user_id=$userId',
+    );
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog('Queued episodes response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        // Long queues are large payloads; decode off the UI thread.
+        final data = await compute(_decodeJson, response.body) as Map<String, dynamic>;
+        final episodesList = data['data'] as List<dynamic>? ?? [];
+
+        return episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved: episodeData['saved'] ?? false,
+            queued:
+                episodeData['queued'] ??
+                true, // Should always be true for queued episodes
+            downloaded: episodeData['downloaded'] ?? false,
+            isYoutube: episodeData['is_youtube'] ?? false,
+          );
+        }).toList();
+      } else {
+        throw Exception(
+          'Failed to load queued episodes: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting queued episodes: $e');
+      rethrow;
+    }
+  }
+
+  // Get saved episodes
+  Future<List<CastawayEpisode>> getSavedEpisodes(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/saved_episode_list/$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      // Saved episodes API response received
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final episodesList = data['saved_episodes'] as List<dynamic>? ?? [];
+
+        return episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved:
+                episodeData['saved'] ??
+                true, // Should always be true for saved episodes
+            queued: episodeData['queued'] ?? false,
+            downloaded: episodeData['downloaded'] ?? false,
+            isYoutube: episodeData['is_youtube'] ?? false,
+            saveDate: episodeData['savedate'],
+          );
+        }).toList();
+      } else {
+        throw Exception(
+          'Failed to load saved episodes: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting saved episodes: $e');
+      rethrow;
+    }
+  }
+
+  // Get saved episodes with pagination support
+  Future<EpisodePage> getSavedEpisodesPaged(
+    int userId, {
+    int limit = 50,
+    int offset = 0,
+    String sortBy = 'date',
+    String sortOrder = 'desc',
+    String filter = 'all',
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/saved_episode_list/$userId').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+        'filter': filter,
+      },
+    );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final total = (data['total'] as num?)?.toInt() ?? 0;
+        final episodesList = data['saved_episodes'] as List<dynamic>? ?? [];
+
+        final episodes = episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved: episodeData['saved'] ?? true,
+            queued: episodeData['queued'] ?? false,
+            downloaded: episodeData['downloaded'] ?? false,
+            isYoutube: episodeData['is_youtube'] ?? false,
+            saveDate: episodeData['savedate'],
+          );
+        }).toList();
+
+        return EpisodePage(episodes: episodes, total: total);
+      } else {
+        throw Exception('Failed to load saved episodes: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting paged saved episodes: $e');
+      rethrow;
+    }
+  }
+
+  // --- Collections ------------------------------------------------------
+  // Hand-picked groups of episodes; the default one is "Saved".
+
+  Map<String, String> get _jsonHeaders => {'Api-Key': _apiKey!, 'Content-Type': 'application/json'};
+
+  void _requireAuth() {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+  }
+
+  /// The server's error text from a JSON `{message}` body, or the status code.
+  String _errorText(http.Response response) {
+    try {
+      final data = jsonDecode(response.body);
+      final msg = data['message'] ?? data['detail'] ?? data['error'];
+      if (msg is String && msg.isNotEmpty) return msg;
+    } catch (_) {}
+    return 'Server returned ${response.statusCode}';
+  }
+
+  Future<List<CastawayCollection>> getCollections(int userId) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/user/$userId');
+    final response = await _get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+    final list = jsonDecode(response.body)['collections'] as List<dynamic>? ?? [];
+    return list.map((c) => CastawayCollection.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  /// Distinct categories across the user's podcasts, for auto-add.
+  Future<List<String>> getUserCategories(int userId) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/categories/$userId');
+    final response = await _get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+    return (jsonDecode(response.body)['categories'] as List<dynamic>? ?? []).cast<String>();
+  }
+
+  /// Returns the new collection's id. With [backfill], episodes already in
+  /// [autoAddCategories] are added too.
+  Future<int> createCollection(
+    int userId, {
+    required String name,
+    String? description,
+    String icon = 'ph-bookmark-simple',
+    List<String>? autoAddCategories,
+    bool backfill = false,
+  }) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/create');
+    final response = await _post(url,
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          'user_id': userId,
+          'name': name,
+          'description': description,
+          'icon': icon,
+          'auto_add_categories': autoAddCategories,
+          'backfill': backfill,
+        }));
+    if (response.statusCode == 409) throw Exception('A collection with that name already exists');
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+    return (jsonDecode(response.body)['collection_id'] as num).toInt();
+  }
+
+  Future<void> updateCollection(
+    int collectionId, {
+    required String name,
+    String? description,
+    required String icon,
+    required List<String> autoAddCategories,
+    bool backfill = false,
+  }) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/$collectionId');
+    final response = await _client
+        .patch(url,
+            headers: _jsonHeaders,
+            body: jsonEncode({
+              'name': name,
+              'description': description ?? '',
+              'icon': icon,
+              'auto_add_categories': autoAddCategories,
+              'backfill': backfill,
+            }))
+        .timeout(_timeout);
+    if (response.statusCode == 409) throw Exception('A collection with that name already exists');
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+  }
+
+  Future<void> deleteCollection(int collectionId) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/$collectionId');
+    final response = await _client.delete(url, headers: {'Api-Key': _apiKey!}).timeout(_timeout);
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+  }
+
+  Future<void> setEpisodeInCollection(
+      int collectionId, int userId, int episodeId, bool isYoutube, bool inCollection) async {
+    _requireAuth();
+    final action = inCollection ? 'add_episode' : 'remove_episode';
+    final url = Uri.parse('$_server/api/data/collections/$collectionId/$action');
+    final response = await _post(url,
+        headers: _jsonHeaders,
+        body: jsonEncode({'user_id': userId, 'episode_id': episodeId, 'is_youtube': isYoutube}));
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+  }
+
+  /// Adds every `(episodeId, isYoutube)` pair to one collection.
+  Future<void> bulkAddToCollection(
+      int collectionId, int userId, List<(int, bool)> episodes) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/bulk_add');
+    final response = await _post(url,
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          'user_id': userId,
+          'collection_id': collectionId,
+          'episodes': [for (final (id, yt) in episodes) [id, yt]],
+        }));
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+  }
+
+  /// Ids of the collections (including Saved) that hold this episode.
+  Future<Set<int>> getEpisodeCollections(int userId, int episodeId, bool isYoutube) async {
+    _requireAuth();
+    final url = Uri.parse(
+        '$_server/api/data/episode_collections/$userId/$episodeId?is_youtube=$isYoutube');
+    final response = await _get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+    return (jsonDecode(response.body)['collection_ids'] as List<dynamic>? ?? [])
+        .map((e) => (e as num).toInt())
+        .toSet();
+  }
+
+  Future<EpisodePage> getCollectionEpisodesPaged(
+    int collectionId, {
+    int limit = 50,
+    int offset = 0,
+    String sortBy = 'date',
+    String sortOrder = 'desc',
+    String filter = 'all',
+  }) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/collections/$collectionId/episodes').replace(
+      queryParameters: {
+        'limit': '$limit',
+        'offset': '$offset',
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+        'filter': filter,
+      },
+    );
+    final response = await _get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+    final data = jsonDecode(response.body);
+    final list = data['saved_episodes'] as List<dynamic>? ?? [];
+    return EpisodePage(
+      episodes: list.map((e) => CastawayEpisode.fromJson(e as Map<String, dynamic>)).toList(),
+      total: (data['total'] as num?)?.toInt() ?? list.length,
+    );
+  }
+
+  // --- Bulk episode actions (multi-select) -------------------------------
+
+  /// POST /api/data/bulk_<action>: `mark_episodes_completed`, `save_episodes`,
+  /// `queue_episodes` or `download_episodes`. Returns the server's summary.
+  Future<String> bulkEpisodeAction(
+      String action, List<int> episodeIds, int userId, bool isYoutube) async {
+    _requireAuth();
+    final url = Uri.parse('$_server/api/data/bulk_$action');
+    final response = await _post(url,
+        headers: _jsonHeaders,
+        body: jsonEncode({'episode_ids': episodeIds, 'user_id': userId, 'is_youtube': isYoutube}));
+    if (response.statusCode != 200) throw Exception(_errorText(response));
+    return jsonDecode(response.body)['message'] as String? ?? 'Done';
+  }
+
+  // Get episode metadata
+  Future<CastawayEpisode?> getEpisodeMetadata(
+    int episodeId,
+    int userId, {
+    bool isYoutube = false,
+    bool personEpisode = false,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_episode_metadata');
+
+    try {
+      final requestBody = jsonEncode({
+        'episode_id': episodeId,
+        'user_id': userId,
+        'person_episode': personEpisode,
+        'is_youtube': isYoutube,
+      });
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final episodeData = data['episode'];
+
+        return CastawayEpisode(
+          podcastName: episodeData['podcastname'] ?? '',
+          episodeTitle: episodeData['episodetitle'] ?? '',
+          episodePubDate: episodeData['episodepubdate'] ?? '',
+          episodeDescription: episodeData['episodedescription'] ?? '',
+          episodeArtwork: episodeData['episodeartwork'] ?? '',
+          episodeUrl: episodeData['episodeurl'] ?? '',
+          episodeDuration: episodeData['episodeduration'] ?? 0,
+          listenDuration: episodeData['listenduration'] ?? 0,
+          episodeId: episodeData['episodeid'] ?? episodeId,
+          completed: episodeData['completed'] ?? false,
+          saved: episodeData['is_saved'] ?? false,
+          queued: episodeData['is_queued'] ?? false,
+          downloaded: episodeData['is_downloaded'] ?? false,
+          isYoutube: episodeData['is_youtube'] ?? isYoutube,
+          podcastId: episodeData['podcastid'],
+        );
+      }
+      return null;
+    } catch (e) {
+      _devLog('Error getting episode metadata: $e');
+      return null;
+    }
+  }
+
+  // Get downloaded episodes from server
+  Future<List<CastawayEpisode>> getServerDownloads(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/download_episode_list?user_id=$userId',
+    );
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final episodesList =
+            data['downloaded_episodes'] as List<dynamic>? ?? [];
+
+        return episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved: episodeData['saved'] ?? false,
+            queued: episodeData['queued'] ?? false,
+            downloaded:
+                episodeData['downloaded'] ??
+                true, // Should always be true for downloaded episodes
+            isYoutube: episodeData['is_youtube'] ?? false,
+          );
+        }).toList();
+      } else {
+        throw Exception(
+          'Failed to load server downloads: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting server downloads: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<PodcastDownloadSummary>> getPodcastDownloadSummary(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/podcast_download_summary/$userId');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final podcastsList = data['podcasts'] as List<dynamic>? ?? [];
+
+        return podcastsList.map((p) {
+          return PodcastDownloadSummary(
+            podcastId: (p['podcastid'] as num?)?.toInt() ?? 0,
+            podcastName: p['podcastname'] ?? '',
+            artworkUrl: p['artworkurl'],
+            episodeCount: (p['episode_count'] as num?)?.toInt() ?? 0,
+          );
+        }).toList();
+      } else {
+        throw Exception('Failed to load podcast download summary: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting podcast download summary: $e');
+      rethrow;
+    }
+  }
+
+  Future<EpisodePage> getPodcastDownloadsPaged(
+    int userId,
+    int podcastId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/podcast_downloads_paged/$userId/$podcastId',
+    ).replace(queryParameters: {
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    });
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final total = (data['total'] as num?)?.toInt() ?? 0;
+        final episodesList = data['episodes'] as List<dynamic>? ?? [];
+
+        final episodes = episodesList.map((episodeData) {
+          return CastawayEpisode(
+            podcastName: episodeData['podcastname'] ?? '',
+            episodeTitle: episodeData['episodetitle'] ?? '',
+            episodePubDate: episodeData['episodepubdate'] ?? '',
+            episodeDescription: episodeData['episodedescription'] ?? '',
+            episodeArtwork: episodeData['episodeartwork'] ?? '',
+            episodeUrl: episodeData['episodeurl'] ?? '',
+            episodeDuration: episodeData['episodeduration'] ?? 0,
+            listenDuration: episodeData['listenduration'] ?? 0,
+            episodeId: episodeData['episodeid'] ?? 0,
+            completed: episodeData['completed'] ?? false,
+            saved: episodeData['saved'] ?? false,
+            queued: episodeData['queued'] ?? false,
+            downloaded: episodeData['downloaded'] ?? true,
+            isYoutube: episodeData['is_youtube'] ?? false,
+          );
+        }).toList();
+
+        return EpisodePage(episodes: episodes, total: total);
+      } else {
+        throw Exception('Failed to load podcast downloads: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting podcast downloads paged: $e');
+      rethrow;
+    }
+  }
+
+  // Get stream URL for episode
+  String getStreamUrl(
+    int episodeId,
+    int userId, {
+    bool isYoutube = false,
+    bool isLocal = false,
+  }) {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    if (isYoutube) {
+      return '$_server/api/data/stream/$episodeId?api_key=$_apiKey&user_id=$userId&type=youtube';
+    } else if (isLocal) {
+      return '$_server/api/data/stream/$episodeId?api_key=$_apiKey&user_id=$userId';
+    } else {
+      // For external episodes, return the original URL
+      return '';
+    }
+  }
+
+  // Search for podcasts using Castaway search API
+  Future<CastawaySearchResult> searchPodcasts(
+    String query,
+    SearchProvider provider,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Server and API key must be set');
+    }
+
+    // The server searches Apple and Podcast Index for us (it holds the Podcast Index key).
+    final url = Uri.parse(
+      '$_server/api/data/proxy_search?query=${Uri.encodeComponent(query)}&index=${provider.value}',
+    );
+
+    try {
+      _devLog('Making search request to: $url');
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Search API response received
+        return CastawaySearchResult.fromJson(data);
+      } else {
+        throw Exception('Failed to search podcasts: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error searching podcasts: $e');
+      rethrow;
+    }
+  }
+
+  // Check if a podcast is already added to the server
+  Future<bool> checkPodcastExists(
+    String podcastTitle,
+    String podcastUrl,
+    int userId,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      return false;
+    }
+
+    final url = Uri.parse('$_server/api/data/check_podcast').replace(
+      queryParameters: {
+        'user_id': userId.toString(),
+        'podcast_name': podcastTitle,
+        'podcast_url': podcastUrl,
+      },
+    );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error checking podcast exists: $e');
+      return false;
+    }
+  }
+
+  // Add a podcast to the server
+  Future<bool> addPodcast(UnifiedCastawayPodcast podcast, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/add_podcast');
+    final body = {
+      'podcast_values': {
+        'pod_title': podcast.title,
+        'pod_artwork': podcast.artwork,
+        'pod_author': podcast.author,
+        'categories': podcast.categories ?? {},
+        'pod_description': podcast.description,
+        'pod_episode_count': podcast.episodeCount,
+        'pod_feed_url': podcast.url,
+        'pod_website': podcast.link,
+        'pod_explicit': podcast.explicit,
+        'user_id': userId,
+      },
+      'podcast_index_id': podcast.indexId,
+    };
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error adding podcast: $e');
+      rethrow;
+    }
+  }
+
+  // Remove a podcast from the server
+  Future<bool> removePodcast(
+    String podcastTitle,
+    String podcastUrl,
+    int userId,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/remove_podcast');
+    final body = {
+      'podcast_name': podcastTitle,
+      'podcast_url': podcastUrl,
+      'user_id': userId,
+    };
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      _devLog('Error removing podcast: $e');
+      rethrow;
+    }
+  }
+
+  /// YouTube channels matching [query], through the server's search proxy.
+  Future<List<YouTubeChannelResult>> searchYouTubeChannels(String query) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Server and API key must be set');
+    }
+    final url = Uri.parse('$_server/api/data/proxy_search')
+        .replace(queryParameters: {'query': query, 'index': 'youtube'});
+    final response =
+        await _client.get(url, headers: _authHeaders).timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    final data = jsonDecode(response.body);
+    final results = data is Map ? data['results'] as List<dynamic>? ?? const [] : const [];
+    return results
+        .whereType<Map<String, dynamic>>()
+        .map(YouTubeChannelResult.fromJson)
+        .where((c) => c.channelId.isNotEmpty)
+        .toList();
+  }
+
+  /// Feed URL to podcast ID for everything the user follows.
+  Future<Map<String, int>> getFollowedFeedIds(int userId) async {
+    final podcasts = await getUserPodcasts(userId);
+    return {
+      for (final p in podcasts)
+        if (p.url.isNotEmpty && p.id != null) p.url: p.id!,
+    };
+  }
+
+  /// Subscribes to a channel and returns its podcast ID. The server adds its
+  /// videos in the background.
+  Future<int> subscribeToYouTubeChannel(String channelId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse('$_server/api/data/youtube/subscribe')
+        .replace(queryParameters: {'channel_id': channelId, 'user_id': userId.toString()});
+    // The server reads the channel with yt-dlp before answering.
+    final response =
+        await _client.post(url, headers: _authHeaders).timeout(const Duration(seconds: 90));
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final podcastId = data['podcast_id'];
+    if (data['success'] != true || podcastId is! int) {
+      throw Exception(data['message'] ?? 'Subscribing failed');
+    }
+    return podcastId;
+  }
+
+  Future<bool> removeYouTubeChannel(String channelName, String channelUrl, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final response = await _post(
+      Uri.parse('$_server/api/data/remove_youtube_channel'),
+      headers: {..._authHeaders, 'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': userId, 'channel_name': channelName, 'channel_url': channelUrl}),
+    );
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    return (jsonDecode(response.body) as Map<String, dynamic>)['success'] == true;
+  }
+
+  /// How many days of videos a channel keeps; 0 is no limit.
+  /// Where Add to queue puts an episode by default: 'top' or 'bottom'.
+  Future<String> getQueueAddPosition(int userId) async {
+    final url = Uri.parse('$_server/api/data/get_queue_add_position/$userId');
+    final response = await _get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode != 200) {
+      throw Exception('Failed to get queue position: ${response.statusCode}');
+    }
+    return (jsonDecode(response.body) as Map<String, dynamic>)['position'] as String? ?? 'bottom';
+  }
+
+  Future<void> setQueueAddPosition(int userId, String position) async {
+    final url = Uri.parse('$_server/api/data/update_queue_add_position');
+    final response = await _put(
+      url,
+      headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': userId, 'position': position}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to save queue position: ${response.statusCode}');
+    }
+  }
+
+  Future<int?> getFeedCutoffDays(int podcastId, int userId) async {
+    final url = Uri.parse('$_server/api/data/get_feed_cutoff_days').replace(
+      queryParameters: {'podcast_id': podcastId.toString(), 'user_id': userId.toString()},
+    );
+    final response = await _get(url, headers: _authHeaders);
+    if (response.statusCode != 200) return null;
+    return (jsonDecode(response.body) as Map<String, dynamic>)['feed_cutoff_days'] as int?;
+  }
+
+  Future<void> updateFeedCutoffDays(int podcastId, int userId, int days) async {
+    final response = await _post(
+      Uri.parse('$_server/api/data/update_feed_cutoff_days'),
+      headers: {..._authHeaders, 'Content-Type': 'application/json'},
+      body: jsonEncode({'podcast_id': podcastId, 'user_id': userId, 'feed_cutoff_days': days}),
+    );
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+  }
+
+  Future<YouTubeVideoFilter> getYouTubeVideoFilter(int podcastId, int userId) async {
+    final url = Uri.parse('$_server/api/data/youtube_video_filter').replace(
+      queryParameters: {'podcast_id': podcastId.toString(), 'user_id': userId.toString()},
+    );
+    final response = await _get(url, headers: _authHeaders);
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    return YouTubeVideoFilter.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Saves the filter and returns it as the server stored it.
+  Future<YouTubeVideoFilter> updateYouTubeVideoFilter(
+      int podcastId, int userId, YouTubeVideoFilter filter) async {
+    final response = await _post(
+      Uri.parse('$_server/api/data/update_youtube_video_filter'),
+      headers: {..._authHeaders, 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'podcast_id': podcastId,
+        'user_id': userId,
+        'min_minutes': filter.minMinutes,
+        'max_minutes': filter.maxMinutes,
+        'title_contains': filter.titleContains,
+      }),
+    );
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    return YouTubeVideoFilter.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  // Get podcast details dynamically (whether added or not)
+  Future<PodcastDetailsData> getPodcastDetailsDynamic({
+    required int userId,
+    required String podcastTitle,
+    required String podcastUrl,
+    required int podcastIndexId,
+    required bool added,
+    bool displayOnly = false,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_podcast_details_dynamic')
+        .replace(
+          queryParameters: {
+            'user_id': userId.toString(),
+            'podcast_title': podcastTitle,
+            'podcast_url': podcastUrl,
+            'podcast_index_id': podcastIndexId.toString(),
+            'added': added.toString(),
+            'display_only': displayOnly.toString(),
+          },
+        );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Podcast details API response received
+        return PodcastDetailsData.fromJson(data);
+      } else {
+        throw Exception(
+          'Failed to get podcast details: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting podcast details: $e');
+      rethrow;
+    }
+  }
+
+  // Get podcast details by podcast ID (for subscribed podcasts)
+  Future<Map<String, dynamic>?> getPodcastDetailsById(
+    int podcastId,
+    int userId,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_podcast_details').replace(
+      queryParameters: {
+        'podcast_id': podcastId.toString(),
+        'user_id': userId.toString(),
+      },
+    );
+
+    try {
+      _devLog('Getting podcast details by ID from: $url');
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Podcast details by ID API response received
+        return data['details'];
+      } else {
+        throw Exception(
+          'Failed to get podcast details: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting podcast details by ID: $e');
+      rethrow;
+    }
+  }
+
+  // Get podcast ID by feed URL and title
+  Future<int?> getPodcastId(
+    int userId,
+    String podcastFeed,
+    String podcastTitle,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_podcast_id').replace(
+      queryParameters: {
+        'user_id': userId.toString(),
+        'podcast_feed': podcastFeed,
+        'podcast_title': podcastTitle,
+      },
+    );
+
+    try {
+      _devLog('Getting podcast ID from: $url');
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Podcast ID API response received
+        final podcastId = data['podcast_id'];
+        if (podcastId is int) {
+          return podcastId;
+        }
+        return null;
+      } else {
+        throw Exception('Failed to get podcast ID: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting podcast ID: $e');
+      return null;
+    }
+  }
+
+  // Get episodes for an added podcast
+  Future<List<CastawayEpisode>> getPodcastEpisodes(
+    int userId,
+    int podcastId,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/podcast_episodes').replace(
+      queryParameters: {
+        'user_id': userId.toString(),
+        'podcast_id': podcastId.toString(),
+      },
+    );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final episodes = data['episodes'] as List;
+        return episodes.map((episodeData) {
+          // Add default values only for fields not provided by this endpoint
+          final episodeWithDefaults = Map<String, dynamic>.from(episodeData);
+          
+          // Only add defaults if these fields are not present in the API response
+          episodeWithDefaults['saved'] ??= false;
+          episodeWithDefaults['queued'] ??= false;
+          episodeWithDefaults['downloaded'] ??= false;
+          episodeWithDefaults['is_youtube'] ??= false;
+
+          return CastawayEpisode.fromJson(episodeWithDefaults);
+        }).toList();
+      } else {
+        throw Exception(
+          'Failed to get podcast episodes: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting podcast episodes: $e');
+      rethrow;
+    }
+  }
+
+  // Get user statistics
+  Future<UserStats> getUserStats(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/get_stats',
+    ).replace(queryParameters: {'user_id': userId.toString()});
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return UserStats.fromJson(data);
+      } else {
+        throw Exception('Failed to get user stats: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user stats: $e');
+      rethrow;
+    }
+  }
+
+  // Get Castaway version
+  Future<String> getCastawayVersion() async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_castaway_version');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['data'] ?? 'Unknown';
+      } else {
+        throw Exception(
+          'Failed to get Castaway version: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting Castaway version: $e');
+      return 'Unknown';
+    }
+  }
+
+  // Get user details by user ID
+  Future<Map<String, dynamic>?> getUserDetails(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/user_details_id/$userId');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        throw Exception('Failed to get user details: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user details: $e');
+      return null;
+    }
+  }
+
+  // Get user ID from API key
+  Future<int?> getUserIdFromApiKey() async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_user');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['retrieved_id'] as int?;
+      } else {
+        throw Exception('Failed to get user ID: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user ID: $e');
+      return null;
+    }
+  }
+
+  // Get home overview data
+  Future<HomeOverview> getHomeOverview(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/home_overview?user_id=$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return HomeOverview.fromJson(data);
+      } else {
+        throw Exception('Failed to load home overview: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting home overview: $e');
+      rethrow;
+    }
+  }
+
+  // Get playlists
+  Future<PlaylistResponse> getPlaylists(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_playlists?user_id=$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      // Playlists API response received
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return PlaylistResponse.fromJson(data);
+      } else {
+        throw Exception('Failed to load playlists: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting playlists: $e');
+      rethrow;
+    }
+  }
+
+  // Get user theme
+  Future<String?> getUserTheme(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_theme/$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+      );
+
+      // Theme API response received
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['theme'] as String?;
+      } else {
+        throw Exception('Failed to get user theme: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting user theme: $e');
+      return null;
+    }
+  }
+
+  // Set user theme
+  Future<bool> setUserTheme(int userId, String theme) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/user/set_theme');
+    _devLog('Making API call to: $url');
+
+    try {
+      final requestBody = jsonEncode({'user_id': userId, 'new_theme': theme});
+
+      final response = await _put(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      // Set theme API response received
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['message'] != null;
+      } else {
+        throw Exception('Failed to set user theme: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error setting user theme: $e');
+      return false;
+    }
+  }
+
+  // Get user playlists
+  Future<List<PlaylistData>> getUserPlaylists(int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_playlists?user_id=$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog(
+        'Get playlists response: ${response.statusCode} - ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> playlistsData = data['playlists'] ?? [];
+
+        List<PlaylistData> playlists = [];
+        for (var playlistData in playlistsData) {
+          playlists.add(PlaylistData.fromJson(playlistData));
+        }
+
+        return playlists;
+      } else {
+        throw Exception('Failed to get playlists: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error getting playlists: $e');
+      rethrow;
+    }
+  }
+
+  // Create playlist
+  Future<bool> createPlaylist(CreatePlaylistRequest request) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/create_playlist');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode(request.toJson()),
+      );
+
+      _devLog(
+        'Create playlist response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error creating playlist: $e');
+      return false;
+    }
+  }
+
+  // Delete playlist
+  Future<bool> deletePlaylist(int userId, int playlistId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/delete_playlist');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _delete(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode({'user_id': userId, 'playlist_id': playlistId}),
+      );
+
+      _devLog(
+        'Delete playlist response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error deleting playlist: $e');
+      return false;
+    }
+  }
+
+  // Get playlist episodes
+  Future<PlaylistEpisodesResponse> getPlaylistEpisodes(
+    int userId,
+    int playlistId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/get_playlist_episodes?user_id=$userId&playlist_id=$playlistId&limit=$limit&offset=$offset',
+    );
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog(
+        'Get playlist episodes response: ${response.statusCode} - ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return PlaylistEpisodesResponse.fromJson(data);
+      } else {
+        throw Exception(
+          'Failed to get playlist episodes: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _devLog('Error getting playlist episodes: $e');
+      rethrow;
+    }
+  }
+
+  // Reorder queue episodes
+  /// Reorder the queue. Each entry carries `is_youtube` so the server can tell a
+  /// podcast episode id from a YouTube video id that share the same integer.
+  Future<bool> reorderQueue(
+    int userId,
+    List<({int episodeId, bool isYoutube})> episodes,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/reorder_queue?user_id=$userId');
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'episodes': episodes
+              .map((e) => {'episode_id': e.episodeId, 'is_youtube': e.isYoutube})
+              .toList(),
+        }),
+      );
+
+      _devLog(
+        'Reorder queue response: ${response.statusCode} - ${response.body}',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _devLog('Error reordering queue: $e');
+      return false;
+    }
+  }
+
+  // Search episodes in user's subscriptions
+  Future<SearchResultPage> searchEpisodes(
+    int userId,
+    String searchTerm, {
+    int limit = 50,
+    int offset = 0,
+    List<String>? categories,
+  }) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/search_data').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      },
+    );
+    _devLog('Making API call to: $url');
+
+    try {
+      final body = <String, dynamic>{
+        'search_term': searchTerm,
+        'user_id': userId,
+      };
+      if (categories != null && categories.isNotEmpty) {
+        body['categories'] = categories;
+      }
+
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> episodesData = data['data'] ?? [];
+        final total = (data['total'] as num?)?.toInt() ?? episodesData.length;
+
+        List<SearchEpisodeResult> results = [];
+        for (var episodeData in episodesData) {
+          results.add(SearchEpisodeResult.fromJson(episodeData));
+        }
+
+        return SearchResultPage(results: results, total: total);
+      } else {
+        throw Exception('Failed to search episodes: ${response.statusCode}');
+      }
+    } catch (e) {
+      _devLog('Error searching episodes: $e');
+      rethrow;
+    }
+  }
+
+  /// Search inside the transcripts of the user's episodes. Throws
+  /// [TranscriptSearchUnsupported] when the server predates transcript search.
+  Future<TranscriptSearchPage> searchTranscripts(String query, {int limit = 20, int offset = 0}) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    final url = Uri.parse('$_server/api/data/transcripts/search').replace(
+      queryParameters: {'q': query, 'limit': '$limit', 'offset': '$offset'},
+    );
+    final response = await _get(url, headers: {'Api-Key': _apiKey!});
+    if (response.statusCode == 404) throw TranscriptSearchUnsupported();
+    if (response.statusCode != 200) {
+      throw Exception('Failed to search transcripts: ${response.statusCode}');
+    }
+    return TranscriptSearchPage.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  // Fetch podcast 2.0 data for a specific episode
+  Future<Map<String, dynamic>?> fetchPodcasting2Data(
+    int episodeId,
+    int userId,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/fetch_podcasting_2_data').replace(
+      queryParameters: {
+        'episode_id': episodeId.toString(),
+        'user_id': userId.toString(),
+      },
+    );
+
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog(
+        'Podcast 2.0 data response: ${response.statusCode} - ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        _devLog('Failed to fetch podcast 2.0 data: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      _devLog('Error fetching podcast 2.0 data: $e');
+      return null;
+    }
+  }
+
+  // Fetch podcast 2.0 data for a specific podcast
+  Future<Map<String, dynamic>?> fetchPodcasting2PodData(
+    int podcastId,
+    int userId,
+  ) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/fetch_podcasting_2_pod_data')
+        .replace(
+          queryParameters: {
+            'podcast_id': podcastId.toString(),
+            'user_id': userId.toString(),
+          },
+        );
+
+    _devLog('Making API call to: $url');
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      _devLog(
+        'Podcast 2.0 pod data response: ${response.statusCode} - ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        _devLog('Failed to fetch podcast 2.0 pod data: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      _devLog('Error fetching podcast 2.0 pod data: $e');
+      return null;
+    }
+  }
+
+  // ---- People (/api/data/people/*) ----
+
+  Map<String, String> get _authHeaders {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+    return {'Api-Key': _apiKey!};
+  }
+
+  Uri _peopleUrl(String path, [Map<String, String>? query]) =>
+      Uri.parse('$_server/api/data/people/$path').replace(queryParameters: query);
+
+  /// The server's own message for a failed request, if it sent one.
+  static String _errorMessage(http.Response response) {
+    try {
+      final body = jsonDecode(response.body);
+      final message = body is Map ? body['message'] : null;
+      if (message is String && message.isNotEmpty) return message;
+    } catch (_) {}
+    return 'Request failed (${response.statusCode})';
+  }
+
+  /// Everyone credited on one of the user's podcasts. Returns null when the
+  /// server predates the people endpoints (404), so callers can fall back to
+  /// [fetchPodcasting2PodData].
+  Future<PodcastCredits?> getPodcastPeople(int podcastId) async {
+    final response = await _get(_peopleUrl('podcast/$podcastId'), headers: _authHeaders);
+    if (response.statusCode == 200) {
+      return PodcastCredits.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+    _devLog('Podcast people: ${response.statusCode}');
+    return null;
+  }
+
+  /// People on one of the user's episodes (its own credits plus the show's
+  /// regulars). Null when the server predates the people endpoints.
+  Future<List<CreditedPerson>?> getEpisodePeople(int episodeId) async {
+    final response = await _get(_peopleUrl('episode/$episodeId'), headers: _authHeaders);
+    if (response.statusCode == 200) {
+      return (jsonDecode(response.body) as List<dynamic>)
+          .map((e) => CreditedPerson.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    _devLog('Episode people: ${response.statusCode}');
+    return null;
+  }
+
+  Future<PersonProfile> getPersonProfile(int personId, {int limit = 50, int offset = 0}) async {
+    final response = await _get(
+      _peopleUrl('$personId', {'limit': '$limit', 'offset': '$offset'}),
+      headers: _authHeaders,
+    );
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    return PersonProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// People this server knows from its feeds, matching [query].
+  Future<List<PersonHit>> searchPeople(String query) async {
+    final response = await _get(_peopleUrl('search', {'q': query}), headers: _authHeaders);
+    if (response.statusCode != 200) return [];
+    return (jsonDecode(response.body) as List<dynamic>)
+        .map((e) => PersonHit.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Follow or unfollow a person. Returns whether the server accepted it.
+  Future<bool> setPersonFollowed(int personId, bool follow) async {
+    final url = _peopleUrl('$personId/follow');
+    final response = follow
+        ? await _post(url, headers: _authHeaders)
+        : await _client.delete(url, headers: _authHeaders).timeout(_timeout);
+    return response.statusCode == 200;
+  }
+
+  Future<List<PersonInfo>> getFollowedPeople() async {
+    final response = await _get(_peopleUrl('followed'), headers: _authHeaders);
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    return (jsonDecode(response.body) as List<dynamic>)
+        .map((e) => PersonInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<bool> getAutoPlayNextStatus(int podcastId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_auto_play_next_status');
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode({'podcast_id': podcastId, 'user_id': userId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['auto_play_next'] ?? false;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      _devLog('Error getting auto-play-next status: $e');
+      return false;
+    }
+  }
+
+  Future<CastawayEpisode?> getNextPodcastEpisode(int episodeId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_next_podcast_episode');
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode({'episode_id': episodeId, 'user_id': userId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data == null) return null;
+
+        return CastawayEpisode(
+          podcastName: data['podcastname'] ?? '',
+          episodeTitle: data['episodetitle'] ?? '',
+          episodePubDate: data['episodepubdate'] ?? '',
+          episodeDescription: data['episodedescription'] ?? '',
+          episodeArtwork: data['episodeartwork'] ?? '',
+          episodeUrl: data['episodeurl'] ?? '',
+          episodeDuration: data['episodeduration'] ?? 0,
+          listenDuration: data['listenduration'] ?? 0,
+          episodeId: data['episodeid'] ?? 0,
+          completed: data['completed'] ?? false,
+          saved: data['saved'] ?? false,
+          queued: data['queued'] ?? false,
+          downloaded: data['downloaded'] ?? false,
+          isYoutube: data['is_youtube'] ?? false,
+        );
+      } else {
+        return null;
+      }
+    } catch (e) {
+      _devLog('Error getting next podcast episode: $e');
+      return null;
+    }
+  }
+
+  Future<CastawayEpisode?> getNextPlaylistEpisode(
+      int episodeId, int playlistId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse('$_server/api/data/get_next_playlist_episode');
+
+    try {
+      final response = await _post(
+        url,
+        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
+        body: jsonEncode(
+            {'episode_id': episodeId, 'playlist_id': playlistId, 'user_id': userId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data == null) return null;
+
+        return CastawayEpisode(
+          podcastName: data['podcastname'] ?? '',
+          episodeTitle: data['episodetitle'] ?? '',
+          episodePubDate: data['episodepubdate'] ?? '',
+          episodeDescription: data['episodedescription'] ?? '',
+          episodeArtwork: data['episodeartwork'] ?? '',
+          episodeUrl: data['episodeurl'] ?? '',
+          episodeDuration: data['episodeduration'] ?? 0,
+          listenDuration: data['listenduration'] ?? 0,
+          episodeId: data['episodeid'] ?? 0,
+          completed: data['completed'] ?? false,
+          saved: data['saved'] ?? false,
+          queued: data['queued'] ?? false,
+          downloaded: data['downloaded'] ?? false,
+          isYoutube: data['is_youtube'] ?? false,
+        );
+      } else {
+        return null;
+      }
+    } catch (e) {
+      _devLog('Error getting next playlist episode: $e');
+      return null;
+    }
+  }
+
+  Future<int?> getPodcastIdFromEpisodeId(int episodeId, int userId) async {
+    if (_server == null || _apiKey == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final url = Uri.parse(
+      '$_server/api/data/get_podcast_id_from_ep_id?episode_id=$episodeId&user_id=$userId',
+    );
+
+    try {
+      final response = await _get(url, headers: {'Api-Key': _apiKey!});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['podcast_id'] as int?;
+      } else {
+        return null;
+      }
+    } catch (e) {
+      _devLog('Error getting podcast ID from episode: $e');
+      return null;
+    }
+  }
+}
+
+class PodcastDetailsData {
+  final int podcastId;
+  final String podcastName;
+  final String feedUrl;
+  final String description;
+  final String author;
+  final String artworkUrl;
+  final bool explicit;
+  final int episodeCount;
+  final Map<String, String>? categories;
+  final String websiteUrl;
+  final int podcastIndexId;
+  final bool isYoutube;
+
+  PodcastDetailsData({
+    required this.podcastId,
+    required this.podcastName,
+    required this.feedUrl,
+    required this.description,
+    required this.author,
+    required this.artworkUrl,
+    required this.explicit,
+    required this.episodeCount,
+    this.categories,
+    required this.websiteUrl,
+    required this.podcastIndexId,
+    required this.isYoutube,
+  });
+
+  factory PodcastDetailsData.fromJson(Map<String, dynamic> json) {
+    return PodcastDetailsData(
+      podcastId: json['podcastid'] ?? 0,
+      podcastName: json['podcastname'] ?? '',
+      feedUrl: json['feedurl'] ?? '',
+      description: json['description'] ?? '',
+      author: json['author'] ?? '',
+      artworkUrl: json['artworkurl'] ?? '',
+      explicit: json['explicit'] ?? false,
+      episodeCount: json['episodecount'] ?? 0,
+      categories: json['categories'] != null
+          ? Map<String, String>.from(json['categories'] as Map)
+          : null,
+      websiteUrl: json['websiteurl'] ?? '',
+      podcastIndexId: json['podcastindexid'] ?? 0,
+      isYoutube: json['is_youtube'] ?? false,
+    );
+  }
+}
+
+class PlayEpisodeDetails {
+  final double playbackSpeed;
+  final int startSkip;
+  final int endSkip;
+  // True only for a genuine per-podcast override, not the echoed-back account default.
+  final bool playbackSpeedCustomized;
+
+  PlayEpisodeDetails({
+    required this.playbackSpeed,
+    required this.startSkip,
+    required this.endSkip,
+    this.playbackSpeedCustomized = false,
+  });
+}
+
+// Per-podcast silence-trim settings (#727)
+class SilenceTrimSettings {
+  final bool enabled;
+  final int threshold;
+
+  const SilenceTrimSettings({required this.enabled, required this.threshold});
+}
+
+// A single auto-skip range (trimmed silence, #727), times in seconds.
+class SkipSegment {
+  final int segmentId;
+  final String kind;
+  final double startTime;
+  final double endTime;
+  final String? source;
+
+  const SkipSegment({
+    this.segmentId = 0,
+    required this.kind,
+    required this.startTime,
+    required this.endTime,
+    this.source,
+  });
+}
+
+/// One timed line of a transcript (times in seconds).
+class TranscriptCue {
+  final double start;
+  final double end;
+  final String text;
+
+  const TranscriptCue({required this.start, required this.end, required this.text});
+}
+
+// Playlist Data Classes
+class PlaylistData {
+  final int playlistId;
+  final int userId;
+  final String name;
+  final String? description;
+  final bool isSystemPlaylist;
+  final List<int>? podcastIds;
+  final bool includeUnplayed;
+  final bool includePartiallyPlayed;
+  final bool includePlayed;
+  final int? minDuration;
+  final int? maxDuration;
+  final String sortOrder;
+  final bool groupByPodcast;
+  final int? maxEpisodes;
+  final String lastUpdated;
+  final String created;
+  final int? episodeCount;
+  final String? iconName;
+
+  PlaylistData({
+    required this.playlistId,
+    required this.userId,
+    required this.name,
+    this.description,
+    required this.isSystemPlaylist,
+    this.podcastIds,
+    required this.includeUnplayed,
+    required this.includePartiallyPlayed,
+    required this.includePlayed,
+    this.minDuration,
+    this.maxDuration,
+    required this.sortOrder,
+    required this.groupByPodcast,
+    this.maxEpisodes,
+    required this.lastUpdated,
+    required this.created,
+    this.episodeCount,
+    this.iconName,
+  });
+
+  factory PlaylistData.fromJson(Map<String, dynamic> json) {
+    return PlaylistData(
+      playlistId: json['playlist_id'] ?? 0,
+      userId: json['user_id'] ?? 0,
+      name: json['name'] ?? '',
+      description: json['description'],
+      isSystemPlaylist: json['is_system_playlist'] ?? false,
+      podcastIds: json['podcast_ids'] != null
+          ? List<int>.from(json['podcast_ids'])
+          : null,
+      includeUnplayed: json['include_unplayed'] ?? true,
+      includePartiallyPlayed: json['include_partially_played'] ?? true,
+      includePlayed: json['include_played'] ?? false,
+      minDuration: json['min_duration'],
+      maxDuration: json['max_duration'],
+      sortOrder: json['sort_order'] ?? 'date_desc',
+      groupByPodcast: json['group_by_podcast'] ?? false,
+      maxEpisodes: json['max_episodes'],
+      lastUpdated: json['last_updated'] ?? '',
+      created: json['created'] ?? '',
+      episodeCount: json['episode_count'],
+      iconName: json['icon_name'],
+    );
+  }
+}
+
+class CreatePlaylistRequest {
+  final int userId;
+  final String name;
+  final String? description;
+  final List<int>? podcastIds;
+  final bool includeUnplayed;
+  final bool includePartiallyPlayed;
+  final bool includePlayed;
+  final int? minDuration;
+  final int? maxDuration;
+  final String sortOrder;
+  final bool groupByPodcast;
+  final int? maxEpisodes;
+  final String iconName;
+  final double? playProgressMin;
+  final double? playProgressMax;
+  final int? timeFilterHours;
+
+  CreatePlaylistRequest({
+    required this.userId,
+    required this.name,
+    this.description,
+    this.podcastIds,
+    required this.includeUnplayed,
+    required this.includePartiallyPlayed,
+    required this.includePlayed,
+    this.minDuration,
+    this.maxDuration,
+    required this.sortOrder,
+    required this.groupByPodcast,
+    this.maxEpisodes,
+    required this.iconName,
+    this.playProgressMin,
+    this.playProgressMax,
+    this.timeFilterHours,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'name': name,
+      'description': description,
+      'podcast_ids': podcastIds,
+      'include_unplayed': includeUnplayed,
+      'include_partially_played': includePartiallyPlayed,
+      'include_played': includePlayed,
+      'min_duration': minDuration,
+      'max_duration': maxDuration,
+      'sort_order': sortOrder,
+      'group_by_podcast': groupByPodcast,
+      'max_episodes': maxEpisodes,
+      'icon_name': iconName,
+      'play_progress_min': playProgressMin,
+      'play_progress_max': playProgressMax,
+      'time_filter_hours': timeFilterHours,
+    };
+  }
+}
+
+class PlaylistEpisodesResponse {
+  final List<CastawayEpisode> episodes;
+  final PlaylistInfo playlistInfo;
+  final int total;
+
+  PlaylistEpisodesResponse({
+    required this.episodes,
+    required this.playlistInfo,
+    required this.total,
+  });
+
+  factory PlaylistEpisodesResponse.fromJson(Map<String, dynamic> json) {
+    return PlaylistEpisodesResponse(
+      episodes: (json['episodes'] as List<dynamic>? ?? [])
+          .map((e) => CastawayEpisode.fromJson(e))
+          .toList(),
+      playlistInfo: PlaylistInfo.fromJson(json['playlist_info'] ?? {}),
+      total: (json['total'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class PlaylistInfo {
+  final String name;
+  final String? description;
+  final int? episodeCount;
+  final String? iconName;
+
+  PlaylistInfo({
+    required this.name,
+    this.description,
+    this.episodeCount,
+    this.iconName,
+  });
+
+  factory PlaylistInfo.fromJson(Map<String, dynamic> json) {
+    return PlaylistInfo(
+      name: json['name'] ?? '',
+      description: json['description'],
+      episodeCount: json['episode_count'],
+      iconName: json['icon_name'],
+    );
+  }
+}
+
+class SearchEpisodeResult {
+  final int podcastId;
+  final String podcastName;
+  final String artworkUrl;
+  final String author;
+  final String categories;
+  final String description;
+  final int? episodeCount;
+  final String feedUrl;
+  final String websiteUrl;
+  final bool explicit;
+  final int userId;
+  final int episodeId;
+  final String episodeTitle;
+  final String episodeDescription;
+  final String episodePubDate;
+  final String episodeArtwork;
+  final String episodeUrl;
+  final int episodeDuration;
+  final bool completed;
+  final bool saved;
+  final bool queued;
+  final bool downloaded;
+  final bool isYoutube;
+  final int? listenDuration;
+
+  SearchEpisodeResult({
+    required this.podcastId,
+    required this.podcastName,
+    required this.artworkUrl,
+    required this.author,
+    required this.categories,
+    required this.description,
+    this.episodeCount,
+    required this.feedUrl,
+    required this.websiteUrl,
+    required this.explicit,
+    required this.userId,
+    required this.episodeId,
+    required this.episodeTitle,
+    required this.episodeDescription,
+    required this.episodePubDate,
+    required this.episodeArtwork,
+    required this.episodeUrl,
+    required this.episodeDuration,
+    required this.completed,
+    required this.saved,
+    required this.queued,
+    required this.downloaded,
+    required this.isYoutube,
+    this.listenDuration,
+  });
+
+  factory SearchEpisodeResult.fromJson(Map<String, dynamic> json) {
+    return SearchEpisodeResult(
+      podcastId: json['podcastid'] ?? 0,
+      podcastName: json['podcastname'] ?? '',
+      artworkUrl: json['artworkurl'] ?? '',
+      author: json['author'] ?? '',
+      categories: _parseCategories(json['categories']),
+      description: json['description'] ?? '',
+      episodeCount: json['episodecount'],
+      feedUrl: json['feedurl'] ?? '',
+      websiteUrl: json['websiteurl'] ?? '',
+      explicit: (json['explicit'] ?? 0) == 1,
+      userId: json['userid'] ?? 0,
+      episodeId: json['episodeid'] ?? 0,
+      episodeTitle: json['episodetitle'] ?? '',
+      episodeDescription: json['episodedescription'] ?? '',
+      episodePubDate: json['episodepubdate'] ?? '',
+      episodeArtwork: json['episodeartwork'] ?? '',
+      episodeUrl: json['episodeurl'] ?? '',
+      episodeDuration: json['episodeduration'] ?? 0,
+      completed: json['completed'] ?? false,
+      saved: json['saved'] ?? false,
+      queued: json['queued'] ?? false,
+      downloaded: json['downloaded'] ?? false,
+      isYoutube: json['is_youtube'] ?? false,
+      listenDuration: json['listenduration'],
+    );
+  }
+
+  // Convert to CastawayEpisode for compatibility with existing widgets
+  CastawayEpisode toCastawayEpisode() {
+    return CastawayEpisode(
+      podcastName: podcastName,
+      episodeTitle: episodeTitle,
+      episodePubDate: episodePubDate,
+      episodeDescription: episodeDescription,
+      episodeArtwork: episodeArtwork.isNotEmpty ? episodeArtwork : artworkUrl,
+      episodeUrl: episodeUrl,
+      episodeDuration: episodeDuration,
+      listenDuration: listenDuration,
+      episodeId: episodeId,
+      completed: completed,
+      saved: saved,
+      queued: queued,
+      downloaded: downloaded,
+      isYoutube: isYoutube,
+      podcastId: podcastId,
+    );
+  }
+
+  /// Parse categories from either string or Map format
+  static String _parseCategories(dynamic categories) {
+    if (categories == null) return '';
+
+    if (categories is String) {
+      // Old format - return as is
+      return categories;
+    } else if (categories is Map<String, dynamic>) {
+      // New format - convert map values to comma-separated string
+      if (categories.isEmpty) return '';
+      return categories.values.join(', ');
+    }
+
+    return '';
+  }
+}
+
+class PodcastDownloadSummary {
+  final int podcastId;
+  final String podcastName;
+  final String? artworkUrl;
+  final int episodeCount;
+
+  PodcastDownloadSummary({
+    required this.podcastId,
+    required this.podcastName,
+    this.artworkUrl,
+    required this.episodeCount,
+  });
+}
+
+class EpisodePage {
+  final List<CastawayEpisode> episodes;
+  final int total;
+
+  EpisodePage({required this.episodes, required this.total});
+}
+
+class SearchResultPage {
+  final List<SearchEpisodeResult> results;
+  final int total;
+
+  SearchResultPage({required this.results, required this.total});
+}
+
+class TranscriptSearchUnsupported implements Exception {}
+
+/// A place in a transcript where the search was said.
+class TranscriptMoment {
+  /// Seconds into the episode; null for transcripts without timings.
+  final double? start;
+  final String text;
+
+  TranscriptMoment({this.start, required this.text});
+
+  factory TranscriptMoment.fromJson(Map<String, dynamic> json) => TranscriptMoment(
+        start: (json['start'] as num?)?.toDouble(),
+        text: json['text'] as String? ?? '',
+      );
+}
+
+class TranscriptHit {
+  final SearchEpisodeResult episode;
+
+  /// `generated` (AI, made on the server) or `feed` (published by the podcast).
+  final String source;
+  final int mentions;
+  final List<TranscriptMoment> moments;
+
+  TranscriptHit({required this.episode, required this.source, required this.mentions, required this.moments});
+
+  factory TranscriptHit.fromJson(Map<String, dynamic> json) => TranscriptHit(
+        episode: SearchEpisodeResult.fromJson(json['episode'] as Map<String, dynamic>),
+        source: json['source'] as String? ?? 'feed',
+        mentions: (json['mentions'] as num?)?.toInt() ?? 0,
+        moments: (json['moments'] as List<dynamic>? ?? [])
+            .map((m) => TranscriptMoment.fromJson(m as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class TranscriptSearchPage {
+  final List<TranscriptHit> results;
+  final int total;
+
+  /// Lowercased words and phrases to highlight.
+  final List<String> terms;
+
+  /// How many of the user's episodes have a searchable transcript.
+  final int searchableEpisodes;
+
+  TranscriptSearchPage({required this.results, required this.total, required this.terms, required this.searchableEpisodes});
+
+  factory TranscriptSearchPage.fromJson(Map<String, dynamic> json) => TranscriptSearchPage(
+        results: (json['results'] as List<dynamic>? ?? [])
+            .map((r) => TranscriptHit.fromJson(r as Map<String, dynamic>))
+            .toList(),
+        total: (json['total'] as num?)?.toInt() ?? 0,
+        terms: (json['terms'] as List<dynamic>? ?? []).map((t) => t.toString()).toList(),
+        searchableEpisodes: (json['searchable_episodes'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class DownloadTask {
+  final String id;
+  final String taskType;
+  final String status;
+  final double progress;
+  final String? message;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final Map<String, dynamic>? result;
+  final String? episodeTitle;
+  final String? podcastName;
+
+  DownloadTask({
+    required this.id,
+    required this.taskType,
+    required this.status,
+    required this.progress,
+    this.message,
+    required this.createdAt,
+    required this.updatedAt,
+    this.result,
+    this.episodeTitle,
+    this.podcastName,
+  });
+
+  factory DownloadTask.fromJson(Map<String, dynamic> json) {
+    return DownloadTask(
+      id: json['id'] as String,
+      taskType: json['task_type'] as String,
+      status: json['status'] as String,
+      progress: (json['progress'] as num).toDouble(),
+      message: json['message'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+      result: json['result'] as Map<String, dynamic>?,
+      episodeTitle: json['episode_title'] as String?,
+      podcastName: json['podcast_name'] as String?,
+    );
+  }
+
+  int? get episodeId {
+    final id = result?['episode_id'];
+    if (id is int) return id;
+    if (id is String) return int.tryParse(id);
+    return null;
+  }
+
+  bool get isCompleted => status == 'SUCCESS';
+  bool get isFailed => status == 'FAILED';
+  bool get isActive => status == 'PENDING' || status == 'DOWNLOADING';
+}
