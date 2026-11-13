@@ -39,13 +39,22 @@ impl ScratchDb {
 
 const BASELINE: &str = include_str!("../../migrations/0001_baseline.sql");
 
+/// Every migration version, in order (one numbered file each).
+fn all_versions() -> Vec<i32> {
+    let count = std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations"))
+        .unwrap()
+        .filter(|e| e.as_ref().unwrap().path().extension().is_some_and(|x| x == "sql"))
+        .count();
+    (1..=count as i32).collect()
+}
+
 #[tokio::test]
 async fn a_fresh_database_gets_the_schema_and_its_own_secrets() {
     let a = ScratchDb::new("fresh_a").await;
     let b = ScratchDb::new("fresh_b").await;
     for db in [&a, &b] {
         pinepods_api::database::migrate::run(&db.pool).await.unwrap();
-        assert_eq!(db.versions().await, vec![1, 2]);
+        assert_eq!(db.versions().await, all_versions());
         assert_eq!(db.count("Playlists").await, 7, "the system playlists are seeded");
         let user: String = sqlx::query_scalar(r#"SELECT username FROM "Users" WHERE userid = 1"#).fetch_one(&db.pool).await.unwrap();
         assert_eq!(user, "background_tasks");
@@ -65,7 +74,7 @@ async fn a_fresh_database_gets_the_schema_and_its_own_secrets() {
 
     // Starting again changes nothing.
     pinepods_api::database::migrate::run(&a.pool).await.unwrap();
-    assert_eq!(a.versions().await, vec![1, 2]);
+    assert_eq!(a.versions().await, all_versions());
     assert_eq!(a.count("Playlists").await, 7);
     a.drop().await;
     b.drop().await;
@@ -85,7 +94,7 @@ async fn a_current_pinepods_database_is_adopted_without_reseeding() {
     .unwrap();
 
     pinepods_api::database::migrate::run(&db.pool).await.unwrap();
-    assert_eq!(db.versions().await, vec![1, 2]);
+    assert_eq!(db.versions().await, all_versions(), "the baseline is adopted, later migrations run");
     assert_eq!(db.count("Users").await, 1, "the existing data is kept and nothing is seeded on top");
     assert_eq!(db.count("Playlists").await, 0);
     db.drop().await;

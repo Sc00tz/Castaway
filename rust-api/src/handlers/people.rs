@@ -1,5 +1,5 @@
-//! People credited on podcasts and episodes, person pages, follows, and contributing people to
-//! PodPeopleDB. The caller is always the API key's owner.
+//! People credited on podcasts and episodes, person pages and follows. The caller is always the
+//! API key's owner.
 
 use axum::{
     extract::{Path, Query, State},
@@ -12,7 +12,7 @@ use crate::{
     error::AppError,
     handlers::{extract_api_key, require_valid_api_key},
     services::people::{
-        external, podpeople, store, CreditedPerson, Endpoints, Person, PersonProfile, PodcastCredits,
+        external, store, CreditedPerson, PersonHit, Endpoints, Person, PersonProfile, PodcastCredits,
     },
     AppState,
 };
@@ -119,13 +119,10 @@ pub async fn person_profile(
 
 #[derive(Deserialize, utoipa::IntoParams)]
 pub struct LookupQuery {
-    /// A PodPeopleDB person id (from search results).
-    pub podpeople_id: Option<i64>,
-    /// Or a name.
-    pub name: Option<String>,
+    pub name: String,
 }
 
-/// Resolve a PodPeopleDB id or a name to a Castaway person id, so it can be opened or followed.
+/// Resolve a name to a Castaway person id, so it can be opened or followed.
 #[utoipa::path(
     get,
     path = "/people/lookup",
@@ -145,13 +142,7 @@ pub async fn lookup_person(
     Query(q): Query<LookupQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     caller(&state, &headers).await?;
-    let id = match (q.podpeople_id, q.name.as_deref()) {
-        (Some(pp), _) => podpeople::person_for_podpeople(&state.db_pool, &Endpoints::from_config(&state.config), pp).await?,
-        (None, Some(name)) => store::find_by_name(&state.db_pool, name)
-            .await?
-            .ok_or_else(|| AppError::not_found("Person not found"))?,
-        (None, None) => return Err(AppError::bad_request("Give podpeople_id or name")),
-    };
+    let id = store::find_by_name(&state.db_pool, &q.name).await?.ok_or_else(|| AppError::not_found("Person not found"))?;
     Ok(Json(serde_json::json!({ "person_id": id })))
 }
 
@@ -160,7 +151,7 @@ pub struct SearchQuery {
     pub q: String,
 }
 
-/// Search people on this server and PodPeopleDB.
+/// Search the people this server knows from its feeds.
 #[utoipa::path(
     get,
     path = "/people/search",
@@ -169,7 +160,7 @@ pub struct SearchQuery {
     params(SearchQuery),
     security(("api_key" = [])),
     responses(
-        (status = 200, description = "Matches", body = Vec<podpeople::PersonHit>),
+        (status = 200, description = "Matches", body = Vec<PersonHit>),
         (status = 401, description = "Invalid or missing API key"),
     ),
 )]
@@ -177,9 +168,9 @@ pub async fn search_people(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(q): Query<SearchQuery>,
-) -> Result<Json<Vec<podpeople::PersonHit>>, AppError> {
+) -> Result<Json<Vec<PersonHit>>, AppError> {
     let user_id = caller(&state, &headers).await?;
-    Ok(Json(podpeople::search(&state.db_pool, &Endpoints::from_config(&state.config), user_id, &q.q).await?))
+    Ok(Json(crate::services::people::search(&state.db_pool, user_id, &q.q).await?))
 }
 
 /// Follow a person: their new episodes, on any show, show up for you.
@@ -251,27 +242,3 @@ pub async fn followed_people(
     Ok(Json(store::followed(&state.db_pool, user_id).await?))
 }
 
-/// Add people to one of your podcasts (or one episode). Sent to PodPeopleDB, where they go live
-/// right away for everyone, and shown here immediately.
-#[utoipa::path(
-    post,
-    path = "/people/contribute",
-    tag = "people",
-    summary = "Add people to a podcast or episode",
-    request_body = podpeople::ContributeRequest,
-    security(("api_key" = [])),
-    responses(
-        (status = 200, description = "Everyone on the podcast or episode afterwards", body = Vec<CreditedPerson>),
-        (status = 400, description = "Rejected (PodPeopleDB's reason is in the message)"),
-        (status = 401, description = "Invalid or missing API key"),
-        (status = 404, description = "Not one of your podcasts"),
-    ),
-)]
-pub async fn contribute_people(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(req): Json<podpeople::ContributeRequest>,
-) -> Result<Json<Vec<CreditedPerson>>, AppError> {
-    let user_id = caller(&state, &headers).await?;
-    Ok(Json(podpeople::contribute(&state.db_pool, &Endpoints::from_config(&state.config), user_id, &req).await?))
-}

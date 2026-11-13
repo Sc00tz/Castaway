@@ -128,8 +128,8 @@ impl TestApp {
                 trust_unverified_email: false,
             },
             api: ApiConfig {
-                search_api_url: fixtures.url("search-api/api/search"),
-                people_api_url: fixtures.url("people-api"),
+                itunes_search_url: fixtures.url("itunes/search"),
+                podcast_index_url: fixtures.url("podcastindex/api/1.0"),
                 youtube_feed_url: fixtures.url("youtube/{channel_id}.xml"),
             },
         };

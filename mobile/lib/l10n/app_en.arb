@@ -598,7 +598,6 @@
   "local_download_not_found": "Local download not found",
   "explicit": "Explicit",
   "hosts": "Hosts",
-  "hosts_empty_prompt": "Who hosts this show? Add them so everyone can find them.",
   "guests": "Guests",
   "subscribe": "Subscribe",
   "follow": "Follow",
@@ -862,7 +861,6 @@
   "podcast_id_not_available": "Podcast ID not available",
   "episode_details_title": "Episode Details",
   "in_this_episode": "In This Episode",
-  "episode_people_empty_prompt": "Know who's in this episode? Add the hosts and guests.",
   "pause": "Pause",
   "play_again": "Play again",
   "play": "Play",
@@ -1740,30 +1738,6 @@
   "oidc_callback_no_api_key": "OIDC callback received but no API key found",
   "oidc_authentication_successful": "OIDC authentication successful!",
   "not_following_anyone_body": "Search above, or tap a host or guest on a podcast or episode, then Follow. Their new episodes on any show will show up here.",
-  "added_name": "Added {name}",
-  "@added_name": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "added_people_count": "Added {count} people",
-  "@added_people_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "add_people_count": "Add {count} people",
-  "@add_people_count": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "could_not_save_queue_position": "Could not save the queue position",
   "add_to_queue_position": "Add to queue position",
   "add_to_queue_position_description": "Where Add to Queue puts an episode. The arrow beside it picks the other end.",
@@ -1912,15 +1886,6 @@
   "troubleshooting_tips": "Troubleshooting Tips",
   "reorder_tabs": "Reorder tabs",
   "episode_filter": "Episode Filter",
-  "whos_in_this_episode": "Who's in this episode?",
-  "who_hosts_this_show": "Who hosts this show?",
-  "podpeople_added_unverified": "Added to PodPeopleDB for everyone right away, marked unverified until reviewed.",
-  "host": "Host",
-  "guest": "Guest",
-  "add_people_hint": "Name, or several: Alice, Bob and Carol",
-  "add_another": "Add another",
-  "nobody_listed_yet": "Nobody listed yet.",
-  "unverified_person": "Unverified: added by the community, not yet reviewed",
   "could_not_follow": "Could not follow",
   "could_not_unfollow": "Could not unfollow",
   "following": "Following",
@@ -2271,7 +2236,6 @@
       }
     }
   },
-  "co_host": "Co-host",
   "saved_and_collections": "Saved & Collections",
   "add_to_collection": "Add to collection",
   "add_to_collection_menu": "Add to Collection…",

@@ -1,8 +1,8 @@
-//! People: credits stored at refresh, one identity across shows, follows, PodPeopleDB sync and
-//! contributions, and episodes from shows outside the library.
+//! People: credits stored at refresh, one identity across shows, follows, and episodes from
+//! shows outside the library (from Podcast Index's person search).
 
 use crate::harness::*;
-use pinepods_api::services::people::{external, podpeople, Endpoints};
+use pinepods_api::services::people::{external, Endpoints};
 
 fn person_tag(role: &str, name: &str) -> String {
     format!("    <podcast:person role=\"{role}\">{name}</podcast:person>\n")
@@ -56,7 +56,6 @@ async fn credits_are_stored_at_refresh_and_pages_never_fetch_the_feed() {
     let alice = find(&credits["people"], "Alice Host");
     assert_eq!(alice["scope"], "podcast");
     assert_eq!(alice["sources"], json!(["feed"]));
-    assert_eq!(alice["verified"], true);
     assert_eq!(names(&credits["guests"]), ["Bob Guest", "Carol Cohost"]);
     assert_eq!(find(&credits["guests"], "Bob Guest")["episode_count"], 2);
 
@@ -175,119 +174,12 @@ async fn people_endpoints_only_show_your_own_library() {
         .send()
         .await
         .assert_status(403);
-    app.post("/api/data/people/contribute")
-        .key(&other)
-        .json(&json!({ "podcast_id": pod, "people": [{ "name": "Sneaky" }] }))
-        .send()
-        .await
-        .assert_status(404);
 
     // A person's page lists only the viewer's own shows.
     let id = podcast_people(&app, &owner, pod).await["people"][0]["id"].as_i64().unwrap();
     let profile = app.get(&format!("/api/data/people/{id}")).key(&other).send().await.ok_json();
     assert_eq!(profile["episodes"], json!([]), "{profile:#}");
     assert!(profile["podcasts"].as_array().unwrap().iter().all(|p| p["podcastid"].is_null()));
-}
-
-fn community_batch() -> Value {
-    json!({ "results": [{
-        "index": 0,
-        "podcast_id": 5,
-        "podcastindex_id": null,
-        "feed_url": null,
-        "people": [
-            { "person": { "id": 77, "slug": "eve", "name": "Eve Community", "img": null, "verified": false },
-              "roles": ["host"], "group": "", "scope": "podcast", "episode_count": 0,
-              "sources": ["community"], "verified": false },
-            // Feed credits come from our own copy of the feed, so this one is ignored.
-            { "person": { "id": 78, "slug": "alice", "name": "Alice Host", "img": null, "verified": true },
-              "roles": ["host"], "group": "", "scope": "podcast", "episode_count": 0,
-              "sources": ["feed"], "verified": true }
-        ],
-        "episode_credits": [
-            { "person": { "id": 79, "slug": "frank", "name": "Frank Guest", "img": null, "verified": false },
-              "role": "guest", "group": "", "episode_guid": "guid-1", "enclosure_url": null,
-              "episode_title": "Episode 1", "verified": false }
-        ]
-    }]})
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn podpeople_sync_adds_and_removes_community_credits() {
-    let app = TestApp::new().await;
-    let user = app.user("synced").await;
-    let feed_url = app.fixtures().serve_feed("community.xml", show("Community").to_xml());
-    let pod = app.subscribe(&user, &feed_url, 3).await;
-    let batch = "people-api/api/v2/podcasts/batch";
-    app.fixtures().serve(batch, Fixture::new("application/json", community_batch().to_string()));
-
-    podpeople::sync(app.db(), &endpoints(&app), None).await.unwrap();
-    let credits = podcast_people(&app, &user, pod).await;
-    assert_eq!(names(&credits["people"]), ["Alice Host", "Eve Community"], "{credits:#}");
-    let eve = find(&credits["people"], "Eve Community");
-    assert_eq!(eve["sources"], json!(["podpeople"]));
-    assert_eq!(eve["verified"], false);
-    assert_eq!(eve["podpeople_id"], 77);
-    assert_eq!(find(&credits["people"], "Alice Host")["sources"], json!(["feed"]));
-    let one = app.episode_id(&user, pod, "Episode 1").await;
-    assert!(names(&episode_people(&app, &user, one).await).contains(&"Frank Guest".to_string()));
-
-    // PodPeopleDB unreachable: keep what we have.
-    app.fixtures().serve(batch, Fixture::new("text/plain", "down").status(503));
-    podpeople::sync(app.db(), &endpoints(&app), None).await.unwrap();
-    assert_eq!(names(&podcast_people(&app, &user, pod).await["people"]), ["Alice Host", "Eve Community"]);
-
-    // Removed upstream: removed here.
-    app.fixtures().serve(batch, Fixture::new("application/json", json!({ "results": [] }).to_string()));
-    podpeople::sync(app.db(), &endpoints(&app), None).await.unwrap();
-    assert_eq!(names(&podcast_people(&app, &user, pod).await["people"]), ["Alice Host"]);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn contributions_go_to_podpeople_and_show_up_right_away() {
-    let app = TestApp::new().await;
-    let user = app.user("helper").await;
-    let feed_url = app.fixtures().serve_feed("helped.xml", Feed::with_episodes("Needs Hosts", 2).to_xml());
-    let pod = app.subscribe(&user, &feed_url, 2).await;
-    let submissions = "people-api/api/v2/submissions";
-    app.fixtures().serve(
-        submissions,
-        Fixture::new(
-            "application/json",
-            json!({
-                "submission_id": 1, "podcast": null, "episode_id": null,
-                "credits": [{ "credit_id": 1, "role": "host", "created": true, "new_person": true,
-                              "person": { "id": 90, "slug": "gina-new", "name": "Gina New", "img": null, "verified": false } }]
-            })
-            .to_string(),
-        ),
-    );
-
-    let after = app
-        .post("/api/data/people/contribute")
-        .key(&user)
-        .json(&json!({ "podcast_id": pod, "people": [{ "name": "Gina New" }] }))
-        .send()
-        .await
-        .ok_json();
-    assert_eq!(names(&after), ["Gina New"], "{after:#}");
-    assert_eq!(find(&after, "Gina New")["verified"], false);
-    assert_eq!(names(&podcast_people(&app, &user, pod).await["people"]), ["Gina New"]);
-
-    let hits = app.fixtures().hits(submissions);
-    assert_eq!(hits.len(), 1);
-    assert!(hits[0].headers.get("x-podpeople-client").is_some_and(|v| v.starts_with("pinepods/")), "{:?}", hits[0].headers);
-
-    // PodPeopleDB's refusal is passed on.
-    app.fixtures().serve(submissions, Fixture::new("application/json", r#"{"error":"add at least one person"}"#).status(400));
-    let resp = app
-        .post("/api/data/people/contribute")
-        .key(&user)
-        .json(&json!({ "podcast_id": pod, "people": [{ "name": "Someone" }] }))
-        .send()
-        .await;
-    resp.assert_status(400);
-    assert!(resp.text().contains("add at least one person"), "{}", resp.text());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -303,8 +195,9 @@ async fn external_episodes_come_from_shows_outside_the_library() {
                 "datePublished": t, "duration": 600, "feedTitle": format!("Feed of {title}"),
                 "feedUrl": feed, "feedId": 42, "guid": title, "description": "d", "image": "", "feedImage": "https://img.example.invalid/f.jpg" })
     };
+    app.db().set_podcast_index_credentials(Some(("test-key", "test-secret"))).await.unwrap();
     app.fixtures().serve(
-        "search-api/api/search",
+        "podcastindex/api/1.0/search/byperson",
         Fixture::new(
             "application/json",
             json!({ "items": [

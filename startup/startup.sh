@@ -42,8 +42,6 @@ export DB_NAME=$DB_NAME
 export DB_PORT=$DB_PORT
 export DB_TYPE=$DB_TYPE
 export REVERSE_PROXY=$REVERSE_PROXY
-export SEARCH_API_URL=${SEARCH_API_URL:-'https://search.pinepods.online/api/search'}
-export PEOPLE_API_URL=${PEOPLE_API_URL:-'https://people.pinepods.online'}
 export PINEPODS_PORT=$PINEPODS_PORT
 export PROXY_PROTOCOL=$PROXY_PROTOCOL
 export DEBUG_MODE=${DEBUG_MODE:-'False'}
@@ -221,8 +219,9 @@ if [[ "$BUNDLED_DB" == true ]]; then
     fi
     export DB_PASSWORD=$(cat "$pw_file")
 
-    # If PUID changed since the database was created, hand its files to the new owner.
-    if [[ "$(stat -c %u "$PGDATA")" != "$(id -u pinepods)" ]]; then
+    # If PUID changed since the database was created, hand its files to the new owner. Checked
+    # as that user: some mounts (Docker Desktop's) report a different owner to root.
+    if ! pg test -O "$PGDATA"; then
         echo "Updating database file ownership for the new PUID..."
         chown -R pinepods:pinepods "$PGDATA" "$pw_file"
     fi

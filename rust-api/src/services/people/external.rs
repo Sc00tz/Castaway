@@ -1,5 +1,5 @@
 //! Episodes a person appears in on shows outside the user's library, cached per person in
-//! `PersonExternalEpisodes` from PodPeopleDB credits and the Podcast Index person search.
+//! `PersonExternalEpisodes` from Podcast Index's person search (needs this server's key).
 //! Refreshed in the background: when a stale person page is opened, and on a schedule for
 //! followed people.
 
@@ -36,66 +36,8 @@ struct Found {
     source: &'static str,
 }
 
-async fn from_podpeople(http: &reqwest::Client, api: &Endpoints, podpeople_id: i32) -> Vec<Found> {
-    #[derive(Deserialize)]
-    struct Detail {
-        #[serde(default)]
-        recent_episodes: Vec<Ep>,
-    }
-    #[derive(Deserialize)]
-    struct Ep {
-        guid: Option<String>,
-        enclosure_url: Option<String>,
-        title: String,
-        description: Option<String>,
-        image: Option<String>,
-        pub_date: Option<String>,
-        duration: Option<i64>,
-        podcast_title: String,
-        podcast_image: Option<String>,
-        podcastindex_id: Option<i64>,
-        feed_url: Option<String>,
-        role: String,
-    }
-    let url = format!("{}/api/v2/people/{}", api.people, podpeople_id);
-    let Ok(resp) = http.get(url).send().await else { return Vec::new() };
-    if !resp.status().is_success() {
-        return Vec::new();
-    }
-    let Ok(detail) = resp.json::<Detail>().await else { return Vec::new() };
-    detail
-        .recent_episodes
-        .into_iter()
-        .filter_map(|e| {
-            Some(Found {
-                feed_url: e.feed_url?,
-                podcast_title: Some(e.podcast_title),
-                podcast_artwork: e.podcast_image,
-                podcastindex_id: e.podcastindex_id,
-                guid: e.guid,
-                title: e.title,
-                description: e.description,
-                url: e.enclosure_url?,
-                artwork: e.image,
-                pub_date: e.pub_date.as_deref().and_then(parse_date),
-                duration: e.duration,
-                role: Some(e.role),
-                source: "podpeople",
-            })
-        })
-        .collect()
-}
-
-fn parse_date(s: &str) -> Option<chrono::NaiveDateTime> {
-    chrono::DateTime::parse_from_rfc3339(s)
-        .map(|d| d.naive_utc())
-        .ok()
-        .or_else(|| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
-        .or_else(|| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok())
-}
-
-/// Podcast Index episodes tagged with (or mentioning) the person, through the Castaway search API.
-async fn from_index(http: &reqwest::Client, api: &Endpoints, name: &str) -> Vec<Found> {
+/// Podcast Index episodes tagged with (or mentioning) the person. Empty without a key.
+async fn from_index(db: &DatabasePool, api: &Endpoints, name: &str) -> Vec<Found> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Item {
@@ -116,12 +58,15 @@ async fn from_index(http: &reqwest::Client, api: &Endpoints, name: &str) -> Vec<
         #[serde(default)]
         items: Vec<Item>,
     }
-    if api.search.is_empty() {
-        return Vec::new();
-    }
-    let req = http.get(&api.search).query(&[("query", name), ("index", "person"), ("search_type", "person")]);
-    let Ok(resp) = req.send().await else { return Vec::new() };
-    let Ok(body) = resp.json::<Resp>().await else { return Vec::new() };
+    let params = [("q", name.to_string())];
+    let value = match crate::services::directory::podcast_index(db, &api.api, "/search/byperson", &params).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::debug!("Podcast Index person search for {name} failed: {e:?}");
+            return Vec::new();
+        }
+    };
+    let Ok(body) = serde_json::from_value::<Resp>(value) else { return Vec::new() };
     body.items
         .into_iter()
         .filter_map(|i| {
@@ -147,31 +92,16 @@ async fn from_index(http: &reqwest::Client, api: &Endpoints, name: &str) -> Vec<
 
 /// Fetch and store a person's external episodes now.
 pub async fn refresh(db: &DatabasePool, api: &Endpoints, person_id: i32) -> AppResult<usize> {
-    let Some((name, podpeople_id)) = fetch_optional!(
+    let Some(name) = fetch_optional!(
         db,
-        r#"SELECT name AS name, podpeopleid AS podpeopleid FROM "Persons" WHERE personid = $1"#,
+        r#"SELECT name AS name FROM "Persons" WHERE personid = $1"#,
         [person_id],
-        |r| (r.str("name")?, r.opt_int("podpeopleid")?.map(|v| v as i32))
+        |r| r.str("name")?
     ) else {
         return Ok(0);
     };
-    let http = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .user_agent(concat!("Castaway/", env!("CARGO_PKG_VERSION")))
-        .build()?;
-    let (community, index) = tokio::join!(
-        async {
-            match podpeople_id {
-                Some(id) => from_podpeople(&http, api, id).await,
-                None => Vec::new(),
-            }
-        },
-        from_index(&http, api, &name)
-    );
-
-    // PodPeopleDB credits first: they carry the role.
     let mut seen = HashSet::new();
-    let mut found: Vec<Found> = community.into_iter().chain(index).filter(|f| seen.insert(f.url.clone())).collect();
+    let mut found: Vec<Found> = from_index(db, api, &name).await.into_iter().filter(|f| seen.insert(f.url.clone())).collect();
     found.sort_by(|a, b| b.pub_date.cmp(&a.pub_date));
     found.truncate(MAX_EPISODES);
 

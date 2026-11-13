@@ -6,9 +6,8 @@ import 'package:http/testing.dart';
 import 'package:pinepods_mobile/entities/people.dart';
 import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
 
-Map<String, dynamic> _credited(String name, {int id = 1, bool verified = true}) => {
+Map<String, dynamic> _credited(String name, {int id = 1}) => {
       'id': id,
-      'podpeople_id': null,
       'name': name,
       'img': '',
       'href': null,
@@ -18,46 +17,14 @@ Map<String, dynamic> _credited(String name, {int id = 1, bool verified = true}) 
       'scope': 'podcast',
       'episode_count': 0,
       'sources': ['feed'],
-      'verified': verified,
       'followed': false,
     };
 
 void main() {
-  group('splitNames', () {
-    test('a paste splits on commas, "and" and "&"', () {
-      final (names, rest) = splitNames('Alice, Bob and Carol & Dan', all: true);
-      expect(names, ['Alice', 'Bob', 'Carol', 'Dan']);
-      expect(rest, '');
-    });
-
-    test('while typing, only commas split and the remainder is kept', () {
-      final (names, rest) = splitNames('Alice, Bob and Ca', all: false);
-      expect(names, ['Alice']);
-      expect(rest, 'Bob and Ca');
-    });
-
-    test('a trailing space being typed is not swallowed', () {
-      final (names, rest) = splitNames('Adam ', all: false);
-      expect(names, isEmpty);
-      expect(rest, 'Adam ');
-    });
-
-    test('semicolons and line breaks always split; empties are dropped', () {
-      final (names, _) = splitNames('One;\nTwo,, Three', all: true);
-      expect(names, ['One', 'Two', 'Three']);
-    });
-
-    test('"and" inside a name is left alone', () {
-      final (names, _) = splitNames('Sandy Anderson', all: true);
-      expect(names, ['Sandy Anderson']);
-    });
-  });
-
   group('parsing', () {
-    test('CreditedPerson treats empty image as none and keeps verified', () {
-      final p = CreditedPerson.fromJson(_credited('Jane', verified: false));
+    test('CreditedPerson treats empty image as none', () {
+      final p = CreditedPerson.fromJson(_credited('Jane'));
       expect(p.img, isNull);
-      expect(p.verified, isFalse);
       expect(p.canOpen, isTrue);
     });
 
@@ -88,11 +55,6 @@ void main() {
       expect(profile.externalEpisodes.single.episodeId, 0);
       expect(profile.refreshing, isTrue);
     });
-
-    test('ContributePerson sends a name only for new people', () {
-      expect(const ContributePerson(name: 'New', role: 'host').toJson(), {'name': 'New', 'role': 'host'});
-      expect(const ContributePerson(personId: 4, name: 'Old', role: 'guest').toJson(), {'person_id': 4, 'role': 'guest'});
-    });
   });
 
   group('PinepodsService people', () {
@@ -115,17 +77,6 @@ void main() {
       final s = service((request) async => http.Response('not found', 404));
       expect(await s.getPodcastPeople(5), isNull);
       expect(await s.getEpisodePeople(5), isNull);
-    });
-
-    test('contribute surfaces the server message on failure', () async {
-      final s = service((request) async => http.Response(
-            jsonEncode({'error': 'Bad request', 'message': 'PodPeopleDB: rate limited'}),
-            400,
-          ));
-      expect(
-        () => s.contributePeople(podcastId: 1, people: const [ContributePerson(name: 'X', role: 'host')]),
-        throwsA(predicate((e) => e.toString().contains('PodPeopleDB: rate limited'))),
-      );
     });
 
     test('unfollow uses DELETE', () async {

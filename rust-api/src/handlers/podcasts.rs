@@ -3620,79 +3620,6 @@ pub async fn get_podcast_details_dynamic(
     }
 }
 
-// Query struct for podpeople discovery passthrough
-#[derive(Deserialize, utoipa::IntoParams)]
-pub struct PodPeopleDiscoverQuery {
-    pub kind: String,
-    pub limit: Option<i32>,
-}
-
-// Proxy PodPeopleDB's JSON discovery endpoints (top-hosts, recent-hosts, popular-podcasts, stats)
-// so the Castaway web app can surface a "Discover hosts" experience without talking to PodPeopleDB
-// directly (PEOPLE_API_URL is backend-only). Returns the upstream JSON verbatim.
-#[utoipa::path(
-    get,
-    path = "/podpeople/discover",
-    tag = "podcasts",
-    summary = "Get podpeople discover",
-    params(PodPeopleDiscoverQuery),
-    security(("api_key" = [])),
-    responses(
-        (status = 200, description = "Success", body = serde_json::Value),
-        (status = 401, description = "Invalid or missing API key"),
-    ),
-)]
-pub async fn get_podpeople_discover(
-    State(state): State<crate::AppState>,
-    headers: HeaderMap,
-    Query(query): Query<PodPeopleDiscoverQuery>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let api_key = extract_api_key(&headers)?;
-    require_valid_api_key(&state, &api_key).await?;
-
-    // Allowlist the upstream path so `kind` can't be used to hit arbitrary endpoints.
-    let path = match query.kind.as_str() {
-        "top-hosts" => "top-hosts",
-        "recent-hosts" => "recent-hosts",
-        "popular-podcasts" => "popular-podcasts",
-        "stats" => "stats",
-        _ => return Err(AppError::bad_request("Invalid discover kind")),
-    };
-
-    let people_url = std::env::var("PEOPLE_API_URL")
-        .unwrap_or_else(|_| "https://people.pinepods.online".to_string());
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .unwrap_or_default();
-
-    let mut req = client.get(&format!("{}/api/discover/{}", people_url, path));
-    if let Some(limit) = query.limit {
-        req = req.query(&[("limit", limit)]);
-    }
-
-    let response = req
-        .send()
-        .await
-        .map_err(|e| AppError::external_error(&format!("Failed to fetch from podpeople: {}", e)))?;
-
-    if !response.status().is_success() {
-        // Graceful default: empty rather than an error so the UI just shows nothing.
-        return Ok(Json(if path == "stats" {
-            serde_json::json!({})
-        } else {
-            serde_json::json!([])
-        }));
-    }
-
-    let data: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| AppError::external_error(&format!("Failed to parse podpeople response: {}", e)))?;
-
-    Ok(Json(data))
-}
 
 // Request struct for update_feed_cutoff_days
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -4071,21 +3998,21 @@ pub struct ProxySearchParams {
     pub search_type: Option<String>,
 }
 
-// Proxy podcast/iTunes/YouTube/person search through the backend so the
-// browser (and mobile clients) never need to reach SEARCH_API_URL directly.
-// SEARCH_API_URL can therefore be an internal-only Docker hostname.
+// Search a podcast directory. `index` is "itunes" (Apple Podcasts, no key needed) or
+// "podcastindex" (needs this server's Podcast Index key); `search_type` "person" searches
+// Podcast Index by host or guest name instead of by title.
 #[utoipa::path(
     get,
     path = "/proxy_search",
     tag = "podcasts",
-    summary = "Proxy search",
+    summary = "Search podcast directories",
     params(ProxySearchParams),
     security(("api_key" = [])),
     responses(
-        (status = 200, description = "Success", body = serde_json::Value),
-        (status = 400, description = "Empty search"),
+        (status = 200, description = "The directory's own response", body = serde_json::Value),
+        (status = 400, description = "Empty search or unknown index"),
         (status = 401, description = "Invalid or missing API key"),
-        (status = 503, description = "The search service isn't reachable or answered with an error"),
+        (status = 503, description = "The directory isn't reachable, or Podcast Index has no key"),
     ),
 )]
 pub async fn proxy_search(
@@ -4100,67 +4027,21 @@ pub async fn proxy_search(
         return Err(AppError::unauthorized("Invalid API key"));
     }
 
-    if params.query.trim().is_empty() {
+    let term = params.query.trim();
+    if term.is_empty() {
         return Err(AppError::bad_request("Enter something to search for"));
     }
 
-    let search_api_url = std::env::var("SEARCH_API_URL")
-        .unwrap_or_else(|_| "https://search.pinepods.online/api/search".to_string());
-
-    // Forward params via reqwest's query builder so encoding is handled for us.
-    let mut query_params: Vec<(&str, String)> = vec![
-        ("query", params.query.clone()),
-        ("index", params.index.clone()),
-    ];
-    if let Some(search_type) = params.search_type.clone() {
-        query_params.push(("search_type", search_type));
-    }
-
-    let response = reqwest::Client::new()
-        .get(&search_api_url)
-        .query(&query_params)
-        .send()
-        .await
-        .map_err(|e| search_unreachable(&search_api_url, e))?;
-
-    if !response.status().is_success() {
-        return Err(search_failed(&search_api_url, response.status()));
-    }
-
-    let body: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| AppError::external_error(&format!("Failed to parse search response: {}", e)))?;
-
+    let api = &state.config.api;
+    let body = match params.index.to_ascii_lowercase().as_str() {
+        "itunes" => crate::services::directory::itunes_search(api, term).await?,
+        "podcastindex" => {
+            let path = if params.search_type.as_deref() == Some("person") { "/search/byperson" } else { "/search/byterm" };
+            crate::services::directory::podcast_index(&state.db_pool, api, path, &[("q", term.to_string())]).await?
+        }
+        other => return Err(AppError::bad_request(format!("Unknown search index '{other}': use itunes or podcastindex"))),
+    };
     Ok(Json(body))
-}
-
-/// The search service didn't answer: a 503 naming it, so clients can say so.
-fn search_unreachable(url: &str, e: reqwest::Error) -> AppError {
-    tracing::warn!("Search service {} unreachable: {}", url, e);
-    AppError::service_unavailable(format!("The search service isn't reachable ({}): {}", service_host(url), e.without_url()))
-}
-
-/// The search service answered with an error status.
-fn search_failed(url: &str, status: reqwest::StatusCode) -> AppError {
-    tracing::warn!("Search service {} answered HTTP {}", url, status);
-    AppError::service_unavailable(format!("The search service ({}) answered with an error: HTTP {}", service_host(url), status.as_u16()))
-}
-
-fn service_host(url: &str) -> String {
-    url::Url::parse(url)
-        .ok()
-        .and_then(|u| u.host_str().map(|h| u.port().map_or_else(|| h.to_string(), |p| format!("{h}:{p}"))))
-        .unwrap_or_else(|| url.to_string())
-}
-
-// Derive a sibling search-service endpoint URL from SEARCH_API_URL, which by
-// convention ends in "/api/search" (e.g. https://search.pinepods.online/api/search).
-// Lets discovery calls (trending/categories) reuse the same internal host config.
-pub fn search_service_url(endpoint: &str) -> String {
-    let base = std::env::var("SEARCH_API_URL")
-        .unwrap_or_else(|_| "https://search.pinepods.online/api/search".to_string());
-    base.replace("/api/search", endpoint)
 }
 
 #[derive(Deserialize, Debug, utoipa::IntoParams)]
@@ -4177,8 +4058,7 @@ pub struct ProxyTrendingParams {
     pub since: Option<i64>,
 }
 
-// Proxy PodcastIndex trending through the backend so browsers/mobile never reach
-// SEARCH_API_URL directly. Powers the Discover page's category-filtered trending rows.
+// Podcast Index trending (needs this server's key). Powers the Discover page's trending rows.
 #[utoipa::path(
     get,
     path = "/proxy_trending",
@@ -4203,8 +4083,6 @@ pub async fn proxy_trending(
         return Err(AppError::unauthorized("Invalid API key"));
     }
 
-    let url = search_service_url("/api/trending");
-
     let mut query_params: Vec<(&str, String)> = Vec::new();
     if let Some(v) = params.cat.filter(|s| !s.is_empty()) {
         query_params.push(("cat", v));
@@ -4222,26 +4100,11 @@ pub async fn proxy_trending(
         query_params.push(("since", v.to_string()));
     }
 
-    let response = reqwest::Client::new()
-        .get(&url)
-        .query(&query_params)
-        .send()
-        .await
-        .map_err(|e| search_unreachable(&url, e))?;
-
-    if !response.status().is_success() {
-        return Err(search_failed(&url, response.status()));
-    }
-
-    let body: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| AppError::external_error(&format!("Failed to parse trending response: {}", e)))?;
-
+    let body = crate::services::directory::podcast_index(&state.db_pool, &state.config.api, "/podcasts/trending", &query_params).await?;
     Ok(Json(body))
 }
 
-// Proxy PodcastIndex /categories/list. Powers the Discover page's "Browse by category" chips.
+// Podcast Index's category list (needs this server's key). Powers "Browse by category".
 #[utoipa::path(
     get,
     path = "/proxy_categories",
@@ -4264,23 +4127,7 @@ pub async fn proxy_categories(
         return Err(AppError::unauthorized("Invalid API key"));
     }
 
-    let url = search_service_url("/api/categories");
-
-    let response = reqwest::Client::new()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| search_unreachable(&url, e))?;
-
-    if !response.status().is_success() {
-        return Err(search_failed(&url, response.status()));
-    }
-
-    let body: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| AppError::external_error(&format!("Failed to parse categories response: {}", e)))?;
-
+    let body = crate::services::directory::podcast_index(&state.db_pool, &state.config.api, "/categories/list", &[]).await?;
     Ok(Json(body))
 }
 
@@ -4337,7 +4184,7 @@ pub async fn get_recommendations(
     }
 
     let recs =
-        crate::services::recommendations::generate_recommendations(&state.db_pool, user_id, limit)
+        crate::services::recommendations::generate_recommendations(&state.db_pool, &state.config.api, user_id, limit)
             .await?;
 
     // Best-effort cache write; a failure here shouldn't fail the request.

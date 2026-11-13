@@ -72,6 +72,7 @@ id3 = "1.17.2"
 mp3-metadata = "0.4.0"
 quick-xml = "0.42.0"
 unicode-normalization = "0.1.26"
+sha1 = "0.11.0"
 sha2 = "0.11.1"
 hex = "0.4.3"
 pbkdf2 = { version = "0.13.0", default-features = false, features = ["hmac"] }

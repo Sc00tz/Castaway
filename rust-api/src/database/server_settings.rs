@@ -174,3 +174,48 @@ impl DatabasePool {
         })
     }
 }
+
+impl DatabasePool {
+    /// This server's Podcast Index API key and secret, if an admin has entered them.
+    pub async fn podcast_index_credentials(&self) -> AppResult<Option<(String, String)>> {
+        let row: Option<(Option<String>, Option<String>)> = dialect_match!(self, {
+            pg(pool) => q::query_as(r#"SELECT podcastindexapikey, podcastindexapisecret FROM "AppSettings" LIMIT 1"#)
+                .fetch_optional(pool)
+                .await?,
+        });
+        match row {
+            Some((Some(key), Some(secret))) if !key.is_empty() && !secret.is_empty() => {
+                Ok(Some((key, self.decrypt_password(&secret).await?)))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// The saved Podcast Index key (never the secret), for the settings page.
+    pub async fn podcast_index_key(&self) -> AppResult<Option<String>> {
+        let key: Option<Option<String>> = dialect_match!(self, {
+            pg(pool) => q::query_scalar(r#"SELECT podcastindexapikey FROM "AppSettings" LIMIT 1"#)
+                .fetch_optional(pool)
+                .await?,
+        });
+        Ok(key.flatten().filter(|k| !k.is_empty()))
+    }
+
+    /// Saves the Podcast Index key and secret (the secret encrypted), or clears both with None.
+    pub async fn set_podcast_index_credentials(&self, credentials: Option<(&str, &str)>) -> AppResult<()> {
+        let (key, secret) = match credentials {
+            Some((key, secret)) => (Some(key.to_string()), Some(self.encrypt_password(secret).await?)),
+            None => (None, None),
+        };
+        dialect_match!(self, {
+            pg(pool) => {
+                q::query(r#"UPDATE "AppSettings" SET podcastindexapikey = $1, podcastindexapisecret = $2"#)
+                    .bind(key)
+                    .bind(secret)
+                    .execute(pool)
+                    .await?;
+            },
+        });
+        Ok(())
+    }
+}

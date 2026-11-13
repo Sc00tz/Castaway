@@ -685,16 +685,6 @@ pub async fn refresh_due_podcasts(state: &AppState) -> AppResult<usize> {
     Ok(refresh_items(state, items).await)
 }
 
-/// Refresh these feeds for every subscriber now (a Podping announced an update). Failure backoff
-/// is skipped: the host says there's something new. Returns how many feeds were refreshed.
-pub async fn refresh_feed_urls(state: &AppState, urls: &[String]) -> AppResult<usize> {
-    if urls.is_empty() {
-        return Ok(0);
-    }
-    let items = load_refresh_items(state, Some(urls), None, true).await?;
-    Ok(refresh_items(state, items).await)
-}
-
 /// Refresh podcast rows: RSS feeds once per (feed, credentials) and YouTube channels once per
 /// channel, for all their subscribers, then playlist counts of users with new episodes. Returns
 /// the number of feeds and channels refreshed.

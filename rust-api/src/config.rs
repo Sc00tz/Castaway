@@ -14,11 +14,6 @@ pub struct Config {
     pub api: ApiConfig,
 }
 
-/// The hosted search and podcast-people services, used unless SEARCH_API_URL / PEOPLE_API_URL
-/// point elsewhere.
-pub const DEFAULT_SEARCH_API_URL: &str = "https://search.pinepods.online/api/search";
-pub const DEFAULT_PEOPLE_API_URL: &str = "https://people.pinepods.online";
-
 /// An environment variable, treating blank as unset (the process supervisor passes unset
 /// variables through as empty strings).
 pub fn env_value(name: &str) -> Option<String> {
@@ -39,8 +34,10 @@ pub const YOUTUBE_FEED_URL: &str = "https://www.youtube.com/feeds/videos.xml?cha
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiConfig {
-    pub search_api_url: String,
-    pub people_api_url: String,
+    /// Apple's iTunes Search API.
+    pub itunes_search_url: String,
+    /// Podcast Index API base, e.g. https://api.podcastindex.org/api/1.0.
+    pub podcast_index_url: String,
     /// A YouTube channel's RSS feed, with `{channel_id}` in place of the channel.
     pub youtube_feed_url: String,
 }
@@ -293,8 +290,8 @@ impl Config {
         };
 
         let api = ApiConfig {
-            search_api_url: env_value("SEARCH_API_URL").unwrap_or_else(|| DEFAULT_SEARCH_API_URL.to_string()),
-            people_api_url: env_value("PEOPLE_API_URL").unwrap_or_else(|| DEFAULT_PEOPLE_API_URL.to_string()),
+            itunes_search_url: crate::services::directory::DEFAULT_ITUNES_SEARCH_URL.to_string(),
+            podcast_index_url: crate::services::directory::DEFAULT_PODCAST_INDEX_URL.to_string(),
             youtube_feed_url: YOUTUBE_FEED_URL.to_string(),
         };
 

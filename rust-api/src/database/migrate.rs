@@ -20,6 +20,8 @@ struct Migration {
 const MIGRATIONS: &[Migration] = &[
     Migration { version: 1, name: "baseline", sql: include_str!("../../migrations/0001_baseline.sql") },
     Migration { version: 2, name: "seed", sql: include_str!("../../migrations/0002_seed.sql") },
+    Migration { version: 3, name: "podcast_index_key", sql: include_str!("../../migrations/0003_podcast_index_key.sql") },
+    Migration { version: 4, name: "drop_podpeople", sql: include_str!("../../migrations/0004_drop_podpeople.sql") },
 ];
 
 /// The last migration version of the old Python runner.

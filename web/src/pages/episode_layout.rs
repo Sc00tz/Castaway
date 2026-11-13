@@ -10,8 +10,7 @@ use crate::components::gen_funcs::{
 use crate::components::loading::Loading;
 use crate::components::youtube_video_filter::YouTubeVideoFilterSettings;
 use crate::components::episode_list_view::EpisodeListView;
-use crate::components::people::{AddPeopleSheet, PeopleLayout, PeopleStrip};
-use crate::requests::people_req::{CreditedPerson, PodcastCredits};
+use crate::components::people::{PeopleLayout, PeopleStrip};
 use crate::pages::podcast_layout::ClickedFeedURL;
 use crate::requests::pod_req::{
     call_add_category, call_add_podcast, call_adjust_silence_trim, call_adjust_skip_times,
@@ -559,29 +558,9 @@ pub fn episode_layout() -> Html {
     let is_selecting = use_state(|| false);
 
     let history = BrowserHistory::new();
-    // People on the podcast and the add-people sheet.
-    let show_add_people = use_state(|| false);
-    let open_add_people = {
-        let show_add_people = show_add_people.clone();
-        Callback::from(move |_: ()| show_add_people.set(true))
-    };
-    let people_loaded = state.podcast_people.is_some();
+    // People on the podcast.
     let people_rc = Rc::new(state.podcast_people.clone().unwrap_or_default());
     let guests_rc = Rc::new(state.podcast_guests.clone().unwrap_or_default());
-    let close_add_people = {
-        let show_add_people = show_add_people.clone();
-        Callback::from(move |_: ()| show_add_people.set(false))
-    };
-    let on_people_added = {
-        let dispatch = _dispatch.clone();
-        Callback::from(move |list: Vec<CreditedPerson>| {
-            let credits = PodcastCredits::from_flat(list);
-            dispatch.reduce_mut(|state| {
-                state.podcast_people = Some(credits.people);
-                state.podcast_guests = Some(credits.guests);
-            });
-        })
-    };
     // let node_ref = use_node_ref();
     let user_id = search_state
         .user_details
@@ -4937,7 +4916,6 @@ pub fn episode_layout() -> Html {
                                                                 people={people_rc.clone()}
                                                                 layout={PeopleLayout::Chips}
                                                                 label={i18n_hosts.clone()}
-                                                                on_add={people_loaded.then(|| open_add_people.clone())}
                                                                 empty_text={i18n.t("people.none_on_podcast")}
                                                                 class={classes!("ep-mobile-hosts")}
                                                             />
@@ -5100,7 +5078,6 @@ pub fn episode_layout() -> Html {
                                                                     people={people_rc.clone()}
                                                                     layout={PeopleLayout::Banner}
                                                                     label={i18n.t("episodes_layout.hosted_by")}
-                                                                    on_add={people_loaded.then(|| open_add_people.clone())}
                                                                     empty_text={i18n.t("people.none_on_podcast")}
                                                                     class={classes!("pd-banner-people")}
                                                                 />
@@ -5778,15 +5755,6 @@ pub fn episode_layout() -> Html {
                         }
                     }
                 }
-            { if *show_add_people && *podcast_id > 0 {
-                html! {
-                    <AddPeopleSheet
-                        podcast_id={*podcast_id}
-                        on_close={close_add_people}
-                        on_added={on_people_added}
-                    />
-                }
-            } else { html! {} } }
             <App_drawer />
             <AudioPlayerBar />
             </div>

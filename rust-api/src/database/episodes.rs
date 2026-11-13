@@ -286,15 +286,18 @@ impl DatabasePool {
 
                             // Update history
                             q::query(
+                                // The app's UTC clock, like every other position write: the
+                                // newest position wins, so all of them must share one clock.
                                 r#"INSERT INTO "UserVideoHistory" (userid, videoid, listendate, listenduration)
-                                   VALUES ($1, $2, NOW(), $3)
+                                   VALUES ($1, $2, $5, $3)
                                    ON CONFLICT (userid, videoid)
-                                   DO UPDATE SET listenduration = $4, listendate = NOW()"#
+                                   DO UPDATE SET listenduration = $4, listendate = $5"#
                             )
                             .bind(user_id)
                             .bind(episode_id)
                             .bind(duration)
                             .bind(duration)
+                            .bind(Self::position_time(None))
                             .execute(pool)
                             .await?;
                         }
@@ -318,15 +321,18 @@ impl DatabasePool {
 
                             // Update history
                             q::query(
+                                // The app's UTC clock, like every other position write: the
+                                // newest position wins, so all of them must share one clock.
                                 r#"INSERT INTO "UserEpisodeHistory" (userid, episodeid, listendate, listenduration)
-                                   VALUES ($1, $2, NOW(), $3)
+                                   VALUES ($1, $2, $5, $3)
                                    ON CONFLICT (userid, episodeid)
-                                   DO UPDATE SET listenduration = $4, listendate = NOW()"#
+                                   DO UPDATE SET listenduration = $4, listendate = $5"#
                             )
                             .bind(user_id)
                             .bind(episode_id)
                             .bind(duration)
                             .bind(duration)
+                            .bind(Self::position_time(None))
                             .execute(&mut *tx)
                             .await?;
                             if log {
@@ -418,18 +424,20 @@ impl DatabasePool {
                         .execute(&mut *transaction)
                         .await?;
                     
-                    q::query(r#"UPDATE "UserVideoHistory" SET listenduration = 0, listendate = NOW() WHERE userid = $1 AND videoid = $2"#)
+                    q::query(r#"UPDATE "UserVideoHistory" SET listenduration = 0, listendate = $3 WHERE userid = $1 AND videoid = $2"#)
                         .bind(user_id)
                         .bind(episode_id)
+                        .bind(Self::position_time(None))
                         .execute(&mut *transaction)
                         .await?;
                 } else {
                     // Handle regular episode
                     set_completed_pg(&mut transaction, user_id, &[episode_id], false).await?;
                     
-                    q::query(r#"UPDATE "UserEpisodeHistory" SET listenduration = 0, listendate = NOW() WHERE userid = $1 AND episodeid = $2"#)
+                    q::query(r#"UPDATE "UserEpisodeHistory" SET listenduration = 0, listendate = $3 WHERE userid = $1 AND episodeid = $2"#)
                         .bind(user_id)
                         .bind(episode_id)
+                        .bind(Self::position_time(None))
                         .execute(&mut *transaction)
                         .await?;
                 }

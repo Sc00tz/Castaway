@@ -1,6 +1,6 @@
 // lib/ui/pinepods/people/followed_people.dart
 //
-// The People tab: find anyone (on this server or PodPeopleDB), everyone the
+// The People tab: find anyone credited in this server's feeds, everyone the
 // user follows, and one combined list of their latest episodes across every
 // show.
 
@@ -143,22 +143,9 @@ class _PinepodsPeopleState extends State<PinepodsPeople> {
     if (mounted) _load();
   }
 
-  /// Search hits from PodPeopleDB may not be on this server yet; the lookup
-  /// brings them in and gives their id.
   Future<void> _openHit(PersonHit hit) async {
     if (_opening) return;
-    var id = hit.personId;
-    if (id == null && hit.podpeopleId != null) {
-      final service = signedInService(context);
-      setState(() => _opening = true);
-      try {
-        id = await service?.lookupPerson(podpeopleId: hit.podpeopleId);
-      } catch (_) {
-        id = null;
-      }
-      if (!mounted) return;
-      setState(() => _opening = false);
-    }
+    final id = hit.personId;
     if (id == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(L.of(context)!.couldnt_open_name(hit.name))));
       return;
@@ -251,7 +238,6 @@ class _PinepodsPeopleState extends State<PinepodsPeople> {
           return ListTile(
             leading: PersonAvatar(url: hit.img, size: 44),
             title: Text(hit.name),
-            subtitle: hit.knownFor != null ? Text(hit.knownFor!, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
             trailing: hit.followed ? Icon(PhosphorIconsFill.checkCircle, color: theme.colorScheme.primary) : null,
             onTap: () => _openHit(hit),
           );

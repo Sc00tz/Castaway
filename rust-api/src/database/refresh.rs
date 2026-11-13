@@ -233,7 +233,6 @@ impl DatabasePool {
         if let Err(e) = self.set_refresh_schedule(&[podcast_id], next).await {
             warn!("Scheduling the next refresh of podcast {} failed: {}", podcast_id, e);
         }
-        crate::services::people::podpeople::queue_sync(podcast_id);
 
         // Get the actual first episode ID (earliest by pub date)
         let first_id = self.get_first_episode_id(podcast_id, false).await?;

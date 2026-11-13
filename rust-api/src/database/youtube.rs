@@ -6,7 +6,7 @@ impl DatabasePool {
     // ===================================================================================
     // Unified host feed
     //
-    // A host's episodes are sourced from BOTH the Podcast Index person index AND PodPeopleDB,
+    // A host's episodes come from the Podcast Index person index,
     // and must be viewable whether or not the user is subscribed to the host or to the
     // underlying podcasts. `build_host_feed_shared` produces the non-user-specific feed (podcasts
     // a host appears in + a merged, artwork-resolved episode list) — this is what the handler

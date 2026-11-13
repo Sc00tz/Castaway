@@ -144,7 +144,10 @@ impl DatabasePool {
             .database(&db.name)
             // Port is still relevant for sockets: PG names the socket
             // file `.s.PGSQL.<port>`.
-            .port(db.port);
+            .port(db.port)
+            // Timestamps are stored as UTC wall-clock times. Pin every session to UTC so NOW()
+            // agrees with them whatever the server's or container's TZ is.
+            .options([("timezone", "UTC")]);
         options = if host_is_socket {
             options.socket(&db.host)
         } else {

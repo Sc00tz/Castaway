@@ -296,8 +296,8 @@ fn handle_empty(e: &BytesStart, item: &mut Option<ItemTags>, tags: &mut FeedTags
 }
 
 /// Name key for matching people: accent-folded, lowercased, punctuation dropped, whitespace
-/// collapsed. Must stay identical to `normalize_name` in database_functions/migration_definitions.py
-/// (which backfills existing rows) and to PodPeopleDB's.
+/// collapsed. Stored in `Persons.NameNormalized`, so changing it needs a migration that
+/// recomputes that column.
 pub fn normalize_name(name: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
     let folded: String = name

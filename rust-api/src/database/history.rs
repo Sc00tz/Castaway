@@ -13,27 +13,31 @@ impl DatabasePool {
                 if is_youtube {
                     // Insert or update video history
                     q::query(
+                        // The app's UTC clock, shared by every position write (newest wins).
                         r#"INSERT INTO "UserVideoHistory" ("videoid", "userid", "listenduration", "listendate")
-                           VALUES ($1, $2, $3, NOW())
-                           ON CONFLICT ("videoid", "userid") 
-                           DO UPDATE SET "listenduration" = $3, "listendate" = NOW()"#
+                           VALUES ($1, $2, $3, $4)
+                           ON CONFLICT ("videoid", "userid")
+                           DO UPDATE SET "listenduration" = $3, "listendate" = $4"#
                     )
                     .bind(episode_id)
                     .bind(user_id)
                     .bind(listen_duration)
+                    .bind(Self::position_time(None))
                     .execute(pool)
                     .await?;
                 } else {
                     // Insert or update episode history
                     q::query(
+                        // The app's UTC clock, shared by every position write (newest wins).
                         r#"INSERT INTO "UserEpisodeHistory" ("episodeid", "userid", "listenduration", "listendate")
-                           VALUES ($1, $2, $3, NOW())
-                           ON CONFLICT ("episodeid", "userid") 
-                           DO UPDATE SET "listenduration" = $3, "listendate" = NOW()"#
+                           VALUES ($1, $2, $3, $4)
+                           ON CONFLICT ("episodeid", "userid")
+                           DO UPDATE SET "listenduration" = $3, "listendate" = $4"#
                     )
                     .bind(episode_id)
                     .bind(user_id)
                     .bind(listen_duration)
+                    .bind(Self::position_time(None))
                     .execute(pool)
                     .await?;
                 }

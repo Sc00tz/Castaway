@@ -27,7 +27,6 @@ class CreditedPerson {
   /// Castaway person id; 0 when the server is too old to provide one (then the
   /// person can't be opened or followed).
   final int id;
-  final int? podpeopleId;
   final String name;
   final String? img;
   final String? href;
@@ -42,13 +41,10 @@ class CreditedPerson {
   final int episodeCount;
   final List<String> sources;
 
-  /// False when every credit is an unreviewed community submission.
-  final bool verified;
   final bool followed;
 
   const CreditedPerson({
     required this.id,
-    this.podpeopleId,
     required this.name,
     this.img,
     this.href,
@@ -58,14 +54,12 @@ class CreditedPerson {
     this.scope = 'podcast',
     this.episodeCount = 0,
     this.sources = const [],
-    this.verified = true,
     this.followed = false,
   });
 
   factory CreditedPerson.fromJson(Map<String, dynamic> json) {
     return CreditedPerson(
       id: json['id'] as int? ?? 0,
-      podpeopleId: json['podpeople_id'] as int?,
       name: json['name'] as String? ?? '',
       img: _nonEmpty(json['img']),
       href: _nonEmpty(json['href']),
@@ -75,7 +69,6 @@ class CreditedPerson {
       scope: json['scope'] as String? ?? 'podcast',
       episodeCount: json['episode_count'] as int? ?? 0,
       sources: _strings(json['sources']),
-      verified: json['verified'] as bool? ?? true,
       followed: json['followed'] as bool? ?? false,
     );
   }
@@ -103,7 +96,6 @@ class PodcastCredits {
 /// A person's identity, as on the person page and the followed list.
 class PersonInfo {
   final int id;
-  final int? podpeopleId;
   final String name;
   final String? img;
   final String? href;
@@ -111,7 +103,6 @@ class PersonInfo {
 
   const PersonInfo({
     required this.id,
-    this.podpeopleId,
     required this.name,
     this.img,
     this.href,
@@ -121,7 +112,6 @@ class PersonInfo {
   factory PersonInfo.fromJson(Map<String, dynamic> json) {
     return PersonInfo(
       id: json['id'] as int? ?? 0,
-      podpeopleId: json['podpeople_id'] as int?,
       name: json['name'] as String? ?? '',
       img: _nonEmpty(json['img']),
       href: _nonEmpty(json['href']),
@@ -131,7 +121,6 @@ class PersonInfo {
 
   PersonInfo copyWith({bool? followed}) => PersonInfo(
         id: id,
-        podpeopleId: podpeopleId,
         name: name,
         img: img,
         href: href,
@@ -216,73 +205,26 @@ class PersonProfile {
   }
 }
 
-/// A people search result, from this server or PodPeopleDB.
+/// A people search result.
 class PersonHit {
   final int? personId;
-  final int? podpeopleId;
   final String name;
   final String? img;
-
-  /// A show they're known for, to tell same-named people apart.
-  final String? knownFor;
   final bool followed;
 
   const PersonHit({
     this.personId,
-    this.podpeopleId,
     required this.name,
     this.img,
-    this.knownFor,
     this.followed = false,
   });
 
   factory PersonHit.fromJson(Map<String, dynamic> json) {
     return PersonHit(
       personId: json['person_id'] as int?,
-      podpeopleId: json['podpeople_id'] as int?,
       name: json['name'] as String? ?? '',
       img: _nonEmpty(json['img']),
-      knownFor: _nonEmpty(json['known_for']),
       followed: json['followed'] as bool? ?? false,
     );
   }
-}
-
-/// One person to add in a contribution: an existing person (by either id) or a new name.
-class ContributePerson {
-  final int? personId;
-  final int? podpeopleId;
-  final String name;
-  final String role;
-
-  const ContributePerson({
-    this.personId,
-    this.podpeopleId,
-    required this.name,
-    required this.role,
-  });
-
-  Map<String, dynamic> toJson() => {
-        if (personId != null) 'person_id': personId,
-        if (podpeopleId != null) 'podpeople_id': podpeopleId,
-        // The name is sent for new people only; existing people are matched by id.
-        if (personId == null && podpeopleId == null) 'name': name,
-        'role': role,
-      };
-}
-
-/// Split typed or pasted text into names. Commas, semicolons and line breaks
-/// always separate; " and " and " & " only when [all] (paste or submit), so a
-/// name being typed isn't cut. Returns the complete names and the unfinished
-/// remainder (empty when [all]).
-(List<String>, String) splitNames(String text, {required bool all}) {
-  var normalized = text.replaceAll(RegExp(r'[\n\r;]'), ',');
-  if (all) {
-    normalized = normalized.replaceAll(RegExp(r' (and|&) ', caseSensitive: false), ',');
-  }
-  final raw = normalized.split(',');
-  // Only the start of the remainder is trimmed: it's still being typed.
-  final remainder = all ? '' : raw.removeLast().trimLeft();
-  final names = raw.map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-  return (names, remainder);
 }

@@ -20,21 +20,16 @@ use yewdux::prelude::*;
 
 const PAGE_SIZE: i64 = 50;
 
-/// How the URL names the person: `/person/12` (Castaway id), `/person/pp-34` (a PodPeopleDB id,
-/// from discover) or `/person/Jane%20Doe` (old links by name).
+/// How the URL names the person: `/person/12` (Castaway id) or `/person/Jane%20Doe` (by name).
 #[derive(Clone, PartialEq, Debug)]
 enum PersonKey {
     Id(i32),
-    PodPeople(i64),
     Name(String),
 }
 
 fn parse_key(key: &str) -> PersonKey {
     if let Ok(id) = key.parse::<i32>() {
         return PersonKey::Id(id);
-    }
-    if let Some(id) = key.strip_prefix("pp-").and_then(|s| s.parse::<i64>().ok()) {
-        return PersonKey::PodPeople(id);
     }
     let name = urlencoding::decode(key).map(|s| s.into_owned()).unwrap_or_else(|_| key.to_string());
     PersonKey::Name(name)
@@ -55,7 +50,7 @@ enum Load {
 
 #[derive(Clone, Properties, PartialEq)]
 pub struct PersonProps {
-    /// Castaway person id, `pp-<PodPeopleDB id>`, or a name.
+    /// Castaway person id, or a name.
     pub person_key: String,
 }
 
@@ -94,8 +89,7 @@ pub fn person(props: &PersonProps) -> Html {
                 spawn_local(async move {
                     let person_id = match &key {
                         PersonKey::Id(id) => Ok(*id),
-                        PersonKey::PodPeople(pp) => call_lookup_person(&server, &api_key, Some(*pp), None).await,
-                        PersonKey::Name(name) => call_lookup_person(&server, &api_key, None, Some(name)).await,
+                        PersonKey::Name(name) => call_lookup_person(&server, &api_key, name).await,
                     };
                     let person_id = match person_id {
                         Ok(id) => id,

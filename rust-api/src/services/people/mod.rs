@@ -1,41 +1,34 @@
 //! People credited on podcasts and episodes: one shared identity per person (`Persons`), credits
-//! from the feed's `<podcast:person>` tags (written at refresh) and from PodPeopleDB (written by
-//! the background sync), and per-user follows. Pages read everything from the database; nothing
-//! here fetches a feed or calls PodPeopleDB on a page load.
+//! from the feeds' own `<podcast:person>` tags (written at refresh), per-user follows, and the
+//! episodes a person appears in on other shows (from Podcast Index's person search). Pages read
+//! everything from the database; nothing here fetches a feed on a page load.
 
 pub mod external;
-pub mod podpeople;
 pub mod sql;
 pub mod store;
 
 use serde::{Deserialize, Serialize};
 
-/// Where PodPeopleDB and the Castaway search API (Podcast Index) live, from the server config.
+/// The podcast directories the people features use (Podcast Index person search).
 #[derive(Debug, Clone)]
 pub struct Endpoints {
-    pub people: String,
-    pub search: String,
+    pub api: crate::config::ApiConfig,
 }
 
 impl Endpoints {
     pub fn from_config(config: &crate::config::Config) -> Self {
-        Endpoints {
-            people: config.api.people_api_url.trim_end_matches('/').to_string(),
-            search: config.api.search_api_url.clone(),
-        }
+        Endpoints { api: config.api.clone() }
     }
 }
 
-/// Credit sources, stored in `PodcastPeople.Source` / `EpisodePeople.Source`.
+/// Credit source, stored in `PodcastPeople.Source` / `EpisodePeople.Source`.
 pub const SOURCE_FEED: &str = "feed";
-pub const SOURCE_PODPEOPLE: &str = "podpeople";
 
 /// A person as shown on a podcast or episode page.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CreditedPerson {
     /// Castaway person id (`Persons.PersonID`); use it for the person page and follows.
     pub id: i32,
-    pub podpeople_id: Option<i32>,
     pub name: String,
     pub img: Option<String>,
     pub href: Option<String>,
@@ -49,10 +42,8 @@ pub struct CreditedPerson {
     pub scope: String,
     /// Episodes of this podcast the person is credited on.
     pub episode_count: i64,
-    /// "feed" and/or "podpeople".
+    /// Where the credits came from ("feed").
     pub sources: Vec<String>,
-    /// False when every credit is an unreviewed community submission.
-    pub verified: bool,
     pub followed: bool,
 }
 
@@ -67,7 +58,6 @@ pub struct PodcastCredits {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Person {
     pub id: i32,
-    pub podpeople_id: Option<i32>,
     pub name: String,
     pub img: Option<String>,
     pub href: Option<String>,
@@ -141,9 +131,8 @@ pub fn is_host_role(role: &str) -> bool {
 
 /// One-time work after upgrading: remove the placeholder podcasts the old host feeds created
 /// under the system user, and store Podcasting 2.0 tags for podcasts that have none yet (the
-/// regular refresh skips unchanged feeds, so it would never fill them in). Then a first
-/// PodPeopleDB sync.
-pub async fn startup(db: crate::database::DatabasePool, api: Endpoints) {
+/// regular refresh skips unchanged feeds, so it would never fill them in).
+pub async fn startup(db: crate::database::DatabasePool) {
     use futures::StreamExt;
     use sql::fetch_all;
 
@@ -184,16 +173,26 @@ pub async fn startup(db: crate::database::DatabasePool, api: Endpoints) {
         Ok(_) => {}
         Err(e) => tracing::warn!("Looking up podcasts without stored tags failed: {}", e),
     }
+}
 
-    if podpeople::sync_enabled() {
-        if let Err(e) = podpeople::sync(&db, &api, None).await {
-            tracing::warn!("Startup PodPeopleDB sync failed: {}", e);
-        }
-    }
+/// A people search result.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonHit {
+    pub person_id: i32,
+    pub name: String,
+    pub img: Option<String>,
+    pub followed: bool,
+}
 
-    // Podcasts added since: synced shortly after they're added, wherever they were added from.
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-        podpeople::sync_pending(&db, &api).await;
+/// People this server knows from its feeds whose name matches `query`.
+pub async fn search(db: &crate::database::DatabasePool, user_id: i32, query: &str) -> crate::error::AppResult<Vec<PersonHit>> {
+    let query = query.trim();
+    if query.chars().count() < 2 {
+        return Ok(Vec::new());
     }
+    Ok(store::search(db, query, user_id, 20)
+        .await?
+        .into_iter()
+        .map(|(p, _)| PersonHit { person_id: p.id, name: p.name, img: p.img, followed: p.followed })
+        .collect())
 }

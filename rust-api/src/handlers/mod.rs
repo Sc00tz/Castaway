@@ -11,7 +11,7 @@ pub mod notifications;
 pub mod refresh;
 pub mod feed_problems;
 pub mod podcast_refresh;
-pub mod update_services;
+pub mod podcast_index;
 pub mod proxy;
 pub mod settings;
 pub mod sync;

@@ -228,8 +228,8 @@ pub fn search_bar() -> Html {
         let history = history_clone.clone();
         let podcast_value = podcast_value_clone.clone();
         let search_index = search_index_clone.clone();
-        let search_unavailable_msg = i18n.t("update_services.search_unavailable").to_string();
-        let search_failed_msg = i18n.t("update_services.search_failed").to_string();
+        let search_unavailable_msg = i18n.t("podcast_index.search_unavailable").to_string();
+        let search_failed_msg = i18n.t("podcast_index.search_failed").to_string();
 
         move || {
             // Enter in an empty search box does nothing.
@@ -297,8 +297,8 @@ pub fn search_bar() -> Html {
                         Err(e) => {
                             Dispatch::<PageLoadState>::global()
                                 .reduce_mut(|state| state.is_loading = Some(false));
-                            let message = if e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>().is_some() {
-                                search_unavailable_msg.clone()
+                            let message = if let Some(u) = e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>() {
+                                if u.0.is_empty() { search_unavailable_msg.clone() } else { u.0.clone() }
                             } else {
                                 format!("{}: {}", search_failed_msg, e)
                             };

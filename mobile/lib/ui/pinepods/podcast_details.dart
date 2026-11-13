@@ -21,7 +21,6 @@ import 'package:pinepods_mobile/ui/widgets/pinepods_episode_card.dart';
 import 'package:pinepods_mobile/ui/widgets/platform_progress_indicator.dart';
 import 'package:pinepods_mobile/ui/widgets/episode_context_menu.dart';
 import 'package:pinepods_mobile/ui/pinepods/episode_details.dart';
-import 'package:pinepods_mobile/ui/pinepods/people/add_people_sheet.dart';
 import 'package:pinepods_mobile/ui/pinepods/people/people_widgets.dart';
 import 'package:pinepods_mobile/services/pinepods/pinepods_audio_service.dart';
 import 'package:pinepods_mobile/bloc/podcast/audio_bloc.dart';
@@ -1339,13 +1338,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
     }
   }
 
-  Future<void> _addPeople() async {
-    final podcastId = _peoplePodcastId;
-    if (podcastId == null) return;
-    final added = await showAddPeopleSheet(context, podcastId: podcastId);
-    if (added != null && mounted) await _loadPeople(podcastId);
-  }
-
   Future<void> _toggleFollow() async {
     // Prevent concurrent operations
     if (_isFollowButtonLoading) {
@@ -2204,14 +2196,9 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
               const SizedBox(height: 14),
               _ExpandableDescription(description: _podcast.description, accent: accent),
             ],
-            if (_credits.people.isNotEmpty || _peoplePodcastId != null) ...[
+            if (_credits.people.isNotEmpty) ...[
               const SizedBox(height: 16),
-              PeopleStrip(
-                title: L.of(context)!.hosts,
-                people: _credits.people,
-                onAdd: _peoplePodcastId != null ? _addPeople : null,
-                emptyPrompt: L.of(context)!.hosts_empty_prompt,
-              ),
+              PeopleStrip(title: L.of(context)!.hosts, people: _credits.people),
             ],
             if (_credits.guests.isNotEmpty) ...[
               const SizedBox(height: 16),

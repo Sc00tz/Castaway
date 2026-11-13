@@ -113,16 +113,10 @@ class PersonAvatar extends StatelessWidget {
   }
 }
 
-/// A titled, horizontally scrolling row of people. With [onAdd], ends in an
-/// "Add" tile, and an empty list shows an invitation to add people instead of
-/// nothing.
+/// A titled, horizontally scrolling row of people (nothing when empty).
 class PeopleStrip extends StatelessWidget {
   final String title;
   final List<CreditedPerson> people;
-  final VoidCallback? onAdd;
-
-  /// Shown when [people] is empty and [onAdd] is set.
-  final String? emptyPrompt;
 
   /// Show each person's episode count instead of their role (guest rows).
   final bool showEpisodeCount;
@@ -131,40 +125,23 @@ class PeopleStrip extends StatelessWidget {
     super.key,
     required this.title,
     required this.people,
-    this.onAdd,
-    this.emptyPrompt,
     this.showEpisodeCount = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (people.isEmpty && onAdd == null) return const SizedBox.shrink();
+    if (people.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                people.isEmpty ? title : '$title · ${people.length}',
-                style: theme.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            if (onAdd != null && people.isNotEmpty)
-              TextButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(PhosphorIconsRegular.userPlus, size: 18),
-                label: Text(L.of(context)!.add),
-              ),
-          ],
+        Text(
+          '$title · ${people.length}',
+          style: theme.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        if (people.isEmpty)
-          _EmptyInvite(prompt: emptyPrompt ?? L.of(context)!.nobody_listed_yet, onAdd: onAdd!)
-        else
-          SizedBox(
+        SizedBox(
             height: 112,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -196,7 +173,7 @@ class _PersonTile extends StatelessWidget {
 
     return Semantics(
       button: person.canOpen,
-      label: [person.name, detail, if (!person.verified) 'unverified'].where((s) => s.isNotEmpty).join(', '),
+      label: [person.name, detail].where((s) => s.isNotEmpty).join(', '),
       excludeSemantics: true,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -205,29 +182,7 @@ class _PersonTile extends StatelessWidget {
           width: 76,
           child: Column(
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  PersonAvatar(url: person.img, size: 56),
-                  if (!person.verified)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Tooltip(
-                        message: L.of(context)!.unverified_person,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade600,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              PersonAvatar(url: person.img, size: 56),
               const SizedBox(height: 6),
               Text(
                 person.name,
@@ -241,39 +196,6 @@ class _PersonTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _EmptyInvite extends StatelessWidget {
-  final String prompt;
-  final VoidCallback onAdd;
-
-  const _EmptyInvite({required this.prompt, required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(PhosphorIconsRegular.usersThree, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(child: Text(prompt, style: theme.textTheme.bodyMedium)),
-          const SizedBox(width: 8),
-          FilledButton.tonalIcon(
-            onPressed: onAdd,
-            icon: const Icon(PhosphorIconsRegular.userPlus, size: 18),
-            label: Text(L.of(context)!.add),
-          ),
-        ],
       ),
     );
   }

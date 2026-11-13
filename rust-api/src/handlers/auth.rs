@@ -185,13 +185,11 @@ pub struct CreateFirstAdminResponse {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct ConfigResponse {
-    pub api_url: String,
     pub proxy_url: String,
     pub proxy_host: String,
     pub proxy_port: String,
     pub proxy_protocol: String,
     pub reverse_proxy: String,
-    pub people_url: String,
 }
 
 // Extract basic auth credentials from Authorization header
@@ -531,8 +529,6 @@ pub async fn get_config(
     let proxy_port = std::env::var("PINEPODS_PORT").unwrap_or_else(|_| "8040".to_string());
     let proxy_protocol = std::env::var("PROXY_PROTOCOL").unwrap_or_else(|_| "http".to_string());
     let reverse_proxy = std::env::var("REVERSE_PROXY").unwrap_or_else(|_| "False".to_string());
-    let api_url = std::env::var("SEARCH_API_URL").unwrap_or_else(|_| "https://search.pinepods.online/api/search".to_string());
-    let people_url = std::env::var("PEOPLE_API_URL").unwrap_or_else(|_| "https://people.pinepods.online".to_string());
     
     // Build proxy URL based on reverse proxy setting
     let proxy_url = if reverse_proxy == "True" {
@@ -542,13 +538,11 @@ pub async fn get_config(
     };
     
     Ok(Json(ConfigResponse {
-        api_url,
         proxy_url,
         proxy_host,
         proxy_port,
         proxy_protocol,
         reverse_proxy,
-        people_url,
     }))
 }
 

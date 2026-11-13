@@ -14,7 +14,7 @@ pub mod http;
 pub mod oidc;
 pub mod people;
 pub mod podcasting2;
-pub mod podping;
+pub mod directory;
 pub mod recommendations;
 pub mod refresh_schedule;
 pub mod scheduler;
