@@ -1,5 +1,5 @@
 //! A loopback HTTP server that plays the outside world: podcast RSS feeds, enclosure audio,
-//! artwork, and the external APIs (search, podpeople) the server talks to.
+//! artwork, and the external APIs (Apple, Podcast Index) the server talks to.
 //!
 //! One server per test process, on its own thread + runtime so it outlives each test's
 //! runtime. Tests isolate themselves by path: [`Fixtures`] (from `TestApp::fixtures()`)

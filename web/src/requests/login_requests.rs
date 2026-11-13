@@ -146,14 +146,11 @@ pub async fn call_get_user_details(
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct GetApiDetails {
-    // Add fields according to your API's JSON response
-    pub api_url: Option<String>,
     pub proxy_url: Option<String>,
     pub proxy_host: Option<String>,
     pub proxy_port: Option<String>,
     pub proxy_protocol: Option<String>,
     pub reverse_proxy: Option<String>,
-    pub people_url: Option<String>,
 }
 
 pub async fn call_get_api_config(
@@ -314,7 +311,7 @@ async fn complete_login_flow(
 
     // Step 4: Get server details
     let server_details = call_get_api_config(&server_name, &api_key).await?;
-    if server_details.api_url.is_none() {
+    if server_details.proxy_url.is_none() {
         return Err(anyhow::Error::msg("Failed to get server details"));
     }
 
@@ -397,7 +394,7 @@ pub async fn login_new_server(
 
             // Step 5: Get server details
             let server_details = call_get_api_config(&server_name, &api_key).await?;
-            if server_details.api_url.is_none() {
+            if server_details.proxy_url.is_none() {
                 return Err(anyhow::Error::msg("Failed to get server details"));
             }
 

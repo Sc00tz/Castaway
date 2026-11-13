@@ -571,33 +571,27 @@ class UserDetails {
 }
 
 class ApiConfig {
-  final String? apiUrl;
   final String? proxyUrl;
   final String? proxyHost;
   final String? proxyPort;
   final String? proxyProtocol;
   final String? reverseProxy;
-  final String? peopleUrl;
 
   ApiConfig({
-    this.apiUrl,
     this.proxyUrl,
     this.proxyHost,
     this.proxyPort,
     this.proxyProtocol,
     this.reverseProxy,
-    this.peopleUrl,
   });
 
   factory ApiConfig.fromJson(Map<String, dynamic> json) {
     return ApiConfig(
-      apiUrl: json['api_url'],
       proxyUrl: json['proxy_url'],
       proxyHost: json['proxy_host'],
       proxyPort: json['proxy_port'],
       proxyProtocol: json['proxy_protocol'],
       reverseProxy: json['reverse_proxy'],
-      peopleUrl: json['people_url'],
     );
   }
 }

@@ -32,7 +32,7 @@ class ServerErrorPage extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
-                'assets/images/pinepods-logo.png',
+                'assets/images/castaway-logo.png',
                 width: 120,
                 height: 120,
                 fit: BoxFit.contain,

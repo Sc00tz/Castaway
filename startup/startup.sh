@@ -11,33 +11,47 @@ shutdown() {
 # Set up signal handling
 trap shutdown SIGTERM SIGINT
 
+# Everything Castaway keeps (database, downloads, backups) lives under one folder, which
+# should be a mounted volume. The server reads the same variable.
+export PINEPODS_DATA_DIR=${PINEPODS_DATA_DIR:-/data}
+DATA_DIR=$PINEPODS_DATA_DIR
+
+# Castaway runs on PostgreSQL only. With no DB_HOST it runs the PostgreSQL server built into
+# this image, keeping its files in $DATA_DIR/postgres. Set DB_HOST (with DB_PORT, DB_USER,
+# DB_PASSWORD and DB_NAME) to use a PostgreSQL server of your own instead.
+if [[ -n "$DB_TYPE" && "$DB_TYPE" != "postgresql" && "$DB_TYPE" != "postgres" ]]; then
+    echo "ERROR: DB_TYPE=$DB_TYPE isn't supported. Castaway uses PostgreSQL: leave DB_TYPE and DB_HOST"
+    echo "unset to use the built-in database, or point DB_HOST at your own PostgreSQL server."
+    exit 1
+fi
+DB_TYPE=postgresql
+BUNDLED_DB=false
+if [[ -z "$DB_HOST" ]]; then
+    BUNDLED_DB=true
+    DB_HOST=127.0.0.1
+    DB_PORT=5432
+    DB_USER=${DB_USER:-castaway}
+    DB_NAME=${DB_NAME:-castaway}
+fi
+
 # Export all environment variables
 export DB_USER=$DB_USER
 export DB_PASSWORD=$DB_PASSWORD
 export DB_HOST=$DB_HOST
 export DB_NAME=$DB_NAME
 export DB_PORT=$DB_PORT
-# No database server configured: use SQLite.
-if [[ -z "$DB_TYPE" && -z "$DB_HOST" ]]; then
-    DB_TYPE=sqlite
-fi
 export DB_TYPE=$DB_TYPE
-# SQLite database file (DB_TYPE=sqlite); its directory should be a mounted volume.
-export DB_PATH=${DB_PATH:-/opt/pinepods/data/pinepods.db}
-export FULLNAME=${FULLNAME}
-export USERNAME=${USERNAME}
-export EMAIL=${EMAIL}
-export PASSWORD=${PASSWORD}
 export REVERSE_PROXY=$REVERSE_PROXY
-export SEARCH_API_URL=${SEARCH_API_URL:-'https://search.pinepods.online/api/search'}
-export PEOPLE_API_URL=${PEOPLE_API_URL:-'https://people.pinepods.online'}
 export PINEPODS_PORT=$PINEPODS_PORT
 export PROXY_PROTOCOL=$PROXY_PROTOCOL
 export DEBUG_MODE=${DEBUG_MODE:-'False'}
-# Without any Valkey settings, SQLite installs keep that state in memory, and the others
-# look for a "valkey" host as they always have. VALKEY_MODE=memory or valkey picks explicitly.
+# Without any Valkey settings, the built-in database setup keeps that state in memory (one
+# server process, so nothing else needs to share it), and installs pointed at their own
+# database server look for a "valkey" host. VALKEY_MODE=memory or valkey picks explicitly.
 valkey_mode=$(echo "$VALKEY_MODE" | tr '[:upper:]' '[:lower:]')
-if [[ -z "$VALKEY_URL$REDIS_URL$VALKEY_HOST$REDIS_HOST" && "$DB_TYPE" != "sqlite" && "$valkey_mode" != "memory" ]]; then
+if [[ -z "$VALKEY_URL$REDIS_URL$VALKEY_HOST$REDIS_HOST" && -z "$valkey_mode" && "$BUNDLED_DB" == true ]]; then
+    VALKEY_MODE=memory
+elif [[ -z "$VALKEY_URL$REDIS_URL$VALKEY_HOST$REDIS_HOST" && "$valkey_mode" != "memory" ]]; then
     VALKEY_HOST=valkey
 fi
 export VALKEY_HOST=$VALKEY_HOST
@@ -46,7 +60,7 @@ export VALKEY_MODE=$VALKEY_MODE
 export DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-'en'}
 # Path to the self-updating yt-dlp binary (#793). Lives on the persistent downloads volume
 # so `yt-dlp --update-to` survives container recreation; every yt-dlp caller resolves this.
-export YTDLP_PATH=${YTDLP_PATH:-/opt/pinepods/downloads/.bin/yt-dlp}
+export YTDLP_PATH=${YTDLP_PATH:-$DATA_DIR/downloads/.bin/yt-dlp}
 
 # Fall back to HOSTNAME for SERVER_URL if SERVER_URL isn't already set.
 # IMPORTANT: this must NOT unconditionally overwrite SERVER_URL. Some container
@@ -81,14 +95,6 @@ export OIDC_ROLES_CLAIM=${OIDC_ROLES_CLAIM}
 export OIDC_USER_ROLE=${OIDC_USER_ROLE}
 export OIDC_ADMIN_ROLE=${OIDC_ADMIN_ROLE}
 
-# Print admin info if the example admin from the compose files is used. The password is never
-# printed: container logs are often shared or shipped elsewhere.
-if [[ $FULLNAME == 'Castaway Admin' ]]; then
-  echo "Admin User Information:"
-  echo "FULLNAME: $FULLNAME"
-  echo "USERNAME: $USERNAME"
-  echo "EMAIL: $EMAIL"
-fi
 
 # Print the Castaway banner
 cat << "EOF"
@@ -144,13 +150,10 @@ export TZ
 # Create required directories
 echo "Creating required directories..."
 mkdir -p /pinepods/cache
-mkdir -p /opt/pinepods/backups
-mkdir -p /opt/pinepods/downloads
-mkdir -p /opt/pinepods/certs
-if [[ "$DB_TYPE" == "sqlite" ]]; then
-    mkdir -p "$(dirname "$DB_PATH")"
-fi
-mkdir -p /opt/pinepods/local-media  # User-mounted media library; app writes artwork here
+mkdir -p $DATA_DIR/backups
+mkdir -p $DATA_DIR/downloads
+mkdir -p $DATA_DIR/certs
+mkdir -p $DATA_DIR/local-media  # User-mounted media library; app writes artwork here
 mkdir -p /var/log/pinepods  # Make sure log directory exists
 
 # Seed the persistent, self-updating yt-dlp binary (#793). yt-dlp updates itself at runtime
@@ -168,25 +171,61 @@ if [ -n "${PUID}" ] && [ -n "${PGID}" ]; then
     chown -R "${PUID}:${PGID}" "$YTDLP_BIN_DIR" 2>/dev/null || true
 fi
 
-# Database Setup
-echo "Using $DB_TYPE database"
-# Use compiled database setup binary (no Python dependency)
-# Web API key file creation has been removed for security
-/usr/local/bin/pinepods-db-setup
-echo "Database validation complete"
-
-# Cron jobs removed - now handled by internal Rust scheduler
-
-# Check if we need to create exim directories
-# Only do this if the user/group exists on the system
-if getent group | grep -q "Debian-exim"; then
-    echo "Setting up exim directories and permissions..."
-    mkdir -p /var/log/exim4
-    mkdir -p /var/spool/exim4
-    chown -R Debian-exim:Debian-exim /var/log/exim4
-    chown -R Debian-exim:Debian-exim /var/spool/exim4
+# Built-in PostgreSQL. It runs as the 'pinepods' user (PostgreSQL refuses to run as root),
+# which is remapped to PUID/PGID so the database files belong to the host user like the rest.
+PG_BIN=/usr/libexec/postgresql18
+PG_MAJOR=18
+PG_ROOT=$DATA_DIR/postgres
+PG_SOCKETS=/run/postgresql
+# Horust runs as PUID when both IDs are set and PUID isn't root (see the end of this script);
+# otherwise it runs as root and has to switch to 'pinepods' to start PostgreSQL.
+if [[ -n "$PUID" && -n "$PGID" && ! "$PUID" =~ ^0+$ ]]; then
+    groupmod -o -g "$PGID" pinepods 2>/dev/null || true
+    usermod -o -u "$PUID" -g "$PGID" pinepods 2>/dev/null || true
+    pg_service_cmd="$PG_BIN/postgres"
 else
-    echo "Skipping exim setup as user/group doesn't exist on this system"
+    pg_service_cmd="su-exec pinepods $PG_BIN/postgres"
+fi
+pg() { su-exec pinepods "$@"; }
+
+if [[ "$BUNDLED_DB" == true ]]; then
+    export PGDATA=$PG_ROOT/data
+    pw_file=$PG_ROOT/password
+    mkdir -p "$PG_ROOT" "$PG_SOCKETS"
+    chown pinepods:pinepods "$PG_ROOT" "$PG_SOCKETS"
+    chmod 700 "$PG_ROOT"
+
+    if [[ ! -s "$PGDATA/PG_VERSION" ]]; then
+        echo "Creating the built-in PostgreSQL database in $PGDATA..."
+        # The password never needs typing: Castaway reads it from this file. DB_PASSWORD, if
+        # set on the first start, is used instead of a generated one.
+        if [[ ! -s "$pw_file" ]]; then
+            (umask 077; if [[ -n "$DB_PASSWORD" ]]; then printf '%s' "$DB_PASSWORD"; else openssl rand -hex 24; fi > "$pw_file")
+        fi
+        chown pinepods:pinepods "$pw_file"
+        pg "$PG_BIN/initdb" -D "$PGDATA" -U "$DB_USER" --pwfile="$pw_file" \
+            --auth=scram-sha-256 --encoding=UTF8 --locale=C.UTF-8 >/dev/null
+    fi
+
+    data_major=$(cat "$PGDATA/PG_VERSION")
+    if [[ "$data_major" != "$PG_MAJOR" ]]; then
+        echo "ERROR: $PGDATA was created by PostgreSQL $data_major, but this image runs PostgreSQL $PG_MAJOR."
+        echo "Run the previous image, make a backup in Castaway's settings, then restore it into a fresh database."
+        exit 1
+    fi
+    if [[ ! -s "$pw_file" ]]; then
+        echo "ERROR: $pw_file is missing, so Castaway can't log in to its database."
+        exit 1
+    fi
+    export DB_PASSWORD=$(cat "$pw_file")
+
+    # If PUID changed since the database was created, hand its files to the new owner. Checked
+    # as that user: some mounts (Docker Desktop's) report a different owner to root.
+    if ! pg test -O "$PGDATA"; then
+        echo "Updating database file ownership for the new PUID..."
+        chown -R pinepods:pinepods "$PGDATA" "$pw_file"
+    fi
+    # The Castaway server creates its database and schema itself when it starts.
 fi
 
 # Set up environment variables for Horust logging modes
@@ -202,6 +241,27 @@ fi
 
 # Copy service configurations to Horust directory
 cp /pinepods/startup/services/*.toml /etc/horust/services/
+if [[ "$BUNDLED_DB" == true ]]; then
+    # SIGINT is PostgreSQL's "fast" shutdown: it disconnects clients and stops cleanly.
+    cat > /etc/horust/services/postgres.toml <<EOF
+command = "$pg_service_cmd -D $PGDATA -c listen_addresses=127.0.0.1 -k $PG_SOCKETS"
+stdout = "\${HORUST_STDOUT_MODE}"
+stderr = "\${HORUST_STDERR_MODE}"
+
+[restart]
+strategy = "always"
+backoff = "1s"
+attempts = 0
+
+[environment]
+keep-env = true
+
+[termination]
+signal = "INT"
+wait = "30s"
+EOF
+    sed -i '1i start-after = ["postgres.toml"]' /etc/horust/services/pinepods-api.toml
+fi
 
 # Ensure runtime directories exist and are writable when running non-root.
 # Horust creates a unix-domain-socket folder at /var/run/horust; nginx needs its own dirs.
@@ -250,21 +310,17 @@ if [[ -n "$PUID" && -n "$PGID" ]]; then
     # pre-existing library; the app only needs to write artwork into a subdir.
     # nginx's dirs are deliberately absent here — they are set above to the user
     # nginx actually runs its workers as, which is not PUID when the master is root.
-    chown "${PUID}:${PGID}" /pinepods/cache /var/log/pinepods /opt/pinepods/certs \
-                            /opt/pinepods/downloads /opt/pinepods/backups \
-                            /opt/pinepods/local-media \
+    chown "${PUID}:${PGID}" /pinepods/cache /var/log/pinepods $DATA_DIR/certs \
+                            $DATA_DIR/downloads $DATA_DIR/backups \
+                            $DATA_DIR/local-media \
                             /var/run/horust 2>/dev/null || true
-    # The database setup above ran as root; the SQLite files must belong to the app.
-    if [[ "$DB_TYPE" == "sqlite" ]]; then
-        chown "${PUID}:${PGID}" "$(dirname "$DB_PATH")" "$DB_PATH" "$DB_PATH-wal" "$DB_PATH-shm" 2>/dev/null || true
-    fi
 
     # One-time recursive migration of pre-existing root-owned content, gated by a marker
     # on the persisted downloads volume. Non-fatal so an NFS/read-only mount can't block startup.
-    if [ ! -f /opt/pinepods/downloads/.perms-migrated ]; then
+    if [ ! -f $DATA_DIR/downloads/.perms-migrated ]; then
         echo "One-time permission migration (only happens once; future boots are instant)..."
-        if chown -R "${PUID}:${PGID}" /opt/pinepods/downloads /opt/pinepods/backups 2>/dev/null; then
-            touch /opt/pinepods/downloads/.perms-migrated 2>/dev/null || true
+        if chown -R "${PUID}:${PGID}" $DATA_DIR/downloads $DATA_DIR/backups 2>/dev/null; then
+            touch $DATA_DIR/downloads/.perms-migrated 2>/dev/null || true
         else
             echo "Skipped recursive chown (read-only/NFS mount) — new files will be owned by ${PUID}:${PGID} as they are written."
         fi

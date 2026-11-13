@@ -1,4 +1,4 @@
-# Throwaway databases for the rust-api integration suite (tests/integration).
+# Throwaway PostgreSQL and Valkey for the rust-api integration suite (tests/integration).
 # Started by scripts/integration-tests.sh; ports are deliberately off the defaults so they
 # never collide with a real Castaway (or anything else) running on the dev machine.
 # Data lives on tmpfs: every `up` starts clean, and nothing here is worth keeping.
@@ -6,7 +6,7 @@ name: pinepods-api-tests
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: pinepods
       POSTGRES_PASSWORD: testpass
@@ -15,24 +15,9 @@ services:
     ports:
       - "127.0.0.1:55433:5432"
     tmpfs:
-      - /var/lib/postgresql/data
+      - /var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pinepods"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
-
-  mariadb:
-    image: mariadb:11
-    environment:
-      MARIADB_ROOT_PASSWORD: testpass
-    command: ["--max-connections=500", "--innodb-flush-log-at-trx-commit=0", "--skip-log-bin"]
-    ports:
-      - "127.0.0.1:33307:3306"
-    tmpfs:
-      - /var/lib/mysql
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 2s
       timeout: 3s
       retries: 30

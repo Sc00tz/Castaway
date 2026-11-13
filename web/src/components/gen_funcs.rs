@@ -20,9 +20,8 @@ pub fn generate_gravatar_url(email: &Option<String>, size: usize) -> String {
 }
 
 pub fn format_date(date_str: &str) -> String {
-    // Try parsing with the MySQL format
+    // Timestamps come with or without fractional seconds.
     let date = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S")
-        // If that fails, try the PostgreSQL format
         .or_else(|_| chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.f"))
         // If both parsing attempts fail, fallback to the Unix epoch
         .unwrap_or_else(|_| {

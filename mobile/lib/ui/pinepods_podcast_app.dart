@@ -1110,7 +1110,7 @@ class TitleWidget extends StatelessWidget {
               padding: const EdgeInsets.only(left: 2.0),
               child: Row(
                 children: <Widget>[
-                  Image.asset('assets/images/pinepods-logo.png', width: 26, height: 26),
+                  Image.asset('assets/images/castaway-logo.png', width: 26, height: 26),
                   const SizedBox(width: 8),
                   const Text(
                     'Castaway', // i18n-ignore
@@ -1148,7 +1148,7 @@ class TitleWidget extends StatelessWidget {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Image.asset(
-                                'assets/images/pinepods-logo.png',
+                                'assets/images/castaway-logo.png',
                                 width: 36,
                                 height: 36,
                                 fit: BoxFit.cover,
@@ -1156,7 +1156,7 @@ class TitleWidget extends StatelessWidget {
                             },
                           ),
                         )
-                      : Image.asset('assets/images/pinepods-logo.png', width: 36, height: 36, fit: BoxFit.cover),
+                      : Image.asset('assets/images/castaway-logo.png', width: 36, height: 36, fit: BoxFit.cover),
                 ),
                 const SizedBox(width: 12),
                 // Username

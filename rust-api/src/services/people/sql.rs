@@ -1,35 +1,6 @@
-//! Write a query once, in PostgreSQL form, and run it on any backend (SQLite through
-//! `database::dialect`).
+//! Small query helpers for the people (hosts and guests) store.
 //!
-//! The MySQL form is derived mechanically: identifier quotes are dropped (`"Persons"` ->
-//! `Persons`) and `$1, $2, ...` become `?`. So the rules are: quote only table names, alias every
-//! selected column in lowercase (PostgreSQL folds unquoted names, MySQL keeps them as written),
-//! use each `$n` once and in order, and keep backend-specific syntax (upserts, RETURNING,
-//! boolean aggregates) out of these macros.
-
-/// PostgreSQL query text -> MySQL query text.
-pub fn my(pg: &str) -> String {
-    let mut out = String::with_capacity(pg.len());
-    let mut chars = pg.chars().peekable();
-    let mut in_string = false;
-    while let Some(c) = chars.next() {
-        match c {
-            '\'' => {
-                in_string = !in_string;
-                out.push(c);
-            }
-            '"' if !in_string => {}
-            '$' if !in_string && chars.peek().is_some_and(|d| d.is_ascii_digit()) => {
-                while chars.peek().is_some_and(|d| d.is_ascii_digit()) {
-                    chars.next();
-                }
-                out.push('?');
-            }
-            _ => out.push(c),
-        }
-    }
-    out
-}
+//! Queries are plain PostgreSQL text with `$1, $2, ...` placeholders.
 
 /// A runtime-built bind list, for queries whose placeholder count depends on the input
 /// (multi-row inserts, `IN (...)` lists). Pass it as `dyn binds` in place of `[...]`.
@@ -60,7 +31,7 @@ macro_rules! bind_all {
 }
 
 /// `fetch_all!(db, sql, [binds...], |row| expr)` -> `Vec<T>` (propagates errors with `?`).
-/// `row` is a `&PgRow` / `&MySqlRow`; read columns through [`RowExt`].
+/// `row` is a `&PgRow`; read columns through [`RowExt`].
 macro_rules! fetch_all {
     (@go $db:expr, $sql:expr, ($($binds:tt)*), |$row:ident| $map:expr) => {{
         #[allow(unused_imports)]
@@ -68,16 +39,6 @@ macro_rules! fetch_all {
         match $db {
             $crate::database::DatabasePool::Postgres(pool) => {
                 let q = sqlx::query(sqlx::AssertSqlSafe($sql.to_string()));
-                let rows = $crate::services::people::sql::bind_all!(q, $($binds)*).fetch_all(pool).await?;
-                rows.iter().map(|$row| -> Result<_, sqlx::Error> { Ok($map) }).collect::<Result<Vec<_>, sqlx::Error>>()?
-            }
-            $crate::database::DatabasePool::Sqlite(pool) => {
-                let q = $crate::database::dialect::lite::query(sqlx::AssertSqlSafe($sql.to_string()));
-                let rows = $crate::services::people::sql::bind_all!(q, $($binds)*).fetch_all(pool).await?;
-                rows.iter().map(|$row| -> Result<_, sqlx::Error> { Ok($map) }).collect::<Result<Vec<_>, sqlx::Error>>()?
-            }
-            $crate::database::DatabasePool::MySQL(pool) => {
-                let q = sqlx::query(sqlx::AssertSqlSafe($crate::services::people::sql::my(&$sql)));
                 let rows = $crate::services::people::sql::bind_all!(q, $($binds)*).fetch_all(pool).await?;
                 rows.iter().map(|$row| -> Result<_, sqlx::Error> { Ok($map) }).collect::<Result<Vec<_>, sqlx::Error>>()?
             }
@@ -107,14 +68,6 @@ macro_rules! execute {
                 let q = sqlx::query(sqlx::AssertSqlSafe($sql.to_string()));
                 $crate::services::people::sql::bind_all!(q, $($binds)*).execute(pool).await?.rows_affected()
             }
-            $crate::database::DatabasePool::Sqlite(pool) => {
-                let q = $crate::database::dialect::lite::query(sqlx::AssertSqlSafe($sql.to_string()));
-                $crate::services::people::sql::bind_all!(q, $($binds)*).execute(pool).await?.rows_affected()
-            }
-            $crate::database::DatabasePool::MySQL(pool) => {
-                let q = sqlx::query(sqlx::AssertSqlSafe($crate::services::people::sql::my(&$sql)));
-                $crate::services::people::sql::bind_all!(q, $($binds)*).execute(pool).await?.rows_affected()
-            }
         }
     }};
     ($db:expr, $sql:expr, dyn $binds:expr) => {
@@ -127,8 +80,7 @@ macro_rules! execute {
 
 pub(crate) use {bind_all, execute, fetch_all, fetch_optional};
 
-/// Typed column reads that paper over backend differences: MySQL returns computed booleans as
-/// integers and TIMESTAMP columns as UTC datetimes, PostgreSQL as `bool` and naive timestamps.
+/// Typed column reads that accept any integer width and NULLs.
 pub trait RowExt {
     fn str(&self, col: &str) -> Result<String, sqlx::Error>;
     fn opt_str(&self, col: &str) -> Result<Option<String>, sqlx::Error>;
@@ -193,8 +145,6 @@ macro_rules! row_ext {
 }
 
 row_ext!(sqlx::postgres::PgRow, false);
-row_ext!(sqlx::mysql::MySqlRow, true);
-row_ext!(crate::database::dialect::lite::LiteRow, false);
 
 /// `($1, $2, $3), ($4, $5, $6), ...` for a multi-row insert.
 pub fn values_placeholders(rows: usize, cols: usize) -> String {
@@ -212,17 +162,3 @@ pub fn in_list(start: usize, n: usize) -> String {
     (0..n).map(|i| format!("${}", start + i)).collect::<Vec<_>>().join(", ")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn converts_to_mysql() {
-        assert_eq!(
-            my(r#"SELECT p.personid FROM "Persons" p WHERE p.name = $1 AND p.note = '$2 "x"' LIMIT $2"#),
-            r#"SELECT p.personid FROM Persons p WHERE p.name = ? AND p.note = '$2 "x"' LIMIT ?"#
-        );
-        assert_eq!(values_placeholders(2, 2), "($1, $2), ($3, $4)");
-        assert_eq!(in_list(3, 2), "$3, $4");
-    }
-}

@@ -654,56 +654,6 @@ async fn load_refresh_items(
                 });
             }
         },
-        mysql(pool) => {
-            let in_list = |column: &str, n: Option<usize>| match n {
-                Some(n) if n > 0 => format!("AND {column} IN ({})", vec!["?"; n].join(", ")),
-                Some(_) => "AND FALSE".to_string(),
-                None => String::new(),
-            };
-            let urls = in_list("FeedURL", only.map(<[String]>::len));
-            let feed_ids = in_list("FeedID", feeds.map(<[i32]>::len));
-            let mut query = sqlx::query(sqlx::AssertSqlSafe(format!(
-                "SELECT PodcastID, FeedID, FeedURL, ArtworkURL, AutoDownload, AutoQueue, Username, Password,
-                        IsYouTubeChannel, UserID, FeedCutoffDays, FeedETag, FeedLastModified, FeedContentHash,
-                        RefreshIntervalMinutes
-                 FROM Podcasts
-                 WHERE COALESCE(RefreshPodcast, 1) = 1
-                   AND (RefreshNotBefore IS NULL OR RefreshNotBefore <= NOW())
-                   AND (? OR COALESCE(ConsecutiveFailures, 0) = 0
-                        OR LastRefreshAttempt IS NULL
-                        OR LastRefreshAttempt < NOW() - INTERVAL ({BACKOFF_STEP_MINUTES} * LEAST(COALESCE(ConsecutiveFailures, 0), {BACKOFF_MAX_STEPS})) MINUTE)
-                   {urls} {feed_ids}"
-            )))
-            .bind(ignore_backoff);
-            for url in only.unwrap_or_default() {
-                query = query.bind(url);
-            }
-            for id in feeds.unwrap_or_default() {
-                query = query.bind(id);
-            }
-            let rows = query.fetch_all(pool).await?;
-
-            for result in rows {
-                let podcast_id: i32 = result.try_get("PodcastID")?;
-                refresh_items.push(PodcastRefreshItem {
-                    podcast_id,
-                    feed_id: result.try_get("FeedID")?,
-                    feed_url: result.try_get("FeedURL")?,
-                    artwork_url: result.try_get("ArtworkURL").ok(),
-                    auto_download: result.try_get("AutoDownload")?,
-                    auto_queue: result.try_get("AutoQueue").unwrap_or(false),
-                    username: result.try_get("Username").ok(),
-                    password: result.try_get("Password").ok(),
-                    is_youtube: result.try_get("IsYouTubeChannel")?,
-                    user_id: result.try_get("UserID")?,
-                    feed_cutoff: result.try_get("FeedCutoffDays").ok(),
-                    etag: result.try_get::<Option<String>, _>("FeedETag").ok().flatten(),
-                    last_modified: result.try_get::<Option<String>, _>("FeedLastModified").ok().flatten(),
-                    content_hash: result.try_get::<Option<String>, _>("FeedContentHash").ok().flatten(),
-                    refresh_interval: result.try_get::<Option<i32>, _>("RefreshIntervalMinutes").ok().flatten(),
-                });
-            }
-        },
     });
 
 
@@ -732,16 +682,6 @@ pub async fn refresh_due_podcasts(state: &AppState) -> AppResult<usize> {
     }
     let items = load_refresh_items(state, None, Some(&due), false).await?;
     debug!("Refreshing {} due feeds", due.len());
-    Ok(refresh_items(state, items).await)
-}
-
-/// Refresh these feeds for every subscriber now (a Podping announced an update). Failure backoff
-/// is skipped: the host says there's something new. Returns how many feeds were refreshed.
-pub async fn refresh_feed_urls(state: &AppState, urls: &[String]) -> AppResult<usize> {
-    if urls.is_empty() {
-        return Ok(0);
-    }
-    let items = load_refresh_items(state, Some(urls), None, true).await?;
     Ok(refresh_items(state, items).await)
 }
 

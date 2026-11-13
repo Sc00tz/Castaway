@@ -55,20 +55,13 @@
   },
   "discover": {
     "title": "Discover",
-    "stats_summary": "{hosts} hosts across {podcasts} podcasts",
     "empty_title": "Nothing to discover yet",
-    "empty_message": "Host data comes from the community PodPeopleDB.",
+    "empty_message": "Trending podcasts come from Podcast Index. If this stays empty, an admin can add a free Podcast Index key in Settings → Podcast Index.",
     "for_you": "For You",
     "for_you_empty": "Subscribe to a few podcasts and we'll suggest shows you might like here.",
     "trending": "Trending Now",
     "browse_by_category": "Browse by Category",
-    "all_categories": "All",
-    "hosts_section": "Discover Hosts",
-    "top_hosts": "Top Hosts",
-    "recently_added": "Recently Added",
-    "popular_podcasts": "Popular Podcasts",
-    "shows_count": "{count} shows",
-    "hosts_count": "{count} hosts"
+    "all_categories": "All"
   },
   "audio": {
     "chapters": "Chapters",
@@ -937,25 +930,6 @@
     "banner": "This podcast hasn't been updating.",
     "open": "Details"
   },
-  "update_services": {
-    "title": "Podcast update services",
-    "description": "The search service Castaway uses to find podcasts, and Podping, which tells Castaway when a feed has a new episode.",
-    "search_title": "Search service",
-    "reachable": "Answering ({ms} ms)",
-    "unreachable": "Not answering:",
-    "check_again": "Check again",
-    "podping_toggle": "Update feeds through Podping",
-    "podping_desc": "Podcast hosts announce new episodes over Podping. With this on, Castaway refreshes those feeds within a minute instead of at the next scheduled refresh. Castaway only reads the announcements from the search service; what you subscribe to is never sent.",
-    "relay": "Announcements from:",
-    "relay_following": "The relay is keeping up with Podping.",
-    "relay_behind": "The relay isn't keeping up with Podping right now.",
-    "relay_unavailable": "The relay isn't available:",
-    "client_stats": "{pings} announcements read and {feeds} feeds refreshed since Castaway started. Last read: {time}",
-    "last_error": "Last error:",
-    "never": "never",
-    "search_unavailable": "Search isn't available: Castaway can't reach the search service. An admin can check it under Settings → Admin → Podcast update services.",
-    "search_failed": "Search failed"
-  },
   "notification_center": {
     "active_tasks": "Active Tasks",
     "activity": "Activity",
@@ -1110,31 +1084,9 @@
     "google_scopes": "Google Scopes"
   },
   "people": {
-    "add_people": "Add people",
-    "add_title_podcast": "Who's on this show?",
-    "add_title_episode": "Who's on this episode?",
     "none_on_podcast": "No hosts listed yet.",
     "none_on_episode": "No one is credited on this episode yet.",
     "guests": "Guests",
-    "input_placeholder": "Type a name, or paste several: Alice, Bob and Carol",
-    "input_placeholder_more": "Add another…",
-    "new_person": "Add \"{name}\" as a new person",
-    "press_enter": "Press Enter",
-    "searching": "Searching…",
-    "role": "Role",
-    "role_host": "Host",
-    "role_cohost": "Co-host",
-    "role_guest": "Guest",
-    "add": "Add",
-    "add_count": "Add {count}",
-    "adding": "Adding…",
-    "cancel": "Cancel",
-    "remove": "Remove",
-    "need_a_name": "Type at least one name.",
-    "added_one": "Added {name}. Thanks for contributing!",
-    "added_many": "Added {count} people. Thanks for contributing!",
-    "shared_note": "Shared with PodPeopleDB so every Castaway user sees them. They show as unverified until someone reviews them.",
-    "unverified": "Unverified community submission",
     "follow": "Follow",
     "following": "Following",
     "unfollow": "Unfollow",
@@ -1151,7 +1103,7 @@
     "no_library_episodes": "No episodes with this person in your library yet.",
     "no_elsewhere_episodes": "No episodes found outside your library.",
     "person_not_found": "Person not found",
-    "person_not_found_message": "This person isn't known to this server or PodPeopleDB.",
+    "person_not_found_message": "This person isn't credited in any feed on this server.",
     "latest_episodes": "Latest episodes",
     "followed_empty_title": "You're not following anyone yet",
     "followed_empty_message": "Follow hosts and guests from a podcast or episode page, and their new episodes on any show will show up here."
@@ -1846,5 +1798,27 @@
     "save_error": "Could not save yt-dlp settings",
     "update_started": "Updating yt-dlp — this takes a few seconds.",
     "update_error": "Could not update yt-dlp"
+  },
+  "podcast_index": {
+    "title": "Podcast Index",
+    "description": "Castaway searches Apple Podcasts with no setup. Podcast Index search, person search, trending and categories need your own free API key from api.podcastindex.org. Searches go from this server straight to Podcast Index; the key never leaves the server.",
+    "status_label": "Status",
+    "configured": "A key is saved. Podcast Index search, person search and trending are on.",
+    "not_configured": "No key yet. Apple Podcasts search works; Podcast Index search, person search and trending are off.",
+    "key_label": "API key and secret",
+    "key_help": "Sign up for free at api.podcastindex.org, then paste the key and secret it gives you. Castaway checks them with Podcast Index before saving.",
+    "key_placeholder": "API key",
+    "secret_placeholder": "API secret",
+    "secret_saved_placeholder": "API secret (saved, enter it again to change)",
+    "save": "Save",
+    "remove": "Remove",
+    "saved": "Podcast Index key saved",
+    "removed": "Podcast Index key removed",
+    "search_unavailable": "Search isn't available right now.",
+    "search_failed": "Search failed"
+  },
+  "hide_played": {
+    "label": "Hide played",
+    "all_played": "Every episode here is played. Turn off Hide played to see them."
   }
 }

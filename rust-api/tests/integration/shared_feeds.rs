@@ -131,56 +131,6 @@ async fn feeds_without_subscribers_are_deleted() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn upgrading_creates_feeds_with_the_merged_refresh_state() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let (alice, bob) = (app.user("alice").await, app.user("bob").await);
-    let shared = app.feed("shared.xml", &Feed::with_episodes("Shared", 1));
-    let other = app.feed("other.xml", &Feed::with_episodes("Other", 1));
-    let a = app.subscribe(&alice, &shared, 1).await;
-    let b = app.subscribe(&bob, &shared, 1).await;
-    let c = app.subscribe(&bob, &other, 1).await;
-
-    // As before the upgrade: no feeds, each podcast with its own refresh state.
-    exec(&app, r#"DELETE FROM "Feeds""#).await;
-    exec(
-        &app,
-        &format!(
-            r#"UPDATE "Podcasts" SET NextRefreshAt = '2030-01-01 00:00:00', ConsecutiveFailures = 3, LastErrorKind = 'server',
-                      FeedContentHash = 'h1', FeedETag = NULL WHERE PodcastID = {a}"#
-        ),
-    )
-    .await;
-    exec(
-        &app,
-        &format!(
-            r#"UPDATE "Podcasts" SET NextRefreshAt = '2029-01-01 00:00:00', ConsecutiveFailures = 0, LastErrorKind = NULL,
-                      FeedContentHash = 'h1', FeedETag = 'e1' WHERE PodcastID = {b}"#
-        ),
-    )
-    .await;
-    exec(&app, &format!(r#"UPDATE "Podcasts" SET FeedContentHash = 'h2' WHERE PodcastID = {c}"#)).await;
-    rerun_migrations(&app, &["080"]).await;
-
-    let feed = feed_of(&app, a).await.expect("linked");
-    assert_eq!(feed_of(&app, b).await, Some(feed));
-    assert_ne!(feed_of(&app, c).await, Some(feed));
-    assert_eq!(feeds(&app).await, 2);
-    let merged = format!(
-        r#"SELECT COUNT(*) FROM "Feeds" WHERE FeedID = {feed} AND NextRefreshAt = '2029-01-01 00:00:00'
-           AND ConsecutiveFailures = 0 AND LastErrorKind IS NULL AND FeedContentHash = 'h1' AND FeedETag = 'e1'"#
-    );
-    assert_eq!(int(&app, &merged).await, Some(1), "earliest refresh, healthiest state, agreed hash");
-
-    // The server finds the feeds the upgrade created.
-    assert_eq!(app.db().link_feed(a).await.unwrap().map(i64::from), Some(feed));
-    assert_eq!(app.db().link_unlinked_feeds().await.unwrap(), 0);
-    assert_eq!(feeds(&app).await, 2);
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn other_subscribers_do_not_duplicate_a_users_lists() {
     let app = TestApp::new().await;
     let (alice, bob, carol) = (app.user("alice").await, app.user("bob").await, app.user("carol").await);

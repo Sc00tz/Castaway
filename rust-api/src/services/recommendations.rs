@@ -68,29 +68,14 @@ struct Candidate {
     tf: HashMap<String, f64>,
 }
 
-// Fetch category-filtered trending feeds from the search service. Degrades to an empty
-// list on any failure so recommendations never hard-fail on an upstream hiccup.
-async fn fetch_trending(cat: &str) -> Vec<serde_json::Value> {
-    let url = crate::handlers::podcasts::search_service_url("/api/trending");
+// Fetch category-filtered trending feeds from Podcast Index. Degrades to an empty list on any
+// failure (including no API key) so recommendations never hard-fail on an upstream hiccup.
+async fn fetch_trending(db: &DatabasePool, api: &crate::config::ApiConfig, cat: &str) -> Vec<serde_json::Value> {
     let params = [("cat", cat.to_string()), ("max", CANDIDATES_PER_CATEGORY.to_string())];
-    match reqwest::Client::new().get(&url).query(&params).send().await {
-        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
-            Ok(v) => v
-                .get("feeds")
-                .and_then(|f| f.as_array())
-                .cloned()
-                .unwrap_or_default(),
-            Err(e) => {
-                tracing::warn!("Failed to parse trending response for '{}': {}", cat, e);
-                Vec::new()
-            }
-        },
-        Ok(resp) => {
-            tracing::warn!("Trending request for '{}' returned {}", cat, resp.status());
-            Vec::new()
-        }
+    match crate::services::directory::podcast_index(db, api, "/podcasts/trending", &params).await {
+        Ok(v) => v.get("feeds").and_then(|f| f.as_array()).cloned().unwrap_or_default(),
         Err(e) => {
-            tracing::warn!("Trending request for '{}' failed: {}", cat, e);
+            tracing::warn!("Trending request for '{}' failed: {:?}", cat, e);
             Vec::new()
         }
     }
@@ -169,6 +154,7 @@ fn parse_candidate(feed: &serde_json::Value) -> Option<Candidate> {
 // new — callers should fall back to plain trending in that case.
 pub async fn generate_recommendations(
     db: &DatabasePool,
+    api: &crate::config::ApiConfig,
     user_id: i32,
     limit: usize,
 ) -> AppResult<Vec<RecommendedPodcast>> {
@@ -249,7 +235,7 @@ pub async fn generate_recommendations(
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new(); // dedup key across category fetches
     for (cat, _) in &top_cats {
-        for feed in fetch_trending(cat).await {
+        for feed in fetch_trending(db, api, cat).await {
             if let Some(c) = parse_candidate(&feed) {
                 // Skip already-subscribed feeds.
                 if let Some(id) = c.podcastindexid {

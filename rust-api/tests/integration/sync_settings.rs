@@ -144,7 +144,7 @@ async fn testing_a_connection_saves_nothing() {
     assert!(!bad["message"].as_str().unwrap().contains("wrong"), "{bad}");
 
     let ok = app.post("/api/sync/target/test").key(&user).json(&creds("gpodder", &mock, Some(REMOTE_PASS))).send().await.ok_json();
-    assert_eq!((ok["success"].as_bool(), ok["device_name"].as_str()), (Some(true), Some("pinepods")), "{ok}");
+    assert_eq!((ok["success"].as_bool(), ok["device_name"].as_str()), (Some(true), Some("castaway")), "{ok}");
     assert!(ok["devices"].is_array());
 
     let nc = app.post("/api/sync/target/test").key(&user).json(&creds("nextcloud", &mock, Some(REMOTE_PASS))).send().await.ok_json();
@@ -189,7 +189,7 @@ async fn target_setup_status_runs_and_removal() {
         t["last_success_at"].as_i64().is_some().then_some(t)
     })
     .await;
-    assert_eq!((synced["needs_full_sync"].as_bool(), synced["device_name"].as_str()), (Some(false), Some("pinepods")), "{synced}");
+    assert_eq!((synced["needs_full_sync"].as_bool(), synced["device_name"].as_str()), (Some(false), Some("castaway")), "{synced}");
     assert!(mock.subscriptions(REMOTE_USER).contains(&feed));
 
     // The stored password is never sent back.
@@ -295,7 +295,7 @@ async fn old_routes_keep_their_shapes() {
     assert_eq!((user_stats["Pod_Sync_Type"].as_str(), user_stats["GpodderUrl"].as_str()), (Some("gpodder"), Some(mock.base_url.as_str())));
     assert_eq!((user_stats["SyncServerEnabled"].as_bool(), user_stats["SyncTargetKind"].as_str()), (Some(false), Some("gpodder")));
     let devices = app.get("/api/gpodder/devices").key(&user).send().await.ok_json();
-    assert!(devices.as_array().unwrap().iter().any(|d| d["id"] == "pinepods" && d["is_default"] == true), "{devices}");
+    assert!(devices.as_array().unwrap().iter().any(|d| d["id"] == "castaway" && d["is_default"] == true), "{devices}");
     let stats = app.get("/api/gpodder/gpodder_statistics").key(&user).send().await.ok_json();
     assert_eq!((stats["server_url"].as_str(), stats["connection_status"].as_str()), (Some(mock.base_url.as_str()), Some("Connected")), "{stats}");
     assert_eq!(stats["total_subscriptions"], 1);

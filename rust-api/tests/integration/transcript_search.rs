@@ -97,14 +97,6 @@ async fn insert_generated(app: &TestApp, episode_id: i32, text: &str, segments: 
             r#"INSERT INTO "EpisodeTranscripts" (episodeid, source, model, transcripttext, segments, status) VALUES ($1, 'generated', 'base', $2, $3::jsonb, 'complete')"#,
         )
         .bind(episode_id).bind(text).bind(segments).execute(pool).await.map(|_| ()),
-        DatabasePool::Sqlite(pool) => sqlx::query(
-            r#"INSERT INTO "EpisodeTranscripts" (episodeid, source, model, transcripttext, segments, status) VALUES ($1, 'generated', 'base', $2, $3, 'complete')"#,
-        )
-        .bind(episode_id).bind(text).bind(segments).execute(pool).await.map(|_| ()),
-        DatabasePool::MySQL(pool) => sqlx::query(
-            "INSERT INTO EpisodeTranscripts (EpisodeID, Source, Model, TranscriptText, Segments, Status) VALUES (?, 'generated', 'base', ?, ?, 'complete')",
-        )
-        .bind(episode_id).bind(text).bind(segments).execute(pool).await.map(|_| ()),
     }
     .unwrap();
 }

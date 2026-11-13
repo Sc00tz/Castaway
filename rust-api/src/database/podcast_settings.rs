@@ -18,18 +18,6 @@ impl DatabasePool {
                     Ok(false)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT AutoDownloadEpisodes FROM Users WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                    
-                if let Some(row) = row {
-                    Ok(row.try_get::<bool, _>("AutoDownloadEpisodes")?)
-                } else {
-                    Ok(false)
-                }
-            },
         })
     }
 
@@ -38,14 +26,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET playbackspeed = $1, playbackspeedcustomized = TRUE WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(playback_speed)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET PlaybackSpeed = ?, PlaybackSpeedCustomized = TRUE WHERE PodcastID = ? AND UserID = ?")
                     .bind(playback_speed)
                     .bind(podcast_id)
                     .bind(user_id)
@@ -66,13 +46,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET PlaybackSpeed = 1.0, PlaybackSpeedCustomized = FALSE WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -82,14 +55,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET autodownloaddeletedays = $1, autodownloaddeletecustomized = TRUE WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(days)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET AutoDownloadDeleteDays = ?, AutoDownloadDeleteCustomized = TRUE WHERE PodcastID = ? AND UserID = ?")
                     .bind(days)
                     .bind(podcast_id)
                     .bind(user_id)
@@ -110,13 +75,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET AutoDownloadDeleteDays = 0, AutoDownloadDeleteCustomized = FALSE WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -126,14 +84,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET autodownload = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(auto_download)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET AutoDownload = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(auto_download)
                     .bind(podcast_id)
                     .bind(user_id)
@@ -155,14 +105,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET AutoPlayNext = ? WHERE PodcastID = ? AND UserID = ?")
-                    .bind(auto_play_next)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -172,14 +114,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET autoqueue = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(auto_queue)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET AutoQueue = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(auto_queue)
                     .bind(podcast_id)
                     .bind(user_id)
@@ -201,13 +135,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?
             },
-            mysql(pool) => {
-                sqlx::query_scalar::<_, Option<bool>>("SELECT RefreshPodcast FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?
-            },
         });
         Ok(enabled.map(|e| e.unwrap_or(true)))
     }
@@ -223,16 +150,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?
                     .rows_affected()
-            },
-            mysql(pool) => {
-                // MySQL counts only changed rows: check the row exists instead.
-                sqlx::query("UPDATE Podcasts SET RefreshPodcast = ? WHERE PodcastID = ? AND UserID = ?")
-                    .bind(enabled)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                u64::from(self.get_auto_refresh(podcast_id, user_id).await?.is_some())
             },
         });
         Ok(updated > 0)
@@ -255,28 +172,6 @@ impl DatabasePool {
                 
                 // Update notifications setting
                 let result = q::query(r#"UPDATE "Podcasts" SET notificationsenabled = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(enabled)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                // First verify user owns the podcast
-                let row = sqlx::query("SELECT 1 FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if row.is_none() {
-                    return Ok(false);
-                }
-                
-                // Update notifications setting
-                let result = sqlx::query("UPDATE Podcasts SET NotificationsEnabled = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(enabled)
                     .bind(podcast_id)
                     .bind(user_id)
@@ -308,23 +203,6 @@ impl DatabasePool {
                     .await?;
                 Ok(result.rows_affected() > 0)
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT 1 FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                if row.is_none() {
-                    return Ok(false);
-                }
-                let result = sqlx::query("UPDATE Podcasts SET IsFavorite = ? WHERE PodcastID = ? AND UserID = ?")
-                    .bind(is_favorite)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                Ok(result.rows_affected() > 0)
-            },
         })
     }
 
@@ -339,14 +217,6 @@ impl DatabasePool {
                     .await?;
                 Ok(row.map(|r| r.try_get::<bool, _>("isfavorite").unwrap_or(false)).unwrap_or(false))
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT COALESCE(IsFavorite, false) as isfavorite FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(row.map(|r| r.try_get::<bool, _>("isfavorite").unwrap_or(false)).unwrap_or(false))
-            },
         })
     }
 
@@ -355,15 +225,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET startskip = $1, endskip = $2 WHERE podcastid = $3 AND userid = $4"#)
-                    .bind(start_skip)
-                    .bind(end_skip)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET StartSkip = ?, EndSkip = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(start_skip)
                     .bind(end_skip)
                     .bind(podcast_id)
@@ -406,34 +267,6 @@ impl DatabasePool {
                         .await?;
                 }
             },
-            mysql(pool) => {
-                // Fetch current categories
-                let row = sqlx::query("SELECT Categories FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let current_categories_str: String = row.try_get("Categories").unwrap_or_default();
-                    let mut categories = self.parse_categories_json(&current_categories_str).unwrap_or_default();
-                    
-                    // Remove the category by value (find and remove the key with this value)
-                    categories.retain(|_key, value| value != category);
-                    
-                    // Convert back to JSON string
-                    let new_categories_json = serde_json::to_string(&categories)
-                        .unwrap_or_else(|_| "{}".to_string());
-                    
-                    // Update with new categories
-                    sqlx::query("UPDATE Podcasts SET Categories = ? WHERE PodcastID = ? AND UserID = ?")
-                        .bind(&new_categories_json)
-                        .bind(podcast_id)
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                }
-            },
         });
         Ok(())
     }
@@ -463,32 +296,6 @@ impl DatabasePool {
                     let new_categories_json = serde_json::to_string(&categories)
                         .unwrap_or_else(|_| "{}".to_string());
                     q::query(r#"UPDATE "Podcasts" SET categories = $1 WHERE podcastid = $2"#)
-                        .bind(&new_categories_json)
-                        .bind(podcast_id)
-                        .execute(pool)
-                        .await?;
-                    cleaned += 1;
-                }
-            },
-            mysql(pool) => {
-                let rows = sqlx::query(r#"SELECT PodcastID, Categories FROM Podcasts"#)
-                    .fetch_all(pool)
-                    .await?;
-
-                for row in rows {
-                    let podcast_id: i32 = row.try_get("PodcastID")?;
-                    let current_categories_str: String = row.try_get("Categories").unwrap_or_default();
-                    let mut categories = self.parse_categories_json(&current_categories_str).unwrap_or_default();
-
-                    let before = categories.len();
-                    categories.retain(|_key, value| !value.trim().is_empty());
-                    if categories.len() == before {
-                        continue;
-                    }
-
-                    let new_categories_json = serde_json::to_string(&categories)
-                        .unwrap_or_else(|_| "{}".to_string());
-                    sqlx::query("UPDATE Podcasts SET Categories = ? WHERE PodcastID = ?")
                         .bind(&new_categories_json)
                         .bind(podcast_id)
                         .execute(pool)
@@ -553,53 +360,6 @@ impl DatabasePool {
                     Err(AppError::not_found("Podcast not found"))
                 }
             },
-            mysql(pool) => {
-                // Fetch current categories
-                let row = sqlx::query("SELECT Categories FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let current_categories_str: String = row.try_get("Categories").unwrap_or_default();
-                    let mut categories = self.parse_categories_json(&current_categories_str).unwrap_or_default();
-                    
-                    // Check if category already exists
-                    if categories.values().any(|v| v == category) {
-                        return Ok("Category already exists.".to_string());
-                    }
-                    
-                    // Add new category with a generated key (use the next available number)
-                    let next_key = if categories.is_empty() {
-                        "1".to_string()
-                    } else {
-                        let max_key = categories.keys()
-                            .filter_map(|k| k.parse::<i32>().ok())
-                            .max()
-                            .unwrap_or(0);
-                        (max_key + 1).to_string()
-                    };
-                    
-                    categories.insert(next_key, category.to_string());
-                    
-                    // Convert back to JSON string
-                    let new_categories_json = serde_json::to_string(&categories)
-                        .unwrap_or_else(|_| "{}".to_string());
-                    
-                    // Update with new categories
-                    sqlx::query("UPDATE Podcasts SET Categories = ? WHERE PodcastID = ? AND UserID = ?")
-                        .bind(&new_categories_json)
-                        .bind(podcast_id)
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                    
-                    Ok("Category added!".to_string())
-                } else {
-                    Err(AppError::not_found("Podcast not found"))
-                }
-            },
         })
     }
 
@@ -615,20 +375,6 @@ impl DatabasePool {
                     
                 if let Some(row) = row {
                     let result: Option<bool> = row.try_get("autodownload")?;
-                    Ok(result)
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT AutoDownload FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                    
-                if let Some(row) = row {
-                    let result: Option<bool> = row.try_get("AutoDownload")?;
                     Ok(result)
                 } else {
                     Ok(None)
@@ -654,20 +400,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT AutoQueue FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = row {
-                    let result: Option<bool> = row.try_get("AutoQueue")?;
-                    Ok(result)
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -683,20 +415,6 @@ impl DatabasePool {
 
                 if let Some(row) = row {
                     let result: Option<bool> = row.try_get("autoplaynext")?;
-                    Ok(result)
-                } else {
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT AutoPlayNext FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if let Some(row) = row {
-                    let result: Option<bool> = row.try_get("AutoPlayNext")?;
                     Ok(result)
                 } else {
                     Ok(None)
@@ -722,20 +440,6 @@ impl DatabasePool {
                     Ok(None)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT FeedCutoffDays FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                    
-                if let Some(row) = row {
-                    let result: Option<i32> = row.try_get("FeedCutoffDays")?;
-                    Ok(result.or(Some(365))) // Default to 365 if null
-                } else {
-                    Ok(None)
-                }
-            },
         })
     }
 
@@ -744,14 +448,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET autodeleteoncomplete = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(enabled)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET AutoDeleteOnComplete = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(enabled)
                     .bind(podcast_id)
                     .bind(user_id)
@@ -773,14 +469,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET UsePodcastCovers = ?, UsePodcastCoversCustomized = 1 WHERE PodcastID = ? AND UserID = ?")
-                    .bind(use_podcast_covers as i32)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -790,13 +478,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET usepodcastcovers = FALSE, usepodcastcoverscustomized = FALSE WHERE podcastid = $1 AND userid = $2"#)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET UsePodcastCovers = 0, UsePodcastCoversCustomized = 0 WHERE PodcastID = ? AND UserID = ?")
                     .bind(podcast_id)
                     .bind(user_id)
                     .execute(pool)
@@ -816,14 +497,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?;
                 Ok(result.flatten())
-            },
-            mysql(pool) => {
-                let result = sqlx::query_scalar::<_, Option<i32>>("SELECT UsePodcastCovers FROM Podcasts WHERE PodcastID = ? AND UserID = ? AND UsePodcastCoversCustomized = 1")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                Ok(result.flatten().map(|val| val != 0))
             },
         })
     }
@@ -848,24 +521,6 @@ impl DatabasePool {
                     Ok(false)
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query("
-                    SELECT NotificationsEnabled
-                    FROM Podcasts
-                    WHERE PodcastID = ? AND UserID = ?
-                ")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let enabled: i8 = row.try_get("NotificationsEnabled").unwrap_or(0);
-                    Ok(enabled != 0)
-                } else {
-                    Ok(false)
-                }
-            },
         })
     }
 
@@ -886,28 +541,6 @@ impl DatabasePool {
 
                 // Update the feed cutoff days
                 let result = q::query(r#"UPDATE "Podcasts" SET feedcutoffdays = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(feed_cutoff_days)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                // First verify podcast exists and belongs to user
-                let existing = sqlx::query("SELECT PodcastID FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                if existing.is_none() {
-                    return Ok(false);
-                }
-
-                // Update the feed cutoff days
-                let result = sqlx::query("UPDATE Podcasts SET FeedCutoffDays = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(feed_cutoff_days)
                     .bind(podcast_id)
                     .bind(user_id)

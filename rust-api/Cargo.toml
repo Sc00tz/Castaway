@@ -21,7 +21,7 @@ utoipa-axum = "0.3.0"
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 
 # Database
-sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls", "postgres", "mysql", "sqlite", "uuid", "chrono", "json", "bigdecimal"] }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json", "bigdecimal"] }
 bigdecimal = "0.4.11"
 
 # Redis/Valkey
@@ -72,6 +72,7 @@ id3 = "1.17.2"
 mp3-metadata = "0.4.0"
 quick-xml = "0.42.0"
 unicode-normalization = "0.1.26"
+sha1 = "0.11.0"
 sha2 = "0.11.1"
 hex = "0.4.3"
 pbkdf2 = { version = "0.13.0", default-features = false, features = ["hmac"] }

@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use sha2::{Digest, Sha256};
-use sqlx::{MySqlConnection, Row};
+
+use sqlx::Row;
 
 use super::model::{ActionKind, EpisodeAction};
 use super::resolver::ResolveKey;
@@ -18,12 +18,9 @@ use crate::database::dialect::{dialect_fn, dialect_match};
 // start, so CLOCK_TIMESTAMP(); FLOOR because a plain ::bigint cast rounds to nearest.
 const PG_NOW: &str = "(SELECT FLOOR(EXTRACT(EPOCH FROM CLOCK_TIMESTAMP()))::BIGINT AS t) n";
 
-// Rows per resolver query; MySQL binds 7 values per key and caps a statement at 65535.
+// Rows per resolver query.
 const RESOLVE_CHUNK: usize = 500;
 
-fn sha256_hex(s: &str) -> String {
-    hex::encode(Sha256::digest(s.as_bytes()))
-}
 
 /// Local state of one episode for one user, as apply needs it.
 #[derive(Debug, Clone)]
@@ -62,7 +59,7 @@ pub struct LoggedAction {
 }
 
 fn device_name_candidates(user_id: i32) -> [String; 3] {
-    [PINEPODS_DEVICE_NAME.to_string(), "pinepods-server".to_string(), format!("pinepods-{user_id}")]
+    [PINEPODS_DEVICE_NAME.to_string(), "castaway-server".to_string(), format!("castaway-{user_id}")]
 }
 
 fn legacy_device_name(user_id: i32) -> String {
@@ -86,7 +83,7 @@ pub struct LockedTargets {
 // this first: the external sync engine advances a push cursor under an exclusive lock on the
 // same rows, after re-reading what it sent, so a row written or rewritten while it pushed is
 // never skipped.
-dialect_fn!([pg_lock_targets_shared, lite_lock_targets_shared]
+dialect_fn!([pg_lock_targets_shared]
     pub async fn(conn: &mut q::Conn, user_id: i32) -> AppResult<LockedTargets> {
     let rows: Vec<(i64, bool)> = q::query_as(r#"SELECT actionspushcursor, enabled FROM "SyncTargets" WHERE userid = $1 FOR SHARE"#)
         .bind(user_id)
@@ -94,14 +91,6 @@ dialect_fn!([pg_lock_targets_shared, lite_lock_targets_shared]
         .await?;
     Ok(locked(rows))
 });
-
-pub async fn mysql_lock_targets_shared(conn: &mut MySqlConnection, user_id: i32) -> AppResult<LockedTargets> {
-    let rows: Vec<(i64, bool)> = sqlx::query_as("SELECT ActionsPushCursor, Enabled FROM SyncTargets WHERE UserID = ? LOCK IN SHARE MODE")
-        .bind(user_id)
-        .fetch_all(&mut *conn)
-        .await?;
-    Ok(locked(rows))
-}
 
 fn locked(rows: Vec<(i64, bool)>) -> LockedTargets {
     LockedTargets {
@@ -114,7 +103,7 @@ fn locked(rows: Vec<(i64, bool)>) -> LockedTargets {
 // (`pinepods-internal-<uid>`) is claimed if nothing has the role yet, so Castaway keeps one
 // device. A client may already own the name `pinepods` (UNIQUE(UserID, DeviceName)), so other
 // names are tried after it.
-dialect_fn!([pg_pinepods_device, lite_pinepods_device]
+dialect_fn!([pg_pinepods_device]
     pub async fn(conn: &mut q::Conn, user_id: i32) -> AppResult<i32> {
     let by_role = r#"SELECT deviceid FROM "GpodderDevices" WHERE userid = $1 AND systemrole = 'pinepods'"#;
     if let Some(id) = q::query_scalar::<i32>(by_role).bind(user_id).fetch_optional(&mut *conn).await? {
@@ -158,54 +147,10 @@ dialect_fn!([pg_pinepods_device, lite_pinepods_device]
     Err(AppError::internal(&format!("no free device name for user {user_id}'s pinepods device")))
 });
 
-pub async fn mysql_pinepods_device(conn: &mut MySqlConnection, user_id: i32) -> AppResult<i32> {
-    let by_role = "SELECT DeviceID FROM GpodderDevices WHERE UserID = ? AND SystemRole = 'pinepods'";
-    if let Some(id) = sqlx::query_scalar::<_, i32>(by_role).bind(user_id).fetch_optional(&mut *conn).await? {
-        return Ok(id);
-    }
-    let legacy: Option<i32> = sqlx::query_scalar(
-        "SELECT DeviceID FROM GpodderDevices WHERE UserID = ? AND DeviceName = ? AND SystemRole IS NULL",
-    )
-    .bind(user_id)
-    .bind(legacy_device_name(user_id))
-    .fetch_optional(&mut *conn)
-    .await?;
-    if let Some(id) = legacy {
-        // The unique (UserID, SystemRole) index makes a racing claim fail instead of doubling up.
-        let claimed = sqlx::query("UPDATE IGNORE GpodderDevices SET SystemRole = 'pinepods' WHERE DeviceID = ? AND SystemRole IS NULL")
-            .bind(id)
-            .execute(&mut *conn)
-            .await?;
-        if claimed.rows_affected() == 1 {
-            return Ok(id);
-        }
-    }
-    for name in device_name_candidates(user_id) {
-        let created = sqlx::query(
-            "INSERT IGNORE INTO GpodderDevices (UserID, DeviceName, DeviceType, DeviceCaption, IsDefault, IsActive, SystemRole)
-             VALUES (?, ?, ?, ?, FALSE, TRUE, ?)",
-        )
-        .bind(user_id)
-        .bind(&name)
-        .bind(PINEPODS_DEVICE_TYPE)
-        .bind(PINEPODS_DEVICE_CAPTION)
-        .bind(PINEPODS_ROLE)
-        .execute(&mut *conn)
-        .await?;
-        if created.rows_affected() == 1 {
-            return Ok(created.last_insert_id() as i32);
-        }
-        if let Some(id) = sqlx::query_scalar::<_, i32>(by_role).bind(user_id).fetch_optional(&mut *conn).await? {
-            return Ok(id);
-        }
-    }
-    Err(AppError::internal(&format!("no free device name for user {user_id}'s pinepods device")))
-}
-
-dialect_fn!([pg_log_subscription, lite_log_subscription]
+dialect_fn!([pg_log_subscription]
     pub async fn(conn: &mut q::Conn, user_id: i32, feed_url: &str, action: &str) -> AppResult<bool> {
-    let targets = q::pick(pg_lock_targets_shared, lite_lock_targets_shared)(conn, user_id).await?;
-    let device_id = q::pick(pg_pinepods_device, lite_pinepods_device)(conn, user_id).await?;
+    let targets = pg_lock_targets_shared(conn, user_id).await?;
+    let device_id = pg_pinepods_device(conn, user_id).await?;
     q::query(sqlx::AssertSqlSafe(format!(
         r#"INSERT INTO "GpodderSyncSubscriptions" (userid, deviceid, podcasturl, action, timestamp, serverts, origin)
            SELECT $1, $2, $3, $4, n.t, n.t, 'pinepods' FROM {PG_NOW}"#
@@ -219,23 +164,7 @@ dialect_fn!([pg_log_subscription, lite_log_subscription]
     Ok(targets.any_enabled)
 });
 
-pub async fn mysql_log_subscription(conn: &mut MySqlConnection, user_id: i32, feed_url: &str, action: &str) -> AppResult<bool> {
-    let targets = mysql_lock_targets_shared(conn, user_id).await?;
-    let device_id = mysql_pinepods_device(conn, user_id).await?;
-    sqlx::query(
-        "INSERT INTO GpodderSyncSubscriptions (UserID, DeviceID, PodcastURL, Action, Timestamp, ServerTs, Origin)
-         VALUES (?, ?, ?, ?, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 'pinepods')",
-    )
-    .bind(user_id)
-    .bind(device_id)
-    .bind(feed_url)
-    .bind(action)
-    .execute(&mut *conn)
-    .await?;
-    Ok(targets.any_enabled)
-}
-
-dialect_fn!([pg_episode_for_event, lite_episode_for_event]
+dialect_fn!([pg_episode_for_event]
     pub async fn(conn: &mut q::Conn, user_id: i32, episode_id: i32) -> AppResult<Option<EpisodeForEvent>> {
     let row = q::query(
         r#"SELECT p.feedurl, p.username, p.password, COALESCE(p.isyoutubechannel, FALSE) AS yt,
@@ -261,31 +190,6 @@ dialect_fn!([pg_episode_for_event, lite_episode_for_event]
     }))
 });
 
-pub async fn mysql_episode_for_event(conn: &mut MySqlConnection, user_id: i32, episode_id: i32) -> AppResult<Option<EpisodeForEvent>> {
-    let row = sqlx::query(
-        "SELECT p.FeedURL, p.Username, p.Password, p.IsYouTubeChannel AS yt,
-                e.EpisodeURL, e.EpisodeGUID, e.EpisodeDuration
-         FROM Episodes e JOIN Podcasts p ON p.FeedID = e.FeedID
-         WHERE e.EpisodeID = ? AND p.UserID = ?",
-    )
-    .bind(episode_id)
-    .bind(user_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let Some(row) = row else { return Ok(None) };
-    let feed_url: String = row.try_get::<Option<String>, _>("FeedURL")?.unwrap_or_default();
-    let username: Option<String> = row.try_get("Username")?;
-    let password: Option<String> = row.try_get("Password")?;
-    let yt: bool = row.try_get::<Option<bool>, _>("yt")?.unwrap_or(false);
-    Ok(Some(EpisodeForEvent {
-        shareable: super::shareable_feed(&feed_url, username.as_deref(), password.as_deref(), yt),
-        feed_url,
-        episode_url: row.try_get::<Option<String>, _>("EpisodeURL")?.unwrap_or_default(),
-        guid: row.try_get::<Option<String>, _>("EpisodeGUID")?.filter(|g| !g.is_empty()),
-        duration: row.try_get("EpisodeDuration")?,
-    }))
-}
-
 /// `(position, total)` for a play event, or None when there's nothing worth sending.
 fn play_values(ep: &EpisodeForEvent, event: EpisodeEvent) -> Option<(i32, i32)> {
     let duration = ep.duration.filter(|d| *d > 0);
@@ -301,11 +205,11 @@ fn play_values(ep: &EpisodeForEvent, event: EpisodeEvent) -> Option<(i32, i32)> 
 // row for the episode (coalescing: playback saves every few seconds) and bump its timestamps so
 // cursor readers see it again; otherwise a new row is inserted. "Unpushed" means above every
 // target's ActionsPushCursor, so an external target never misses a position.
-dialect_fn!([pg_log_episode, lite_log_episode]
+dialect_fn!([pg_log_episode]
     pub async fn(conn: &mut q::Conn, user_id: i32, episode_id: i32, ep: &EpisodeForEvent, event: EpisodeEvent) -> AppResult<bool> {
-    let targets = q::pick(pg_lock_targets_shared, lite_lock_targets_shared)(conn, user_id).await?;
+    let targets = pg_lock_targets_shared(conn, user_id).await?;
     let pushed = targets.max_push_cursor;
-    let device_id = q::pick(pg_pinepods_device, lite_pinepods_device)(conn, user_id).await?;
+    let device_id = pg_pinepods_device(conn, user_id).await?;
     if let EpisodeEvent::New = event {
         q::query(sqlx::AssertSqlSafe(format!(
             r#"INSERT INTO "GpodderSyncEpisodeActions"
@@ -373,77 +277,6 @@ dialect_fn!([pg_log_episode, lite_log_episode]
     Ok(targets.any_enabled)
 });
 
-pub async fn mysql_log_episode(conn: &mut MySqlConnection, user_id: i32, episode_id: i32, ep: &EpisodeForEvent, event: EpisodeEvent) -> AppResult<bool> {
-    let targets = mysql_lock_targets_shared(conn, user_id).await?;
-    let pushed = targets.max_push_cursor;
-    let device_id = mysql_pinepods_device(conn, user_id).await?;
-    if let EpisodeEvent::New = event {
-        sqlx::query(
-            "INSERT INTO GpodderSyncEpisodeActions
-               (UserID, DeviceID, PodcastURL, EpisodeURL, Action, Timestamp, ServerTs, Guid, EpisodeID, Origin)
-             VALUES (?, ?, ?, ?, 'new', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), ?, ?, 'pinepods')",
-        )
-        .bind(user_id)
-        .bind(device_id)
-        .bind(&ep.feed_url)
-        .bind(&ep.episode_url)
-        .bind(&ep.guid)
-        .bind(episode_id)
-        .execute(&mut *conn)
-        .await?;
-        return Ok(targets.any_enabled);
-    }
-    let Some((position, total)) = play_values(ep, event) else { return Ok(false) };
-    let latest = sqlx::query(
-        "SELECT a.ActionID, a.Action FROM GpodderSyncEpisodeActions a
-         WHERE a.EpisodeID = ? AND a.UserID = ? AND a.Origin = 'pinepods' AND a.ActionID > ?
-         ORDER BY a.ActionID DESC LIMIT 1",
-    )
-    .bind(episode_id)
-    .bind(user_id)
-    .bind(pushed)
-    .fetch_optional(&mut *conn)
-    .await?;
-    if let Some(row) = latest {
-        let action: String = row.try_get("Action")?;
-        if action == "play" {
-            let action_id: i32 = row.try_get("ActionID")?;
-            sqlx::query(
-                "UPDATE GpodderSyncEpisodeActions
-                 SET Started = 0, Position = ?, Total = ?, Timestamp = UNIX_TIMESTAMP(), ServerTs = UNIX_TIMESTAMP(),
-                     DeviceID = ?, PodcastURL = ?, EpisodeURL = ?, Guid = ?
-                 WHERE ActionID = ?",
-            )
-            .bind(position)
-            .bind(total)
-            .bind(device_id)
-            .bind(&ep.feed_url)
-            .bind(&ep.episode_url)
-            .bind(&ep.guid)
-            .bind(action_id)
-            .execute(&mut *conn)
-            .await?;
-            return Ok(targets.any_enabled);
-        }
-    }
-    sqlx::query(
-        "INSERT INTO GpodderSyncEpisodeActions
-           (UserID, DeviceID, PodcastURL, EpisodeURL, Action, Timestamp, ServerTs, Started, Position, Total, Guid, EpisodeID, Origin)
-         VALUES (?, ?, ?, ?, 'play', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), 0, ?, ?, ?, ?, 'pinepods')",
-    )
-    .bind(user_id)
-    .bind(device_id)
-    .bind(&ep.feed_url)
-    .bind(&ep.episode_url)
-    .bind(position)
-    .bind(total)
-    .bind(&ep.guid)
-    .bind(episode_id)
-    .execute(&mut *conn)
-    .await?;
-    Ok(targets.any_enabled)
-}
-
 // ---------------------------------------------------------------------------------------------
 // Pool-level queries
 // ---------------------------------------------------------------------------------------------
@@ -460,15 +293,6 @@ impl DatabasePool {
             .bind(user_id)
             .fetch_optional(pool)
             .await?,
-            mysql(pool) => sqlx::query_scalar::<_, i64>(
-                "SELECT (u.GpodderServerEnabled
-                         OR EXISTS (SELECT 1 FROM SyncTargets t WHERE t.UserID = u.UserID AND t.Enabled)) + 0
-                 FROM Users u WHERE u.UserID = ?",
-            )
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await?
-            .map(|v| v != 0),
         });
         Ok(enabled.unwrap_or(false))
     }
@@ -506,44 +330,6 @@ impl DatabasePool {
                     .await?;
                     rows.iter()
                         .map(|r| Ok((r.try_get::<i64, _>("idx")? as usize - 1, r.try_get::<Option<i32>, _>("episode_id")?)))
-                        .collect::<AppResult<Vec<_>>>()?
-                },
-                mysql(pool) => {
-                    // No arrays: the keys become a derived table. Hashes are computed here so the
-                    // lookups hit the EpisodeURLHash / EpisodeGUIDHash indexes ('' = no guid).
-                    let row_sql = "SELECT ? AS idx, ? AS purl, ? AS eurl, ? AS base, ? AS ghash, ? AS uhash, ? AS bhash";
-                    let derived = vec![row_sql; chunk.len()].join(" UNION ALL ");
-                    let sql = format!(
-                        "SELECT d.idx, COALESCE(
-                           (SELECT MIN(e.EpisodeID) FROM Episodes e JOIN Podcasts p ON p.FeedID = e.FeedID
-                             WHERE p.UserID = ? AND p.FeedURL = d.purl AND d.ghash <> '' AND e.EpisodeGUIDHash = d.ghash),
-                           (SELECT MIN(e.EpisodeID) FROM Episodes e JOIN Podcasts p ON p.FeedID = e.FeedID
-                             WHERE p.UserID = ? AND e.EpisodeURLHash = d.uhash AND e.EpisodeURL = d.eurl),
-                           (SELECT MIN(e.EpisodeID) FROM Episodes e JOIN Podcasts p ON p.FeedID = e.FeedID
-                             WHERE p.UserID = ? AND d.base <> d.eurl AND e.EpisodeURLHash = d.bhash AND e.EpisodeURL = d.base),
-                           (SELECT MIN(e.EpisodeID) FROM Episodes e JOIN Podcasts p ON p.FeedID = e.FeedID
-                             WHERE p.UserID = ? AND p.FeedURL = d.purl AND SUBSTRING_INDEX(e.EpisodeURL, '?', 1) = d.base)
-                         ) AS episode_id
-                         FROM ({derived}) d"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql));
-                    for _ in 0..4 {
-                        q = q.bind(user_id);
-                    }
-                    for (i, k) in chunk.iter().enumerate() {
-                        let base = super::resolver::url_base(k.episode_url);
-                        q = q
-                            .bind(i as i64)
-                            .bind(k.podcast_url)
-                            .bind(k.episode_url)
-                            .bind(base)
-                            .bind(k.guid.map(sha256_hex).unwrap_or_default())
-                            .bind(sha256_hex(k.episode_url))
-                            .bind(sha256_hex(base));
-                    }
-                    let rows = q.fetch_all(pool).await?;
-                    rows.iter()
-                        .map(|r| Ok((r.try_get::<i64, _>("idx")? as usize, r.try_get::<Option<i32>, _>("episode_id")?)))
                         .collect::<AppResult<Vec<_>>>()?
                 },
             });
@@ -587,33 +373,6 @@ impl DatabasePool {
                     );
                 }
             },
-            mysql(pool) => {
-                for chunk in episode_ids.chunks(1000) {
-                    let marks = vec!["?"; chunk.len()].join(",");
-                    let sql = format!(
-                        "SELECT e.EpisodeID, e.EpisodeDuration, COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = e.EpisodeID AND ues.UserID = p.UserID), 0) AS Completed, h.ListenDuration, h.ListenDate
-                         FROM Episodes e
-                         JOIN Podcasts p ON p.FeedID = e.FeedID AND p.UserID = ?
-                         LEFT JOIN UserEpisodeHistory h ON h.EpisodeID = e.EpisodeID AND h.UserID = ?
-                         WHERE e.EpisodeID IN ({marks})"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(user_id).bind(user_id);
-                    for id in chunk {
-                        q = q.bind(id);
-                    }
-                    for r in q.fetch_all(pool).await? {
-                        out.insert(
-                            r.try_get("EpisodeID")?,
-                            LocalEpisodeState {
-                                duration: r.try_get("EpisodeDuration")?,
-                                completed: r.try_get::<Option<bool>, _>("Completed")?.unwrap_or(false),
-                                position: r.try_get("ListenDuration")?,
-                                listen_date: r.try_get::<Option<NaiveDateTime>, _>("ListenDate")?.map(|d| d.and_utc()),
-                            },
-                        );
-                    }
-                }
-            },
         });
         Ok(out)
     }
@@ -638,25 +397,7 @@ impl DatabasePool {
                 .execute(&mut *tx)
                 .await?;
                 if log {
-                    q::pick(super::events::episode_pg, super::events::episode_lite)(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(position)).await;
-                }
-                tx.commit().await?;
-            },
-            mysql(pool) => {
-                let mut tx = super::events::begin_mysql(pool, user_id, log).await?;
-                sqlx::query(
-                    "INSERT INTO UserEpisodeHistory (UserID, EpisodeID, ListenDate, ListenDuration)
-                     VALUES (?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE ListenDuration = VALUES(ListenDuration), ListenDate = VALUES(ListenDate)",
-                )
-                .bind(user_id)
-                .bind(episode_id)
-                .bind(at)
-                .bind(position)
-                .execute(&mut *tx)
-                .await?;
-                if log {
-                    super::events::episode_mysql(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(position)).await;
+                    super::events::episode_pg(self, &mut tx, user_id, episode_id, EpisodeEvent::Progress(position)).await;
                 }
                 tx.commit().await?;
             },
@@ -677,14 +418,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE UserEpisodeHistory SET ListenDate = ? WHERE UserID = ? AND EpisodeID = ?")
-                    .bind(at)
-                    .bind(user_id)
-                    .bind(episode_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -699,7 +432,7 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
-                q::pick(pg_lock_targets_shared, lite_lock_targets_shared)(&mut tx, user_id).await?;
+                pg_lock_targets_shared(&mut tx, user_id).await?;
                 let now: i64 = q::query_scalar("SELECT FLOOR(EXTRACT(EPOCH FROM CLOCK_TIMESTAMP()))::BIGINT")
                     .fetch_one(&mut *tx)
                     .await?;
@@ -727,37 +460,6 @@ impl DatabasePool {
                 .await?;
                 tx.commit().await?;
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                mysql_lock_targets_shared(&mut tx, user_id).await?;
-                let now: i64 = sqlx::query_scalar("SELECT UNIX_TIMESTAMP()").fetch_one(&mut *tx).await?;
-                for (chunk_no, chunk) in actions.chunks(500).enumerate() {
-                    let values = vec!["(?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
-                    let sql = format!(
-                        "INSERT INTO GpodderSyncEpisodeActions
-                           (UserID, DeviceID, PodcastURL, EpisodeURL, Action, Timestamp, ServerTs, Started, Position, Total, Guid, EpisodeID, Origin)
-                         VALUES {values}"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql));
-                    for (i, a) in chunk.iter().enumerate() {
-                        q = q
-                            .bind(user_id)
-                            .bind(&a.podcast_url)
-                            .bind(&a.episode_url)
-                            .bind(a.action.as_str())
-                            .bind(a.timestamp.timestamp())
-                            .bind(now)
-                            .bind(a.started)
-                            .bind(a.position)
-                            .bind(a.total)
-                            .bind(&a.guid)
-                            .bind(episode_ids.get(chunk_no * 500 + i).copied().flatten())
-                            .bind(origin);
-                    }
-                    q.execute(&mut *tx).await?;
-                }
-                tx.commit().await?;
-            },
         });
         Ok(())
     }
@@ -770,7 +472,7 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
-                q::pick(pg_lock_targets_shared, lite_lock_targets_shared)(&mut tx, user_id).await?;
+                pg_lock_targets_shared(&mut tx, user_id).await?;
                 q::query(sqlx::AssertSqlSafe(format!(
                     r#"INSERT INTO "GpodderSyncSubscriptions" (userid, deviceid, podcasturl, action, timestamp, serverts, origin)
                        SELECT $1, NULL, u.url, $2, n.t, n.t, $3 FROM UNNEST($4::text[]) AS u(url), {PG_NOW}"#
@@ -783,23 +485,6 @@ impl DatabasePool {
                 .await?;
                 tx.commit().await?;
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                mysql_lock_targets_shared(&mut tx, user_id).await?;
-                for url in urls {
-                    sqlx::query(
-                        "INSERT INTO GpodderSyncSubscriptions (UserID, DeviceID, PodcastURL, Action, Timestamp, ServerTs, Origin)
-                         VALUES (?, NULL, ?, ?, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), ?)",
-                    )
-                    .bind(user_id)
-                    .bind(url)
-                    .bind(action)
-                    .bind(origin)
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                tx.commit().await?;
-            },
         });
         Ok(())
     }
@@ -808,10 +493,6 @@ impl DatabasePool {
     pub async fn sync_podcast_owner(&self, podcast_id: i32) -> AppResult<Option<(i32, String)>> {
         let row = dialect_match!(self, {
             pg(pool) => q::query_as::<(i32, Option<String>)>(r#"SELECT userid, feedurl FROM "Podcasts" WHERE podcastid = $1"#)
-                .bind(podcast_id)
-                .fetch_optional(pool)
-                .await?,
-            mysql(pool) => sqlx::query_as::<_, (i32, Option<String>)>("SELECT UserID, FeedURL FROM Podcasts WHERE PodcastID = ?")
                 .bind(podcast_id)
                 .fetch_optional(pool)
                 .await?,
@@ -836,20 +517,6 @@ impl DatabasePool {
             .into_iter()
             .map(|r| logged_action(q::raw(&r)))
             .collect::<AppResult<Vec<_>>>()?,
-            mysql(pool) => sqlx::query(
-                "SELECT ActionID AS id, PodcastURL AS purl, EpisodeURL AS eurl, Guid AS guid, Action AS action,
-                        Timestamp AS ts, Started AS started, Position AS position, Total AS total
-                 FROM GpodderSyncEpisodeActions
-                 WHERE UserID = ? AND EpisodeID IS NULL AND PodcastURL = ?
-                 ORDER BY ActionID",
-            )
-            .bind(user_id)
-            .bind(podcast_url)
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .map(|r| logged_action(&r))
-            .collect::<AppResult<Vec<_>>>()?,
         });
         Ok(rows.into_iter().flatten().collect())
     }
@@ -873,17 +540,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?;
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                for (action_id, episode_id) in matches {
-                    sqlx::query("UPDATE GpodderSyncEpisodeActions SET EpisodeID = ? WHERE ActionID = ? AND EpisodeID IS NULL")
-                        .bind(episode_id)
-                        .bind(action_id)
-                        .execute(&mut *tx)
-                        .await?;
-                }
-                tx.commit().await?;
-            },
         });
         Ok(())
     }
@@ -893,18 +549,8 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
-                let id = q::pick(pg_pinepods_device, lite_pinepods_device)(&mut tx, user_id).await?;
+                let id = pg_pinepods_device(&mut tx, user_id).await?;
                 let name: String = q::query_scalar(r#"SELECT devicename FROM "GpodderDevices" WHERE deviceid = $1"#)
-                    .bind(id)
-                    .fetch_one(&mut *tx)
-                    .await?;
-                tx.commit().await?;
-                Ok(name)
-            },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                let id = mysql_pinepods_device(&mut tx, user_id).await?;
-                let name: String = sqlx::query_scalar("SELECT DeviceName FROM GpodderDevices WHERE DeviceID = ?")
                     .bind(id)
                     .fetch_one(&mut *tx)
                     .await?;
@@ -958,14 +604,6 @@ impl DatabasePool {
                 r#"SELECT userid FROM "GpodderSyncSubscriptions" WHERE serverts < $1
                    UNION SELECT userid FROM "GpodderSyncEpisodeActions" WHERE COALESCE(serverts, 0) < $1"#,
             )
-            .bind(cutoff)
-            .fetch_all(pool)
-            .await?,
-            mysql(pool) => sqlx::query_scalar(
-                "SELECT UserID FROM GpodderSyncSubscriptions WHERE ServerTs < ?
-                 UNION SELECT UserID FROM GpodderSyncEpisodeActions WHERE COALESCE(ServerTs, 0) < ?",
-            )
-            .bind(cutoff)
             .bind(cutoff)
             .fetch_all(pool)
             .await?,
@@ -1025,51 +663,6 @@ impl DatabasePool {
                 tx.commit().await?;
                 Ok(summary)
             },
-            mysql(pool) => {
-                // The share lock is the first statement (MariaDB snapshot isolation).
-                let mut tx = pool.begin().await?;
-                let cursors: Vec<(i64, i64)> = sqlx::query_as(
-                    "SELECT SubsPushCursor, ActionsPushCursor FROM SyncTargets WHERE UserID = ? LOCK IN SHARE MODE",
-                )
-                .bind(user_id)
-                .fetch_all(&mut *tx)
-                .await?;
-                let (subs_pushed, actions_pushed) = lowest(cursors);
-                let subs: Vec<(i64, String, i64)> = sqlx::query_as(
-                    "SELECT CAST(SubscriptionID AS SIGNED), PodcastURL, ServerTs FROM GpodderSyncSubscriptions WHERE UserID = ?",
-                )
-                .bind(user_id)
-                .fetch_all(&mut *tx)
-                .await?;
-                let subs: Vec<LogRow> = subs.into_iter().map(|(id, url, ts)| LogRow { id, key: url, server_ts: ts }).collect();
-                let actions: Vec<(i64, Option<i32>, String, String, String, i64)> = sqlx::query_as(
-                    "SELECT CAST(ActionID AS SIGNED), EpisodeID, PodcastURL, EpisodeURL, Action, CAST(COALESCE(ServerTs, 0) AS SIGNED)
-                     FROM GpodderSyncEpisodeActions WHERE UserID = ?",
-                )
-                .bind(user_id)
-                .fetch_all(&mut *tx)
-                .await?;
-                let actions: Vec<LogRow> = actions
-                    .into_iter()
-                    .map(|(id, ep, purl, eurl, action, ts)| LogRow { id, key: action_key(ep, &purl, &eurl, &action), server_ts: ts })
-                    .collect();
-                let mut summary = CompactSummary::default();
-                for (table, column, ids, count) in [
-                    ("GpodderSyncSubscriptions", "SubscriptionID", superseded(&subs, cutoff, subs_pushed), &mut summary.subscriptions),
-                    ("GpodderSyncEpisodeActions", "ActionID", superseded(&actions, cutoff, actions_pushed), &mut summary.actions),
-                ] {
-                    for chunk in ids.chunks(1000) {
-                        let sql = format!("DELETE FROM {table} WHERE {column} IN ({})", vec!["?"; chunk.len()].join(", "));
-                        let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()));
-                        for id in chunk {
-                            q = q.bind(id);
-                        }
-                        *count += q.execute(&mut *tx).await?.rows_affected();
-                    }
-                }
-                tx.commit().await?;
-                Ok(summary)
-            },
         })
     }
 }
@@ -1096,10 +689,6 @@ fn import_failure(r: ImportFailureRow) -> super::imports::ImportFailure {
 const PG_IMPORT_FAILURE_COLUMNS: &str = "failureid, feedurl, origin, errorkind, lasterror, attempts,
     EXTRACT(EPOCH FROM firstfailedat::timestamptz)::BIGINT, EXTRACT(EPOCH FROM lastattemptat::timestamptz)::BIGINT,
     EXTRACT(EPOCH FROM nextattemptat::timestamptz)::BIGINT";
-const MYSQL_IMPORT_FAILURE_COLUMNS: &str = "FailureID, FeedURL, Origin, ErrorKind, LastError, Attempts,
-    CAST(TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', FirstFailedAt) AS SIGNED),
-    CAST(TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', LastAttemptAt) AS SIGNED),
-    CAST(TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', NextAttemptAt) AS SIGNED)";
 
 impl DatabasePool {
     /// Record a failed import and schedule the next attempt. True when this failure made
@@ -1147,40 +736,6 @@ impl DatabasePool {
                 tx.commit().await?;
                 Ok(delay(attempts).is_none() && delay(attempts - 1).is_some())
             },
-            mysql(pool) => {
-                // Upsert first: SELECT ... FOR UPDATE on a row that isn't there yet takes a gap
-                // lock, and two imports failing at once then deadlock on their inserts.
-                let mut tx = pool.begin().await?;
-                sqlx::query(
-                    "INSERT INTO SyncImportFailures (UserID, FeedURL, Origin, ErrorKind, LastError, Attempts)
-                     VALUES (?, ?, ?, ?, ?, 1)
-                     ON DUPLICATE KEY UPDATE
-                       Origin = VALUES(Origin), ErrorKind = VALUES(ErrorKind), LastError = VALUES(LastError),
-                       Attempts = Attempts + 1, LastAttemptAt = NOW()",
-                )
-                .bind(user_id)
-                .bind(feed_url)
-                .bind(origin)
-                .bind(kind.as_str())
-                .bind(error)
-                .execute(&mut *tx)
-                .await?;
-                let attempts: i32 =
-                    sqlx::query_scalar("SELECT Attempts FROM SyncImportFailures WHERE UserID = ? AND FeedURLHash = SHA2(?, 256)")
-                        .bind(user_id)
-                        .bind(feed_url)
-                        .fetch_one(&mut *tx)
-                        .await?;
-                // NOW() + INTERVAL NULL SECOND is NULL: given up
-                sqlx::query("UPDATE SyncImportFailures SET NextAttemptAt = NOW() + INTERVAL ? SECOND WHERE UserID = ? AND FeedURLHash = SHA2(?, 256)")
-                    .bind(delay(attempts))
-                    .bind(user_id)
-                    .bind(feed_url)
-                    .execute(&mut *tx)
-                    .await?;
-                tx.commit().await?;
-                Ok(delay(attempts).is_none() && delay(attempts - 1).is_some())
-            },
         })
     }
 
@@ -1189,13 +744,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"DELETE FROM "SyncImportFailures" WHERE userid = $1 AND feedurl = $2"#)
-                    .bind(user_id)
-                    .bind(feed_url)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM SyncImportFailures WHERE UserID = ? AND FeedURLHash = SHA2(?, 256)")
                     .bind(user_id)
                     .bind(feed_url)
                     .execute(pool)
@@ -1215,13 +763,6 @@ impl DatabasePool {
             .bind(limit)
             .fetch_all(pool)
             .await?,
-            mysql(pool) => sqlx::query_as(
-                "SELECT UserID, FeedURL, Origin FROM SyncImportFailures
-                 WHERE NextAttemptAt IS NOT NULL AND NextAttemptAt <= NOW() ORDER BY NextAttemptAt LIMIT ?",
-            )
-            .bind(limit)
-            .fetch_all(pool)
-            .await?,
         }))
     }
 
@@ -1231,10 +772,6 @@ impl DatabasePool {
             pg(pool) => {
                 let sql = format!(r#"SELECT {PG_IMPORT_FAILURE_COLUMNS} FROM "SyncImportFailures" WHERE userid = $1 ORDER BY failureid"#);
                 q::query_as(sqlx::AssertSqlSafe(sql)).bind(user_id).fetch_all(pool).await?
-            },
-            mysql(pool) => {
-                let sql = format!("SELECT {MYSQL_IMPORT_FAILURE_COLUMNS} FROM SyncImportFailures WHERE UserID = ? ORDER BY FailureID");
-                sqlx::query_as(sqlx::AssertSqlSafe(sql)).bind(user_id).fetch_all(pool).await?
             },
         });
         Ok(rows.into_iter().map(import_failure).collect())
@@ -1247,10 +784,6 @@ impl DatabasePool {
                 let sql = format!(r#"SELECT {PG_IMPORT_FAILURE_COLUMNS} FROM "SyncImportFailures" WHERE userid = $1 AND failureid = $2"#);
                 q::query_as(sqlx::AssertSqlSafe(sql)).bind(user_id).bind(id).fetch_optional(pool).await?
             },
-            mysql(pool) => {
-                let sql = format!("SELECT {MYSQL_IMPORT_FAILURE_COLUMNS} FROM SyncImportFailures WHERE UserID = ? AND FailureID = ?");
-                sqlx::query_as(sqlx::AssertSqlSafe(sql)).bind(user_id).bind(id).fetch_optional(pool).await?
-            },
         });
         Ok(row.map(import_failure))
     }
@@ -1259,12 +792,6 @@ impl DatabasePool {
     pub async fn sync_import_dismiss(&self, user_id: i32, id: i32) -> AppResult<bool> {
         let n = dialect_match!(self, {
             pg(pool) => q::query(r#"DELETE FROM "SyncImportFailures" WHERE userid = $1 AND failureid = $2"#)
-                .bind(user_id)
-                .bind(id)
-                .execute(pool)
-                .await?
-                .rows_affected(),
-            mysql(pool) => sqlx::query("DELETE FROM SyncImportFailures WHERE UserID = ? AND FailureID = ?")
                 .bind(user_id)
                 .bind(id)
                 .execute(pool)
@@ -1283,7 +810,7 @@ impl DatabasePool {
             pg(pool) => {
                 let mut tx = q::begin(pool).await?;
                 if log {
-                    q::pick(pg_lock_targets_shared, lite_lock_targets_shared)(&mut tx, user_id).await?;
+                    pg_lock_targets_shared(&mut tx, user_id).await?;
                 }
                 q::query(r#"DELETE FROM "SyncImportFailures" WHERE userid = $1 AND failureid = $2"#)
                     .bind(user_id)
@@ -1291,19 +818,7 @@ impl DatabasePool {
                     .execute(&mut *tx)
                     .await?;
                 if log {
-                    q::pick(super::events::subscription_pg, super::events::subscription_lite)(self, &mut tx, user_id, &failure.feed_url, "remove").await;
-                }
-                tx.commit().await?;
-            },
-            mysql(pool) => {
-                let mut tx = super::events::begin_mysql(pool, user_id, log).await?;
-                sqlx::query("DELETE FROM SyncImportFailures WHERE UserID = ? AND FailureID = ?")
-                    .bind(user_id)
-                    .bind(id)
-                    .execute(&mut *tx)
-                    .await?;
-                if log {
-                    super::events::subscription_mysql(self, &mut tx, user_id, &failure.feed_url, "remove").await;
+                    super::events::subscription_pg(self, &mut tx, user_id, &failure.feed_url, "remove").await;
                 }
                 tx.commit().await?;
             },
@@ -1315,12 +830,6 @@ impl DatabasePool {
     pub async fn sync_import_retry(&self, user_id: i32, id: i32) -> AppResult<bool> {
         let n = dialect_match!(self, {
             pg(pool) => q::query(r#"UPDATE "SyncImportFailures" SET nextattemptat = NOW() WHERE userid = $1 AND failureid = $2"#)
-                .bind(user_id)
-                .bind(id)
-                .execute(pool)
-                .await?
-                .rows_affected(),
-            mysql(pool) => sqlx::query("UPDATE SyncImportFailures SET NextAttemptAt = NOW() WHERE UserID = ? AND FailureID = ?")
                 .bind(user_id)
                 .bind(id)
                 .execute(pool)

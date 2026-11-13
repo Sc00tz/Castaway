@@ -24,15 +24,8 @@ async fn a_finished_transcript_downloads_in_each_format() {
 
     export(&app, &user, ep, "srt").await.assert_status(404);
 
-    // The MariaDB helper drops double quotes, so build the JSON there instead of quoting it.
-    let segments = if app.backend() == Backend::MariaDb {
-        "JSON_ARRAY(JSON_OBJECT('start', 0.0, 'end', 1.5, 'text', ' Hello there.'), \
-         JSON_OBJECT('start', 61.25, 'end', 3725.0, 'text', 'General Kenobi.'))"
-            .to_string()
-    } else {
-        r#"'[{"start": 0.0, "end": 1.5, "text": " Hello there."}, {"start": 61.25, "end": 3725.0, "text": "General Kenobi."}]'"#
-            .to_string()
-    };
+    let segments = r#"'[{"start": 0.0, "end": 1.5, "text": " Hello there."}, {"start": 61.25, "end": 3725.0, "text": "General Kenobi."}]'"#
+            .to_string();
     exec(&app, &format!(
         r#"INSERT INTO "EpisodeTranscripts" (EpisodeID, Source, Status, TranscriptText, Segments)
            VALUES ({ep}, 'generated', 'complete', 'Hello there. General Kenobi.', {segments})"#,

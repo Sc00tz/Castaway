@@ -2,7 +2,6 @@
 //! parsing, throttling hosts are backed off, racing refreshes can't duplicate episodes, adding a
 //! podcast downloads its feed once, manual refresh revalidates, duration probes are bounded.
 
-use pinepods_api::database::DatabasePool;
 
 use crate::harness::*;
 
@@ -248,125 +247,6 @@ async fn a_players_duration_fills_in_a_missing_one() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_dedupe_migration_merges_duplicate_episodes_and_their_state() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let user = app.user("listener").await;
-    let feed = Feed::with_episodes("Dupes", 2);
-    let url = app.feed("dupes.xml", &feed);
-    let pod = app.subscribe(&user, &url, 2).await;
-    let uid = user.id;
-    let e1 = app.episode_id(&user, pod, "Episode 1").await;
-    let e2 = app.episode_id(&user, pod, "Episode 2").await;
-
-    // Recreate the pre-065 state: no unique index, duplicate rows from racing refreshes (the
-    // copies have no feed, as episodes had none then).
-    match app.env.backend {
-        Backend::Postgres => exec(&app, "DROP INDEX IF EXISTS idx_episodes_podcastid_guid_unique").await,
-        Backend::MariaDb => exec(&app, "DROP INDEX IF EXISTS idx_episodes_podcastid_guidhash_unique ON Episodes").await,
-        Backend::Sqlite => unreachable!("upgrade tests skip SQLite"),
-    }
-    let dup = |guid: &str, completed: bool| {
-        format!(
-            r#"INSERT INTO "Episodes" (PodcastID, EpisodeTitle, EpisodeDescription, EpisodeURL, EpisodeArtwork, EpisodePubDate, EpisodeDuration, Completed, EpisodeGUID)
-               SELECT PodcastID, EpisodeTitle, EpisodeDescription, EpisodeURL, EpisodeArtwork, EpisodePubDate, EpisodeDuration, {completed}, EpisodeGUID
-               FROM "Episodes" WHERE PodcastID = {pod} AND EpisodeGUID = '{guid}' ORDER BY EpisodeID LIMIT 1"#
-        )
-    };
-    exec(&app, &dup("guid-1", false)).await;
-    exec(&app, &dup("guid-1", true)).await;
-    exec(&app, &dup("guid-2", false)).await;
-    let ids = |guid: &str| {
-        let app = &app;
-        let guid = guid.to_string();
-        async move {
-            let mut out = Vec::new();
-            let mut last = 0;
-            while let Some(id) = int(app, &format!(
-                r#"SELECT MIN(EpisodeID) FROM "Episodes" WHERE PodcastID = {pod} AND EpisodeGUID = '{guid}' AND EpisodeID > {last}"#
-            ))
-            .await
-            {
-                out.push(id);
-                last = id;
-            }
-            out
-        }
-    };
-    let g1 = ids("guid-1").await;
-    let g2 = ids("guid-2").await;
-    assert_eq!((g1.len(), g2.len()), (3, 2), "seeded duplicates");
-    let (d1a, d1b, d2a) = (g1[1], g1[2], g2[1]);
-
-    for sql in [
-        // Episode 1: history on the survivor and a duplicate → max position, latest date.
-        format!(r#"INSERT INTO "UserEpisodeHistory" (UserID, EpisodeID, ListenDate, ListenDuration) VALUES ({uid}, {e1}, '2026-03-02 10:00:00', 100)"#),
-        format!(r#"INSERT INTO "UserEpisodeHistory" (UserID, EpisodeID, ListenDate, ListenDuration) VALUES ({uid}, {d1a}, '2026-03-01 10:00:00', 500)"#),
-        // Episode 2: history only on the duplicate → moved to the survivor.
-        format!(r#"INSERT INTO "UserEpisodeHistory" (UserID, EpisodeID, ListenDate, ListenDuration) VALUES ({uid}, {d2a}, '2026-03-03 10:00:00', 42)"#),
-        format!(r#"INSERT INTO "SavedEpisodes" (UserID, EpisodeID, SaveDate) VALUES ({uid}, {d1a}, '2026-03-01 10:00:00')"#),
-        format!(r#"INSERT INTO "SavedEpisodes" (UserID, EpisodeID, SaveDate) VALUES ({uid}, {d1b}, '2026-03-02 10:00:00')"#),
-        format!(r#"INSERT INTO "EpisodeQueue" (QueueDate, UserID, EpisodeID, QueuePosition, is_youtube) VALUES ('2026-03-01 10:00:00', {uid}, {d1b}, 1, FALSE)"#),
-        format!(r#"INSERT INTO "DownloadedEpisodes" (UserID, EpisodeID, DownloadedDate, DownloadedSize, DownloadedLocation) VALUES ({uid}, {d2a}, '2026-03-01 10:00:00', 10, '/downloads/x.mp3')"#),
-        format!(r#"INSERT INTO "SharedEpisodes" (EpisodeID, SharedBy, ShareCode, ExpirationDate) VALUES ({d1a}, {uid}, 'dedupe-share-{d1a}', '2030-01-01 00:00:00')"#),
-        format!(r#"INSERT INTO "EpisodeSkipSegments" (EpisodeID, Kind, StartTime, EndTime, Source) VALUES ({d1b}, 'silence', 1.0, 2.0, 'test')"#),
-    ] {
-        exec(&app, &sql).await;
-    }
-
-    // Run the real migration runner for 064 + 065 against this database.
-    exec(&app, r#"DELETE FROM schema_migrations WHERE version IN ('064', '065')"#).await;
-    let env = app.env;
-    let db_name = app.db_name.clone();
-    tokio::task::spawn_blocking(move || crate::harness::env::run_migrations(env, &db_name)).await.unwrap();
-
-    let count = |sql: String| {
-        let app = &app;
-        async move { int(app, &sql).await.unwrap_or(0) }
-    };
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "Episodes" WHERE PodcastID = {pod}"#)).await, 2);
-    assert_eq!(count(format!(r#"SELECT EpisodeCount FROM "Podcasts" WHERE PodcastID = {pod}"#)).await, 2);
-    for table in ["UserEpisodeHistory", "SavedEpisodes", "EpisodeQueue", "DownloadedEpisodes", "SharedEpisodes", "EpisodeSkipSegments"] {
-        assert_eq!(
-            count(format!(r#"SELECT COUNT(*) FROM "{table}" WHERE EpisodeID IN ({d1a}, {d1b}, {d2a})"#)).await,
-            0,
-            "{table} still points at a removed duplicate"
-        );
-    }
-    assert_eq!(count(format!(r#"SELECT ListenDuration FROM "UserEpisodeHistory" WHERE UserID = {uid} AND EpisodeID = {e1}"#)).await, 500);
-    assert_eq!(
-        count(format!(r#"SELECT COUNT(*) FROM "UserEpisodeHistory" WHERE UserID = {uid} AND EpisodeID = {e1} AND ListenDate = '2026-03-02 10:00:00'"#)).await,
-        1,
-        "latest listen date kept"
-    );
-    assert_eq!(count(format!(r#"SELECT ListenDuration FROM "UserEpisodeHistory" WHERE UserID = {uid} AND EpisodeID = {e2}"#)).await, 42);
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "SavedEpisodes" WHERE UserID = {uid} AND EpisodeID = {e1}"#)).await, 1);
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "EpisodeQueue" WHERE UserID = {uid} AND EpisodeID = {e1}"#)).await, 1);
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "DownloadedEpisodes" WHERE UserID = {uid} AND EpisodeID = {e2}"#)).await, 1);
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "SharedEpisodes" WHERE EpisodeID = {e1}"#)).await, 1);
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "EpisodeSkipSegments" WHERE EpisodeID = {e1}"#)).await, 1);
-    assert_eq!(count(format!(r#"SELECT COUNT(*) FROM "Episodes" WHERE EpisodeID = {e1} AND Completed = TRUE"#)).await, 1, "completion carried over");
-
-    // The users see one copy, with the merged state.
-    let eps = app.episodes(&user, pod).await;
-    assert_eq!(eps.len(), 2, "{eps:#?}");
-    let ep1 = eps.iter().find(|e| e["Episodeid"] == e1).unwrap();
-    assert_eq!(ep1["saved"], true);
-    assert_eq!(ep1["queued"], true);
-
-    // And the pair is unique again.
-    let insert = dup("guid-1", false);
-    let rejected = match app.db() {
-        DatabasePool::Postgres(pool) => sqlx::raw_sql(sqlx::AssertSqlSafe(insert)).execute(pool).await.is_err(),
-        DatabasePool::Sqlite(pool) => sqlx::raw_sql(sqlx::AssertSqlSafe(insert)).execute(pool).await.is_err(),
-        DatabasePool::MySQL(pool) => sqlx::raw_sql(sqlx::AssertSqlSafe(insert.replace('"', ""))).execute(pool).await.is_err(),
-    };
-    assert!(rejected, "a duplicate GUID insert must fail after 065");
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn a_new_episode_posts_an_http_notification() {
     let app = TestApp::new().await;
     let user = app.user("listener").await;
@@ -461,38 +341,6 @@ async fn a_new_episode_posts_an_http_notification() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_nested_media_player_never_becomes_the_episode_url() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let user = app.user("listener").await;
-    let audio = "https://example.invalid/audio.mp3";
-    let player = format!(
-        r#"<media:content xmlns:media="http://search.yahoo.com/mrss/" url="{audio}" type="audio/mpeg"><media:player url="https://example.invalid/embed?media=Audio" /></media:content>"#
-    );
-    let feed = Feed::new("Player Show").episode(Episode::new(1).enclosure(audio).extra(&player));
-    let url = app.fixtures().serve("player.xml", Fixture::new("application/rss+xml", feed.to_xml()).etag("\"v1\""));
-    let pod = app.subscribe(&user, &url, 1).await;
-    app.refresh().await; // learns the ETag
-
-    let stored_url = || async {
-        let episodes = app.episodes(&user, pod).await;
-        episodes[0]["Episodeurl"].as_str().unwrap().to_string()
-    };
-    assert_eq!(stored_url().await, audio);
-
-    // A URL stored by an older release, on a feed that hasn't changed since.
-    exec(&app, r#"UPDATE "Episodes" SET EpisodeURL = 'https://example.invalid/embed?media=Audio'"#).await;
-    app.refresh().await;
-    assert_ne!(stored_url().await, audio, "a 304 doesn't reapply");
-
-    rerun_migrations(&app, &["087"]).await;
-    app.refresh().await;
-    assert_eq!(stored_url().await, audio);
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn an_image_media_content_does_not_lose_the_enclosure() {
     let app = TestApp::new().await;
     let user = app.user("listener").await;
@@ -508,35 +356,6 @@ async fn an_image_media_content_does_not_lose_the_enclosure() {
 async fn guidless_episodes(app: &TestApp, user: &TestUser, pod: i32) -> Vec<String> {
     let episodes = app.episodes(user, pod).await;
     episodes.iter().map(|e| e["Episodeurl"].as_str().unwrap().to_string()).collect()
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn repairing_a_url_does_not_duplicate_a_guidless_episode() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let user = app.user("listener").await;
-    let audio = "https://example.invalid/audio.mp3";
-    let player_url = "https://example.invalid/embed?media=Audio";
-    let player = format!(
-        r#"<media:content xmlns:media="http://search.yahoo.com/mrss/" url="{audio}" type="audio/mpeg"><media:player url="{player_url}" /></media:content>"#
-    );
-    let feed = Feed::new("No Guid").episode(Episode::new(1).guid(None).enclosure(audio).extra(&player));
-    let url = app.feed("noguid.xml", &feed);
-    let pod = app.subscribe(&user, &url, 1).await;
-
-    // The player page, as 0.9.1 stored it.
-    exec(&app, &format!(r#"UPDATE "Episodes" SET EpisodeURL = '{player_url}' WHERE PodcastID = {pod}"#)).await;
-    rerun_migrations(&app, &["087"]).await;
-    app.refresh().await;
-    assert_eq!(guidless_episodes(&app, &user, pod).await, [audio]);
-
-    // No URL at all, as 0.9.1 stored it beside an image media:content.
-    exec(&app, &format!(r#"UPDATE "Episodes" SET EpisodeURL = '' WHERE PodcastID = {pod}"#)).await;
-    rerun_migrations(&app, &["087"]).await;
-    app.refresh().await;
-    assert_eq!(guidless_episodes(&app, &user, pod).await, [audio]);
 }
 
 #[tokio::test(flavor = "multi_thread")]

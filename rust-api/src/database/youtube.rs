@@ -6,7 +6,7 @@ impl DatabasePool {
     // ===================================================================================
     // Unified host feed
     //
-    // A host's episodes are sourced from BOTH the Podcast Index person index AND PodPeopleDB,
+    // A host's episodes come from the Podcast Index person index,
     // and must be viewable whether or not the user is subscribed to the host or to the
     // underlying podcasts. `build_host_feed_shared` produces the non-user-specific feed (podcasts
     // a host appears in + a merged, artwork-resolved episode list) — this is what the handler
@@ -21,22 +21,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let row = q::query(r#"SELECT podcastid FROM "Podcasts" WHERE feedurl = $1 AND userid = $2"#)
-                    .bind(format!("https://www.youtube.com/channel/{}", channel_id))
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = row {
-                    let podcast_id: i32 = row.try_get("podcastid")?;
-                    debug!("Found existing subscription with ID: {}", podcast_id);
-                    Ok(Some(podcast_id))
-                } else {
-                    info!("No existing subscription found");
-                    Ok(None)
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT PodcastID FROM Podcasts WHERE FeedURL = ? AND UserID = ?")
                     .bind(format!("https://www.youtube.com/channel/{}", channel_id))
                     .bind(user_id)
                     .fetch_optional(pool)
@@ -93,31 +77,6 @@ impl DatabasePool {
                 
                 row.try_get("podcastid")?
             },
-            mysql(pool) => {
-                let result = sqlx::query(r#"
-                    INSERT INTO Podcasts (
-                        UserID, PodcastName, ArtworkURL, Description, EpisodeCount,
-                        WebsiteURL, FeedURL, Author, Categories, Explicit, PodcastIndexID, FeedCutoffDays, IsYouTubeChannel
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                "#)
-                    .bind(user_id)
-                    .bind(name)
-                    .bind(thumbnail_url)
-                    .bind(description)
-                    .bind(0) // Initial episode count
-                    .bind(&feed_url)
-                    .bind(&feed_url)
-                    .bind(name) // Use channel name as author
-                    .bind("{}") // Empty categories for YouTube
-                    .bind(false) // Not explicit by default
-                    .bind(0) // No podcast index ID for YouTube
-                    .bind(feed_cutoff)
-                    .bind(true) // Is YouTube channel
-                    .execute(pool)
-                    .await?;
-                
-                result.last_insert_id() as i32
-            },
         });
         
         // Update UserStats PodcastsAdded counter
@@ -128,12 +87,6 @@ impl DatabasePool {
                     SET podcastsadded = podcastsadded + 1 
                     WHERE userid = $1
                 "#)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await;
-            },
-            mysql(pool) => {
-                let _ = sqlx::query("UPDATE UserStats SET PodcastsAdded = PodcastsAdded + 1 WHERE UserID = ?")
                     .bind(user_id)
                     .execute(pool)
                     .await;
@@ -152,19 +105,6 @@ impl DatabasePool {
                 let row = q::query(r#"
                     SELECT podcastid FROM "Podcasts"
                     WHERE userid = $1 AND podcastname = $2 AND feedurl = $3 AND isyoutubechannel = TRUE
-                "#)
-                    .bind(user_id)
-                    .bind(channel_name)
-                    .bind(channel_url)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                Ok(row.is_some())
-            },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT PodcastID FROM Podcasts
-                    WHERE UserID = ? AND PodcastName = ? AND FeedURL = ? AND IsYouTubeChannel = TRUE
                 "#)
                     .bind(user_id)
                     .bind(channel_name)
@@ -199,23 +139,6 @@ impl DatabasePool {
                 .await?
                 .rows_affected()
             },
-            mysql(pool) => {
-                sqlx::query("
-                    DELETE v FROM YouTubeVideos v
-                    WHERE v.PodcastID = ? AND v.PublishedAt < ?
-                      AND NOT EXISTS (SELECT 1 FROM UserVideoHistory h WHERE h.VideoID = v.VideoID)
-                      AND NOT EXISTS (SELECT 1 FROM SavedVideos s WHERE s.VideoID = v.VideoID)
-                      AND NOT EXISTS (SELECT 1 FROM DownloadedVideos d WHERE d.VideoID = v.VideoID)
-                      AND NOT EXISTS (SELECT 1 FROM PlaylistContents p WHERE p.VideoID = v.VideoID)
-                      AND NOT EXISTS (SELECT 1 FROM CollectionEpisodes c WHERE c.VideoID = v.VideoID)
-                      AND NOT EXISTS (SELECT 1 FROM EpisodeQueue q WHERE q.EpisodeID = v.VideoID AND q.is_youtube = 1)
-                ")
-                .bind(podcast_id)
-                .bind(cutoff_naive)
-                .execute(pool)
-                .await?
-                .rows_affected()
-            },
         });
         if rows_affected > 0 {
             debug!("Removed {} old YouTube videos of podcast {}", rows_affected, podcast_id);
@@ -228,12 +151,6 @@ impl DatabasePool {
         let ids: Vec<Option<String>> = dialect_match!(self, {
             pg(pool) => {
                 q::query_scalar(r#"SELECT youtubevideoid FROM "YouTubeVideos" WHERE podcastid = $1"#)
-                    .bind(podcast_id)
-                    .fetch_all(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar("SELECT YouTubeVideoID FROM YouTubeVideos WHERE PodcastID = ?")
                     .bind(podcast_id)
                     .fetch_all(pool)
                     .await?
@@ -261,19 +178,6 @@ impl DatabasePool {
                 .bind(podcast_ids)
                 .fetch_all(pool)
                 .await?
-            },
-            mysql(pool) => {
-                let sql = format!(
-                    "SELECT PodcastID, VideoMinMinutes, VideoMaxMinutes, VideoTitleFilter FROM Podcasts
-                     WHERE PodcastID IN ({})
-                       AND (VideoMinMinutes IS NOT NULL OR VideoMaxMinutes IS NOT NULL OR VideoTitleFilter IS NOT NULL)",
-                    vec!["?"; podcast_ids.len()].join(", ")
-                );
-                let mut q = sqlx::query_as(sqlx::AssertSqlSafe(sql));
-                for id in podcast_ids {
-                    q = q.bind(id);
-                }
-                q.fetch_all(pool).await?
             },
         });
         Ok(rows
@@ -308,22 +212,7 @@ impl DatabasePool {
                 .await?
                 .rows_affected()
             },
-            mysql(pool) => {
-                sqlx::query(
-                    "UPDATE Podcasts SET VideoMinMinutes = ?, VideoMaxMinutes = ?, VideoTitleFilter = ?, FeedContentHash = NULL
-                     WHERE PodcastID = ? AND UserID = ? AND IsYouTubeChannel = TRUE",
-                )
-                .bind(filter.min_minutes)
-                .bind(filter.max_minutes)
-                .bind(&filter.title_contains)
-                .bind(podcast_id)
-                .bind(user_id)
-                .execute(pool)
-                .await?
-                .rows_affected()
-            },
         });
-        // MySQL counts only changed rows; an unchanged filter still belongs to the user.
         Ok(updated > 0 || self.owns_youtube_channel(podcast_id, user_id).await?)
     }
 
@@ -332,13 +221,6 @@ impl DatabasePool {
         let found: Option<i32> = dialect_match!(self, {
             pg(pool) => {
                 q::query_scalar(r#"SELECT podcastid FROM "Podcasts" WHERE podcastid = $1 AND userid = $2 AND isyoutubechannel = TRUE"#)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar("SELECT PodcastID FROM Podcasts WHERE PodcastID = ? AND UserID = ? AND IsYouTubeChannel = TRUE")
                     .bind(podcast_id)
                     .bind(user_id)
                     .fetch_optional(pool)
@@ -381,25 +263,6 @@ impl DatabasePool {
                     .bind(video.duration)
                     .fetch_one(pool)
                     .await?
-                },
-                mysql(pool) => {
-                    sqlx::query(r#"
-                        INSERT INTO YouTubeVideos (
-                            PodcastID, YouTubeVideoID, VideoTitle, VideoDescription, VideoURL,
-                            ThumbnailURL, PublishedAt, Duration, Completed, ListenPosition
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
-                    "#)
-                    .bind(podcast_id)
-                    .bind(&video.id)
-                    .bind(&title)
-                    .bind(&description)
-                    .bind(&url)
-                    .bind(&video.thumbnail)
-                    .bind(published)
-                    .bind(video.duration)
-                    .execute(pool)
-                    .await?
-                    .last_insert_id() as i32
                 },
             });
             inserted.push(crate::handlers::podcasts::Episode {
@@ -465,13 +328,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE YouTubeVideos SET Duration = ? WHERE YouTubeVideoID = ?")
-                    .bind(duration_seconds)
-                    .bind(video_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         
         debug!("Successfully updated duration for YouTube video {}", video_id);
@@ -530,51 +386,6 @@ impl DatabasePool {
 
                 Ok(Some(episodes))
             },
-            mysql(pool) => {
-                let rows = sqlx::query(r#"
-                    SELECT Podcasts.PodcastID, Podcasts.PodcastName, YouTubeVideos.VideoID AS EpisodeID,
-                    YouTubeVideos.VideoTitle AS EpisodeTitle, YouTubeVideos.PublishedAt AS EpisodePubDate,
-                    YouTubeVideos.VideoDescription AS EpisodeDescription,
-                    YouTubeVideos.ThumbnailURL AS EpisodeArtwork, YouTubeVideos.VideoURL AS EpisodeURL,
-                    YouTubeVideos.Duration AS EpisodeDuration,
-                    YouTubeVideos.ListenPosition AS ListenDuration,
-                    YouTubeVideos.YouTubeVideoID AS guid
-                    FROM YouTubeVideos
-                    INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                    WHERE Podcasts.PodcastID = ? AND Podcasts.UserID = ?
-                    ORDER BY YouTubeVideos.PublishedAt DESC
-                "#)
-                .bind(podcast_id)
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-
-                if rows.is_empty() {
-                    return Ok(None);
-                }
-
-                let mut episodes = Vec::new();
-                for row in rows {
-                    let episode = serde_json::json!({
-                        "Podcastid": row.try_get::<i32, _>("PodcastID").unwrap_or(0),
-                        "Podcastname": row.try_get::<String, _>("PodcastName").unwrap_or_default(),
-                        "Episodeid": row.try_get::<i32, _>("EpisodeID").unwrap_or(0),
-                        "Episodetitle": row.try_get::<String, _>("EpisodeTitle").unwrap_or_default(),
-                        "Episodepubdate": row.try_get::<chrono::NaiveDateTime, _>("EpisodePubDate")
-                            .map(|dt| dt.and_utc().to_rfc3339())
-                            .unwrap_or_default(),
-                        "Episodedescription": row.try_get::<String, _>("EpisodeDescription").unwrap_or_default(),
-                        "Episodeartwork": row.try_get::<String, _>("EpisodeArtwork").unwrap_or_default(),
-                        "Episodeurl": row.try_get::<String, _>("EpisodeURL").unwrap_or_default(),
-                        "Episodeduration": row.try_get::<i32, _>("EpisodeDuration").unwrap_or(0),
-                        "Listenduration": row.try_get::<i32, _>("ListenDuration").unwrap_or(0),
-                        "Guid": row.try_get::<String, _>("guid").unwrap_or_default()
-                    });
-                    episodes.push(episode);
-                }
-
-                Ok(Some(episodes))
-            },
         })
     }
 
@@ -610,27 +421,6 @@ impl DatabasePool {
                     return Err(AppError::external_error(&format!("No YouTube channel found with name {}", channel_name)));
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT PodcastID
-                    FROM Podcasts
-                    WHERE PodcastName = ?
-                    AND FeedURL = ?
-                    AND UserID = ?
-                    AND IsYouTubeChannel = TRUE
-                "#)
-                .bind(channel_name)
-                .bind(channel_url)
-                .bind(user_id)
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = row {
-                    row.try_get::<i32, _>("PodcastID")?
-                } else {
-                    return Err(AppError::external_error(&format!("No YouTube channel found with name {}", channel_name)));
-                }
-            },
         });
 
         // Remove the channel by ID
@@ -653,16 +443,6 @@ impl DatabasePool {
 
                 rows.into_iter()
                     .map(|row| row.try_get::<String, _>("youtubevideoid").unwrap_or_default())
-                    .collect()
-            },
-            mysql(pool) => {
-                let rows = sqlx::query("SELECT YouTubeVideoID FROM YouTubeVideos WHERE PodcastID = ?")
-                    .bind(podcast_id)
-                    .fetch_all(pool)
-                    .await?;
-
-                rows.into_iter()
-                    .map(|row| row.try_get::<String, _>("YouTubeVideoID").unwrap_or_default())
                     .collect()
             },
         });
@@ -709,33 +489,6 @@ impl DatabasePool {
 
                 // Update user stats
                 q::query(r#"UPDATE "UserStats" SET podcastsadded = podcastsadded - 1 WHERE userid = $1"#)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                let delete_queries = vec![
-                    "DELETE FROM PlaylistContents WHERE EpisodeID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM UserEpisodeHistory WHERE EpisodeID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM UserVideoHistory WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM DownloadedEpisodes WHERE EpisodeID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM DownloadedVideos WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM SavedVideos WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM SavedEpisodes WHERE EpisodeID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM EpisodeQueue WHERE EpisodeID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ?)",
-                    "DELETE FROM YouTubeVideos WHERE PodcastID = ?",
-                    "DELETE FROM Podcasts WHERE PodcastID = ? AND IsYouTubeChannel = TRUE",
-                ];
-
-                for query in delete_queries {
-                    sqlx::query(query)
-                        .bind(podcast_id)
-                        .execute(pool)
-                        .await?;
-                }
-
-                // Update user stats
-                sqlx::query("UPDATE UserStats SET PodcastsAdded = PodcastsAdded - 1 WHERE UserID = ?")
                     .bind(user_id)
                     .execute(pool)
                     .await?;

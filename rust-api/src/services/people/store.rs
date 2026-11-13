@@ -39,7 +39,6 @@ pub struct PersonSeed {
     pub name: String,
     pub img: Option<String>,
     pub href: Option<String>,
-    pub podpeople_id: Option<i32>,
 }
 
 async fn insert_person(db: &DatabasePool, seed: &PersonSeed, norm: &str) -> AppResult<i32> {
@@ -47,26 +46,14 @@ async fn insert_person(db: &DatabasePool, seed: &PersonSeed, norm: &str) -> AppR
     let norm = cut(norm, 255);
     dialect_match!(db, {
         pg(pool) => Ok(q::query_scalar::<i32>(
-            r#"INSERT INTO "Persons" (name, namenormalized, img, href, podpeopleid) VALUES ($1, $2, $3, $4, $5) RETURNING personid"#,
+            r#"INSERT INTO "Persons" (name, namenormalized, img, href) VALUES ($1, $2, $3, $4) RETURNING personid"#,
         )
         .bind(name)
         .bind(norm)
         .bind(&seed.img)
         .bind(&seed.href)
-        .bind(seed.podpeople_id)
         .fetch_one(pool)
         .await?),
-        mysql(pool) => {
-            let res = sqlx::query("INSERT INTO Persons (Name, NameNormalized, Img, Href, PodPeopleID) VALUES (?, ?, ?, ?, ?)")
-                .bind(name)
-                .bind(norm)
-                .bind(&seed.img)
-                .bind(&seed.href)
-                .bind(seed.podpeople_id)
-                .execute(pool)
-                .await?;
-            Ok(res.last_insert_id() as i32)
-        },
     })
 }
 
@@ -75,14 +62,13 @@ struct ExistingPerson {
     norm: String,
     img: Option<String>,
     href: Option<String>,
-    podpeople_id: Option<i32>,
 }
 
 async fn persons_by_norm(db: &DatabasePool, norms: &[String]) -> AppResult<Vec<ExistingPerson>> {
     let mut out = Vec::new();
     for chunk in norms.chunks(CHUNK) {
         let sql = format!(
-            r#"SELECT personid AS personid, namenormalized AS norm, img AS img, href AS href, podpeopleid AS podpeopleid
+            r#"SELECT personid AS personid, namenormalized AS norm, img AS img, href AS href
                FROM "Persons" WHERE namenormalized IN ({}) ORDER BY personid"#,
             in_list(1, chunk.len())
         );
@@ -92,7 +78,6 @@ async fn persons_by_norm(db: &DatabasePool, norms: &[String]) -> AppResult<Vec<E
             norm: r.str("norm")?,
             img: r.opt_str("img")?,
             href: r.opt_str("href")?,
-            podpeople_id: r.opt_int("podpeopleid")?.map(|v| v as i32),
         }));
     }
     Ok(out)
@@ -157,51 +142,12 @@ async fn resolve_by_name(db: &DatabasePool, seeds: &[PersonSeed]) -> AppResult<H
     Ok(ids)
 }
 
-/// The person for a PodPeopleDB person: matched by PodPeopleDB id, else adopted by name (a
-/// feed-only person gets the id), else created. Name and image follow PodPeopleDB, which is
-/// curated. Caller holds [`WRITE_LOCK`].
-pub(crate) async fn resolve_podpeople_person(db: &DatabasePool, seed: &PersonSeed) -> AppResult<i32> {
-    let Some(pp_id) = seed.podpeople_id else {
-        return Err(AppError::internal("PodPeopleDB person without an id"));
-    };
-    let found = fetch_optional!(
-        db,
-        r#"SELECT personid AS personid, img AS img, href AS href FROM "Persons" WHERE podpeopleid = $1"#,
-        [pp_id],
-        |r| (r.int("personid")? as i32, r.opt_str("img")?, r.opt_str("href")?)
-    );
-    if let Some((id, img, href)) = found {
-        if (seed.img.is_some() && seed.img != img) || (href.is_none() && seed.href.is_some()) {
-            execute!(
-                db,
-                r#"UPDATE "Persons" SET img = COALESCE($1, img), href = COALESCE(href, $2) WHERE personid = $3"#,
-                [seed.img.clone(), seed.href.clone(), id]
-            );
-        }
-        return Ok(id);
-    }
-    let norm = normalize_name(&seed.name);
-    let adoptable = persons_by_norm(db, std::slice::from_ref(&norm))
-        .await?
-        .into_iter()
-        .find(|p| p.podpeople_id.is_none());
-    if let Some(existing) = adoptable {
-        execute!(
-            db,
-            r#"UPDATE "Persons" SET podpeopleid = $1, img = COALESCE($2, img), href = COALESCE(href, $3) WHERE personid = $4"#,
-            [pp_id, seed.img.clone(), seed.href.clone(), existing.id]
-        );
-        return Ok(existing.id);
-    }
-    insert_person(db, seed, &norm).await
-}
-
 // ---------------------------------------------------------------------------------------------
 // Credits
 // ---------------------------------------------------------------------------------------------
 
-/// One credit row: (podcast or episode id, person id, role, group, verified).
-pub(crate) type CreditRow = (i32, i32, String, Option<String>, bool);
+/// One credit row: (podcast or episode id, person id, role, group).
+pub(crate) type CreditRow = (i32, i32, String, Option<String>);
 
 /// Insert credits into `PodcastPeople` (owner column `podcastid`) or `EpisodePeople`
 /// (`episodeid`). Duplicates of the primary key are dropped first.
@@ -210,17 +156,16 @@ pub(crate) async fn insert_credits(db: &DatabasePool, table: &str, owner: &str, 
     let rows: Vec<&CreditRow> = rows.iter().filter(|r| seen.insert((r.0, r.1, r.2.clone()))).collect();
     for chunk in rows.chunks(CHUNK) {
         let sql = format!(
-            r#"INSERT INTO "{table}" ({owner}, personid, role, persongroup, source, verified) VALUES {}"#,
-            values_placeholders(chunk.len(), 6)
+            r#"INSERT INTO "{table}" ({owner}, personid, role, persongroup, source) VALUES {}"#,
+            values_placeholders(chunk.len(), 5)
         );
-        let mut binds = Vec::with_capacity(chunk.len() * 6);
-        for (owner_id, person_id, role, group, verified) in chunk {
+        let mut binds = Vec::with_capacity(chunk.len() * 5);
+        for (owner_id, person_id, role, group) in chunk {
             binds.push(Bind::Int(*owner_id));
             binds.push(Bind::Int(*person_id));
             binds.push(Bind::Text(Some(cut(role, 64))));
             binds.push(Bind::Text(group.as_deref().map(|g| cut(g, 64))));
             binds.push(Bind::Text(Some(source.to_string())));
-            binds.push(Bind::Bool(*verified));
         }
         execute!(db, sql, dyn binds);
     }
@@ -286,7 +231,7 @@ pub async fn apply_feed_tags(db: &DatabasePool, podcast_id: i32, tags: &FeedTags
         .people
         .iter()
         .chain(tags.items.iter().flat_map(|i| i.people.iter()))
-        .map(|p: &FeedPerson| PersonSeed { name: p.name.clone(), img: p.img.clone(), href: p.href.clone(), podpeople_id: None })
+        .map(|p: &FeedPerson| PersonSeed { name: p.name.clone(), img: p.img.clone(), href: p.href.clone() })
         .collect();
     let ids = resolve_by_name(db, &seeds).await?;
     let person = |p: &FeedPerson| ids.get(&normalize_name(&p.name)).copied();
@@ -294,7 +239,7 @@ pub async fn apply_feed_tags(db: &DatabasePool, podcast_id: i32, tags: &FeedTags
     let podcast_rows: Vec<CreditRow> = tags
         .people
         .iter()
-        .filter_map(|p| Some((podcast_id, person(p)?, normalize_role(p.role.as_deref()), p.group.clone(), true)))
+        .filter_map(|p| Some((podcast_id, person(p)?, normalize_role(p.role.as_deref()), p.group.clone())))
         .collect();
     execute!(db, r#"DELETE FROM "PodcastPeople" WHERE podcastid = $1 AND source = 'feed'"#, [podcast_id]);
     insert_credits(db, "PodcastPeople", "podcastid", SOURCE_FEED, &podcast_rows).await?;
@@ -306,7 +251,7 @@ pub async fn apply_feed_tags(db: &DatabasePool, podcast_id: i32, tags: &FeedTags
         let Some(episode_id) = keys.find(item.guid.as_deref(), item.enclosure_url.as_deref()) else { continue };
         for p in &item.people {
             if let Some(pid) = person(p) {
-                episode_rows.push((episode_id, pid, normalize_role(p.role.as_deref()), p.group.clone(), true));
+                episode_rows.push((episode_id, pid, normalize_role(p.role.as_deref()), p.group.clone()));
             }
         }
         let transcripts = (!item.transcripts.is_empty()).then(|| serde_json::to_string(&item.transcripts).unwrap_or_default());
@@ -353,32 +298,28 @@ pub async fn apply_feed_tags(db: &DatabasePool, podcast_id: i32, tags: &FeedTags
 #[derive(Clone)]
 struct RawCredit {
     person_id: i32,
-    podpeople_id: Option<i32>,
     name: String,
     img: Option<String>,
     href: Option<String>,
     role: String,
     group: Option<String>,
     source: String,
-    verified: bool,
     /// None for a podcast-level credit.
     episode_id: Option<i32>,
 }
 
-const PERSON_COLS: &str = "pe.personid AS personid, pe.podpeopleid AS podpeopleid, pe.name AS name, pe.img AS img, pe.href AS href";
+const PERSON_COLS: &str = "pe.personid AS personid, pe.name AS name, pe.img AS img, pe.href AS href";
 
 macro_rules! raw_credit {
     ($r:ident, $episode:expr) => {
         RawCredit {
             person_id: $r.int("personid")? as i32,
-            podpeople_id: $r.opt_int("podpeopleid")?.map(|v| v as i32),
             name: $r.str("name")?,
             img: $r.opt_str("img")?,
             href: $r.opt_str("href")?,
             role: $r.str("role")?,
             group: $r.opt_str("persongroup")?,
             source: $r.str("source")?,
-            verified: $r.flag("verified")?,
             episode_id: $episode,
         }
     };
@@ -419,7 +360,6 @@ struct Agg {
     roles: BTreeSet<(u8, String)>,
     group: Option<String>,
     sources: BTreeSet<String>,
-    verified: bool,
     podcast_level: bool,
     episodes: HashSet<i32>,
     host_episodes: HashSet<i32>,
@@ -436,7 +376,6 @@ fn aggregate(raws: Vec<RawCredit>) -> Vec<Agg> {
                 roles: BTreeSet::new(),
                 group: None,
                 sources: BTreeSet::new(),
-                verified: false,
                 podcast_level: false,
                 episodes: HashSet::new(),
                 host_episodes: HashSet::new(),
@@ -447,7 +386,6 @@ fn aggregate(raws: Vec<RawCredit>) -> Vec<Agg> {
             agg.group = c.group.clone();
         }
         agg.sources.insert(c.source.clone());
-        agg.verified |= c.verified;
         match c.episode_id {
             None => agg.podcast_level = true,
             Some(e) => {
@@ -465,7 +403,6 @@ fn credited(agg: &Agg, scope: &str, followed: &HashSet<i32>) -> CreditedPerson {
     let roles: Vec<String> = agg.roles.iter().map(|(_, r)| r.clone()).collect();
     CreditedPerson {
         id: agg.first.person_id,
-        podpeople_id: agg.first.podpeople_id,
         name: agg.first.name.clone(),
         img: agg.first.img.clone(),
         href: agg.first.href.clone(),
@@ -475,7 +412,6 @@ fn credited(agg: &Agg, scope: &str, followed: &HashSet<i32>) -> CreditedPerson {
         scope: scope.to_string(),
         episode_count: agg.episodes.len() as i64,
         sources: agg.sources.iter().cloned().collect(),
-        verified: agg.verified,
         followed: followed.contains(&agg.first.person_id),
     }
 }
@@ -484,7 +420,7 @@ async fn podcast_raw_credits(db: &DatabasePool, podcast_id: i32) -> AppResult<Ve
     let mut raws = fetch_all!(
         db,
         format!(
-            r#"SELECT {PERSON_COLS}, pp.role AS role, pp.persongroup AS persongroup, pp.source AS source, pp.verified AS verified
+            r#"SELECT {PERSON_COLS}, pp.role AS role, pp.persongroup AS persongroup, pp.source AS source
                FROM "PodcastPeople" pp JOIN "Persons" pe ON pe.personid = pp.personid
                WHERE pp.podcastid = $1"#
         ),
@@ -494,7 +430,7 @@ async fn podcast_raw_credits(db: &DatabasePool, podcast_id: i32) -> AppResult<Ve
     raws.extend(fetch_all!(
         db,
         format!(
-            r#"SELECT {PERSON_COLS}, ep.episodeid AS episodeid, ep.role AS role, ep.persongroup AS persongroup, ep.source AS source, ep.verified AS verified
+            r#"SELECT {PERSON_COLS}, ep.episodeid AS episodeid, ep.role AS role, ep.persongroup AS persongroup, ep.source AS source
                FROM "EpisodePeople" ep
                JOIN "Episodes" e ON e.episodeid = ep.episodeid
                JOIN "Persons" pe ON pe.personid = ep.personid
@@ -547,7 +483,7 @@ pub async fn episode_credits(db: &DatabasePool, episode_id: i32, user_id: i32) -
     let own = fetch_all!(
         db,
         format!(
-            r#"SELECT {PERSON_COLS}, ep.role AS role, ep.persongroup AS persongroup, ep.source AS source, ep.verified AS verified
+            r#"SELECT {PERSON_COLS}, ep.role AS role, ep.persongroup AS persongroup, ep.source AS source
                FROM "EpisodePeople" ep JOIN "Persons" pe ON pe.personid = ep.personid
                WHERE ep.episodeid = $1"#
         ),
@@ -570,11 +506,10 @@ pub async fn person(db: &DatabasePool, person_id: i32, user_id: i32) -> AppResul
     let followed = followed_ids(db, user_id).await?;
     fetch_optional!(
         db,
-        r#"SELECT personid AS personid, podpeopleid AS podpeopleid, name AS name, img AS img, href AS href FROM "Persons" WHERE personid = $1"#,
+        r#"SELECT personid AS personid, name AS name, img AS img, href AS href FROM "Persons" WHERE personid = $1"#,
         [person_id],
         |r| Person {
             id: r.int("personid")? as i32,
-            podpeople_id: r.opt_int("podpeopleid")?.map(|v| v as i32),
             name: r.str("name")?,
             img: r.opt_str("img")?,
             href: r.opt_str("href")?,
@@ -604,7 +539,7 @@ pub async fn search(db: &DatabasePool, query: &str, user_id: i32, limit: i64) ->
     let prefix = format!("{}%", norm.replace('%', "").replace('_', ""));
     Ok(fetch_all!(
         db,
-        r#"SELECT pe.personid AS personid, pe.podpeopleid AS podpeopleid, pe.name AS name, pe.img AS img, pe.href AS href,
+        r#"SELECT pe.personid AS personid, pe.name AS name, pe.img AS img, pe.href AS href,
                   (SELECT COUNT(*) FROM "PodcastPeople" pp WHERE pp.personid = pe.personid) AS credits
            FROM "Persons" pe
            WHERE pe.namenormalized LIKE $1
@@ -616,7 +551,6 @@ pub async fn search(db: &DatabasePool, query: &str, user_id: i32, limit: i64) ->
             (
                 Person {
                     id,
-                    podpeople_id: r.opt_int("podpeopleid")?.map(|v| v as i32),
                     name: r.str("name")?,
                     img: r.opt_str("img")?,
                     href: r.opt_str("href")?,
@@ -736,7 +670,6 @@ pub async fn library_episodes(
     // The one column named differently per backend.
     let is_video = dialect_match!(db, {
         pg(_) => "e.is_video",
-        mysql(_) => "e.IsVideo",
     });
     Ok(fetch_all!(
         db,
@@ -826,13 +759,12 @@ pub async fn unfollow(db: &DatabasePool, user_id: i32, person_id: i32) -> AppRes
 pub async fn followed(db: &DatabasePool, user_id: i32) -> AppResult<Vec<Person>> {
     Ok(fetch_all!(
         db,
-        r#"SELECT pe.personid AS personid, pe.podpeopleid AS podpeopleid, pe.name AS name, pe.img AS img, pe.href AS href
+        r#"SELECT pe.personid AS personid, pe.name AS name, pe.img AS img, pe.href AS href
            FROM "PersonFollows" f JOIN "Persons" pe ON pe.personid = f.personid
            WHERE f.userid = $1 ORDER BY pe.name"#,
         [user_id],
         |r| Person {
             id: r.int("personid")? as i32,
-            podpeople_id: r.opt_int("podpeopleid")?.map(|v| v as i32),
             name: r.str("name")?,
             img: r.opt_str("img")?,
             href: r.opt_str("href")?,

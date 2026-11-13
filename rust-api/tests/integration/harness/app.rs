@@ -13,7 +13,7 @@ use argon2::password_hash::PasswordHasher;
 use axum::Router;
 use base64::Engine as _;
 use serde_json::json;
-use sqlx::{Connection, Executor, MySqlConnection, PgConnection};
+use sqlx::{Connection, Executor, PgConnection};
 
 use pinepods_api::config::{
     ApiConfig, Config, DatabaseConfig, EmailConfig, OIDCConfig, RedisConfig, SecurityConfig, ServerConfig,
@@ -22,7 +22,7 @@ use pinepods_api::database::DatabasePool;
 use pinepods_api::redis_client::RedisClient;
 use pinepods_api::AppState;
 
-use super::env::{self, col_string, Backend, TestEnv};
+use super::env::{self, TestEnv};
 use super::fixtures::Fixtures;
 use super::http::RequestBuilder;
 
@@ -67,10 +67,7 @@ impl TestApp {
         let pid = std::process::id();
         let slot = ((pid as u64).wrapping_mul(7919) + n as u64) % SLOTS + 1;
         let tag = format!("{pid:x}{n:x}");
-        let db_name = match env.backend {
-            Backend::Sqlite => env::sqlite_dir().join(format!("pt_{tag}.db")).to_string_lossy().into_owned(),
-            _ => format!("pt_{tag}"),
-        };
+        let db_name = format!("pt_{tag}");
         let id_base = slot as i64 * SLOT_WIDTH;
 
         clone_template(env, &db_name, id_base).await;
@@ -78,7 +75,6 @@ impl TestApp {
         let fixtures = Fixtures { server: env.fixtures.clone(), namespace: format!("t-{tag}") };
         let mut config = Config {
             database: DatabaseConfig {
-                db_type: env.backend.db_type().to_string(),
                 host: env.db_host.clone(),
                 port: env.db_port,
                 username: env.db_user.clone(),
@@ -87,8 +83,7 @@ impl TestApp {
                 max_connections: 8,
                 min_connections: 0,
             },
-            // SQLite installs default to the in-memory store; the others use Valkey.
-            redis: (env.backend != Backend::Sqlite).then(|| RedisConfig {
+            redis: Some(RedisConfig {
                 host: env.valkey_host.clone(),
                 port: env.valkey_port,
                 max_connections: 4,
@@ -133,8 +128,8 @@ impl TestApp {
                 trust_unverified_email: false,
             },
             api: ApiConfig {
-                search_api_url: fixtures.url("search-api/api/search"),
-                people_api_url: fixtures.url("people-api"),
+                itunes_search_url: fixtures.url("itunes/search"),
+                podcast_index_url: fixtures.url("podcastindex/api/1.0"),
                 youtube_feed_url: fixtures.url("youtube/{channel_id}.xml"),
             },
         };
@@ -172,16 +167,6 @@ impl TestApp {
         let router = pinepods_api::create_app(state.clone());
 
         TestApp { env, state, router, db_name, tag, fixtures, admin: tokio::sync::OnceCell::new() }
-    }
-
-    pub fn backend(&self) -> Backend {
-        self.env.backend
-    }
-
-    /// SQLite databases start from the baseline schema, so there is no older state to upgrade
-    /// from: tests of a migration's upgrade path skip themselves there.
-    pub fn upgrade_tests_unsupported(&self) -> bool {
-        self.env.backend == Backend::Sqlite
     }
 
     pub fn db(&self) -> &DatabasePool {
@@ -318,23 +303,10 @@ impl Drop for TestApp {
         let _ = std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             rt.block_on(async {
-                match env.backend {
-                    Backend::Postgres => {
-                        let mut c = env::admin_pg(env).await;
-                        let _ = c
-                            .execute(sqlx::AssertSqlSafe(format!(r#"DROP DATABASE IF EXISTS "{name}" WITH (FORCE)"#)))
-                            .await;
-                    }
-                    Backend::MariaDb => {
-                        let mut c = env::admin_mysql(env).await;
-                        let _ = c.execute(sqlx::AssertSqlSafe(format!("DROP DATABASE IF EXISTS `{name}`"))).await;
-                    }
-                    Backend::Sqlite => {
-                        for suffix in ["", "-wal", "-shm"] {
-                            let _ = std::fs::remove_file(format!("{name}{suffix}"));
-                        }
-                    }
-                }
+                let mut c = env::admin_pg(env).await;
+                let _ = c
+                    .execute(sqlx::AssertSqlSafe(format!(r#"DROP DATABASE IF EXISTS "{name}" WITH (FORCE)"#)))
+                    .await;
             });
         })
         .join();
@@ -357,93 +329,29 @@ pub fn basic(username: &str, password: &str) -> String {
 }
 
 async fn clone_template(env: &TestEnv, db_name: &str, id_base: i64) {
-    match env.backend {
-        Backend::Sqlite => {
-            std::fs::copy(&env.template, db_name).expect("copy SQLite template");
-            let mut c = sqlx::SqliteConnection::connect(&format!("sqlite://{db_name}")).await.unwrap();
-            c.execute(sqlx::AssertSqlSafe(format!(
-                "UPDATE sqlite_sequence SET seq = {id_base};
-                 INSERT INTO sqlite_sequence (name, seq)
-                   SELECT name, {id_base} FROM sqlite_master
-                   WHERE type = 'table' AND sql LIKE '%AUTOINCREMENT%' AND name NOT IN (SELECT name FROM sqlite_sequence)"
-            )))
-            .await
-            .expect("offset id sequences");
-            c.close().await.unwrap();
-        }
-        Backend::Postgres => {
-            let mut admin = env::admin_pg(env).await;
-            let create = format!(r#"CREATE DATABASE "{db_name}" TEMPLATE "{}""#, env.template);
-            // Concurrent clones of one template can transiently collide; retry briefly.
-            let mut attempt = 0;
-            loop {
-                match admin.execute(sqlx::AssertSqlSafe(create.clone())).await {
-                    Ok(_) => break,
-                    Err(e) if attempt < 20 && e.to_string().contains("being accessed by other users") => {
-                        attempt += 1;
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    }
-                    Err(e) => panic!("create test database {db_name}: {e}"),
-                }
+    let mut admin = env::admin_pg(env).await;
+    let create = format!(r#"CREATE DATABASE "{db_name}" TEMPLATE "{}""#, env.template);
+    // Concurrent clones of one template can transiently collide; retry briefly.
+    let mut attempt = 0;
+    loop {
+        match admin.execute(sqlx::AssertSqlSafe(create.clone())).await {
+            Ok(_) => break,
+            Err(e) if attempt < 20 && e.to_string().contains("being accessed by other users") => {
+                attempt += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            let mut c = PgConnection::connect(&env::pg_url(env, db_name)).await.unwrap();
-            c.execute(sqlx::AssertSqlSafe(format!(
-                "DO $$ DECLARE r record; BEGIN \
-                   FOR r IN SELECT schemaname, sequencename FROM pg_sequences LOOP \
-                     EXECUTE format('SELECT setval(%L, {id_base})', quote_ident(r.schemaname) || '.' || quote_ident(r.sequencename)); \
-                   END LOOP; END $$"
-            )))
-            .await
-            .expect("offset sequences");
-        }
-        Backend::MariaDb => {
-            let tmpl = &env.template;
-            let mut admin = env::admin_mysql(env).await;
-            admin
-                .execute(sqlx::AssertSqlSafe(format!("CREATE DATABASE `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci")))
-                .await
-                .unwrap();
-            let mut c = MySqlConnection::connect(&env::mysql_url(env, Some(db_name))).await.unwrap();
-            c.execute("SET FOREIGN_KEY_CHECKS = 0").await.unwrap();
-            let tables: Vec<String> = sqlx::query(
-                "SELECT table_name FROM information_schema.tables \
-                 WHERE table_schema = ? AND table_type = 'BASE TABLE' AND table_name <> '_tmpl_ready'",
-            )
-            .bind(tmpl)
-            .fetch_all(&mut c)
-            .await
-            .unwrap()
-            .iter()
-            .map(|r| col_string(r, 0))
-            .collect();
-            for t in &tables {
-                let row = sqlx::query(sqlx::AssertSqlSafe(format!("SHOW CREATE TABLE `{tmpl}`.`{t}`"))).fetch_one(&mut c).await.unwrap();
-                // Unqualified: the connection's current database is the new one, so the
-                // table *and* its FOREIGN KEY ... REFERENCES targets land there.
-                c.execute(sqlx::AssertSqlSafe(col_string(&row, 1))).await.unwrap_or_else(|e| panic!("clone {t}: {e}"));
-                c.execute(sqlx::AssertSqlSafe(format!("INSERT INTO `{t}` SELECT * FROM `{tmpl}`.`{t}`")))
-                    .await
-                    .unwrap_or_else(|e| panic!("copy {t}: {e}"));
-            }
-            let auto: Vec<String> = sqlx::query(
-                "SELECT DISTINCT table_name FROM information_schema.columns \
-                 WHERE table_schema = ? AND extra LIKE '%auto_increment%'",
-            )
-            .bind(db_name)
-            .fetch_all(&mut c)
-            .await
-            .unwrap()
-            .iter()
-            .map(|r| col_string(r, 0))
-            .collect();
-            for t in auto {
-                c.execute(sqlx::AssertSqlSafe(format!("ALTER TABLE `{t}` AUTO_INCREMENT = {}", id_base + 1)))
-                    .await
-                    .unwrap();
-            }
-            c.execute("SET FOREIGN_KEY_CHECKS = 1").await.unwrap();
+            Err(e) => panic!("create test database {db_name}: {e}"),
         }
     }
+    let mut c = PgConnection::connect(&env::pg_url(env, db_name)).await.unwrap();
+    c.execute(sqlx::AssertSqlSafe(format!(
+        "DO $$ DECLARE r record; BEGIN \
+           FOR r IN SELECT schemaname, sequencename FROM pg_sequences LOOP \
+             EXECUTE format('SELECT setval(%L, {id_base})', quote_ident(r.schemaname) || '.' || quote_ident(r.sequencename)); \
+           END LOOP; END $$"
+    )))
+    .await
+    .expect("offset sequences");
 }
 
 /// `PINEPODS_TEST_LOG=<filter>` (e.g. `warn` or `pinepods_api=debug`) prints the server's logs,

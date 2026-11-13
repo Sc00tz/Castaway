@@ -223,8 +223,7 @@ pub async fn call_get_podcast_info(
     api_key: &str,
     search_index: &str,
 ) -> Result<PodcastSearchResult, anyhow::Error> {
-    // Route through the backend search proxy so the browser never needs to
-    // reach SEARCH_API_URL directly (it may be an internal Docker hostname).
+    // The server searches Apple and Podcast Index for us (it holds the Podcast Index key).
     let url = format!(
         "{}/api/data/proxy_search?query={}&index={}",
         server_name,
@@ -259,10 +258,11 @@ pub async fn call_get_podcast_info(
             }
         }
     } else if response.status() == 503 {
-        // The server couldn't reach the search service; its message says which and why.
-        let detail = response.text().await.unwrap_or_default();
-        web_sys::console::log_1(&JsValue::from_str(&format!("Search service unavailable: {}", detail)));
-        Err(anyhow::Error::new(SearchUnavailable))
+        // The directory isn't reachable, or Podcast Index has no key; the server says which.
+        let body: serde_json::Value = response.json().await.unwrap_or_default();
+        let message = body["message"].as_str().unwrap_or_default();
+        let message = message.strip_prefix("Service unavailable: ").unwrap_or(message).to_string();
+        Err(anyhow::Error::new(SearchUnavailable(message)))
     } else {
         let error_msg = format!("Failed to fetch podcast info: {}", response.status_text());
         web_sys::console::log_1(&JsValue::from_str(&error_msg));
@@ -270,13 +270,14 @@ pub async fn call_get_podcast_info(
     }
 }
 
-/// The server answered that the search service can't be reached.
+/// The server couldn't search: the directory isn't reachable, or Podcast Index has no key.
+/// Holds the server's explanation.
 #[derive(Debug)]
-pub struct SearchUnavailable;
+pub struct SearchUnavailable(pub String);
 
 impl std::fmt::Display for SearchUnavailable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("the search service isn't reachable")
+        f.write_str(&self.0)
     }
 }
 
@@ -317,62 +318,6 @@ where
 pub struct PeopleFeedResult {
     pub status: Option<String>,
     pub items: Vec<Episode>,
-}
-
-#[allow(dead_code)]
-pub async fn call_get_person_info(
-    person_name: &String,
-    server_name: &str,
-    api_key: &str,
-    search_index: &str,
-) -> Result<PeopleFeedResult, anyhow::Error> {
-    let url = format!(
-        "{}/api/data/proxy_search?query={}&index={}&search_type=person",
-        server_name,
-        urlencoding::encode(person_name),
-        search_index
-    );
-    let response = Request::get(&url)
-        .header("Api-Key", api_key)
-        .send()
-        .await
-        .map_err(|err| anyhow::Error::new(err))?;
-
-    if response.ok() {
-        let response_text = response
-            .text()
-            .await
-            .map_err(|err| anyhow::Error::new(err))?;
-
-        let search_results: PeopleFeedResult = serde_json::from_str(&response_text)?;
-
-        Ok(search_results)
-    } else {
-        Err(anyhow::Error::msg(format!(
-            "Failed to fetch person info: {}",
-            response.status_text()
-        )))
-    }
-}
-
-pub async fn test_connection(search_api_url: &Option<String>) -> Result<(), Error> {
-    let url = search_api_url
-        .as_ref()
-        .ok_or_else(|| Error::msg("API URL is missing"))?;
-
-    match Request::get(url).send().await {
-        Ok(response) => {
-            if response.ok() {
-                Ok(())
-            } else {
-                Err(Error::msg(format!(
-                    "HTTP error occurred: {}",
-                    response.status_text()
-                )))
-            }
-        }
-        Err(err) => Err(Error::new(err)),
-    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
@@ -827,46 +772,6 @@ pub struct YouTubeVideoDetails {
     #[serde(rename = "publishedAt")]
     pub published_at: String,
     pub duration: Option<String>,
-}
-
-#[allow(dead_code)]
-pub async fn call_youtube_channel_details(
-    channel_id: &str,
-    search_api_url: &Option<String>,
-) -> Result<YouTubeChannelDetails, Error> {
-    let url = if let Some(api_url) = search_api_url {
-        format!("{}/youtube/channel?id={}", api_url, channel_id)
-    } else {
-        return Err(anyhow::Error::msg("Search API URL is not provided"));
-    };
-
-    let response = Request::get(&url)
-        .send()
-        .await
-        .map_err(|e| Error::msg(format!("Network request error: {}", e)))?;
-
-    if response.ok() {
-        let text = response
-            .text()
-            .await
-            .map_err(|e| Error::msg(format!("Failed to get response text: {}", e)))?;
-
-        let channel_details: YouTubeChannelDetails = serde_json::from_str(&text).map_err(|e| {
-            web_sys::console::log_1(&format!("Parse error: {}", e).into());
-            Error::msg(format!(
-                "Failed to parse channel details: {} - Raw text: {}",
-                e, text
-            ))
-        })?;
-
-        Ok(channel_details)
-    } else {
-        let error_text = response.status_text();
-        Err(Error::msg(format!(
-            "Error getting YouTube channel details. Server response: {}",
-            error_text
-        )))
-    }
 }
 
 // Inside transcripts

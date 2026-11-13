@@ -40,25 +40,6 @@ async fn download_episode_and_wait(
                 row.try_get::<Option<chrono::NaiveDateTime>, _>("episodepubdate")?,
             )
         },
-        mysql(pool) => {
-            let row = sqlx::query("
-                SELECT e.EpisodeURL, e.EpisodeTitle, p.PodcastName, e.EpisodePubDate
-                FROM Episodes e
-                JOIN Podcasts p ON e.FeedID = p.FeedID AND p.UserID = ?
-                WHERE e.EpisodeID = ?
-            ")
-            .bind(user_id)
-            .bind(episode_id)
-            .fetch_one(pool)
-            .await?;
-            
-            (
-                row.try_get::<String, _>("EpisodeURL")?,
-                row.try_get::<String, _>("EpisodeTitle")?,
-                row.try_get::<String, _>("PodcastName")?,
-                row.try_get::<Option<chrono::NaiveDateTime>, _>("EpisodePubDate")?,
-            )
-        },
     });
     
     let (episode_url, episode_title, podcast_name, pub_date) = episode_info;
@@ -139,15 +120,6 @@ async fn download_episode_and_wait(
     dialect_match!(db_pool, {
         pg(pool) => {
             q::query(r#"INSERT INTO "DownloadedEpisodes" (userid, episodeid, downloadedsize, downloadedlocation) VALUES ($1, $2, $3, $4)"#)
-                .bind(user_id)
-                .bind(episode_id)
-                .bind(file_size)
-                .bind(file_path.to_string_lossy().to_string())
-                .execute(pool)
-                .await?;
-        },
-        mysql(pool) => {
-            sqlx::query("INSERT INTO DownloadedEpisodes (UserID, EpisodeID, DownloadedSize, DownloadedLocation) VALUES (?, ?, ?, ?)")
                 .bind(user_id)
                 .bind(episode_id)
                 .bind(file_size)
@@ -404,37 +376,6 @@ impl TaskSpawner {
                             row.try_get::<Option<i32>, _>("episodeduration")?
                         )
                     },
-                    mysql(pool) => {
-                        let row = sqlx::query("
-                            SELECT e.EpisodeURL, e.EpisodeTitle, p.PodcastName,
-                                   e.EpisodePubDate, p.Author, e.EpisodeArtwork, p.ArtworkURL,
-                                   e.EpisodeDescription, p.Username, p.Password,
-                                   p.FeedURL, e.EpisodeGUID, e.EpisodeDuration
-                            FROM Episodes e
-                            JOIN Podcasts p ON e.FeedID = p.FeedID AND p.UserID = ?
-                            WHERE e.EpisodeID = ?
-                        ")
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .fetch_one(pool)
-                        .await?;
-
-                        (
-                            row.try_get::<String, _>("EpisodeURL")?,
-                            row.try_get::<String, _>("EpisodeTitle")?,
-                            row.try_get::<String, _>("PodcastName")?,
-                            row.try_get::<Option<chrono::NaiveDateTime>, _>("EpisodePubDate")?,
-                            row.try_get::<Option<String>, _>("Author")?,
-                            row.try_get::<Option<String>, _>("EpisodeArtwork")?,
-                            row.try_get::<Option<String>, _>("ArtworkURL")?,
-                            row.try_get::<Option<String>, _>("EpisodeDescription")?,
-                            row.try_get::<Option<String>, _>("Username")?,
-                            row.try_get::<Option<String>, _>("Password")?,
-                            row.try_get::<Option<String>, _>("FeedURL")?,
-                            row.try_get::<Option<String>, _>("EpisodeGUID")?,
-                            row.try_get::<Option<i32>, _>("EpisodeDuration")?
-                        )
-                    },
                 });
 
                 let (episode_url, episode_title, podcast_name, pub_date, author, episode_artwork, artwork_url, description, feed_username, feed_password, feed_url, episode_guid, episode_duration) = episode_info;
@@ -646,26 +587,6 @@ impl TaskSpawner {
                         q::query(r#"
                             UPDATE "UserStats" SET episodesdownloaded = episodesdownloaded + 1 WHERE userid = $1
                         "#)
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                    },
-                    mysql(pool) => {
-                        sqlx::query("
-                            INSERT INTO DownloadedEpisodes (UserID, EpisodeID, DownloadedSize, DownloadedLocation)
-                            VALUES (?, ?, ?, ?)
-                        ")
-                        .bind(user_id)
-                        .bind(episode_id)
-                        .bind(downloaded as i64)
-                        .bind(file_path.to_string_lossy().as_ref())
-                        .execute(pool)
-                        .await?;
-
-                        // Update UserStats table to increment EpisodesDownloaded count
-                        sqlx::query("
-                            UPDATE UserStats SET EpisodesDownloaded = EpisodesDownloaded + 1 WHERE UserID = ?
-                        ")
                         .bind(user_id)
                         .execute(pool)
                         .await?;
@@ -937,20 +858,6 @@ impl TaskSpawner {
                         
                         (youtube_video_id, video_title)
                     },
-                    mysql(pool) => {
-                        let row = sqlx::query("SELECT YouTubeVideoID, VideoTitle FROM YouTubeVideos WHERE VideoID = ?")
-                            .bind(video_id)
-                            .fetch_one(pool)
-                            .await
-                            .map_err(|e| crate::error::AppError::internal(&format!("Failed to get video: {}", e)))?;
-                        
-                        let youtube_video_id: String = row.try_get("YouTubeVideoID")
-                            .map_err(|e| crate::error::AppError::internal(&format!("Failed to get YouTube video ID: {}", e)))?;
-                        let video_title: String = row.try_get("VideoTitle")
-                            .map_err(|e| crate::error::AppError::internal(&format!("Failed to get video title: {}", e)))?;
-                        
-                        (youtube_video_id, video_title)
-                    },
                 });
                 
                 task_manager.set_task_metadata(&task_id, Some(video_title.clone()), Some("YouTube".to_string())).await?;
@@ -1034,23 +941,6 @@ impl TaskSpawner {
                         
                         rows.into_iter()
                             .map(|row| row.try_get::<i32, _>("episodeid"))
-                            .collect::<Result<Vec<i32>, _>>()?
-                    },
-                    mysql(pool) => {
-                        let rows = sqlx::query("
-                            SELECT e.EpisodeID 
-                            FROM Episodes e
-                            LEFT JOIN DownloadedEpisodes de ON e.EpisodeID = de.EpisodeID AND de.UserID = ?
-                            WHERE e.FeedID = (SELECT FeedID FROM Podcasts WHERE PodcastID = ?) AND de.EpisodeID IS NULL
-                            ORDER BY e.EpisodePubDate DESC
-                        ")
-                            .bind(user_id)
-                            .bind(podcast_id)
-                            .fetch_all(pool)
-                            .await?;
-                        
-                        rows.into_iter()
-                            .map(|row| row.try_get::<i32, _>("EpisodeID"))
                             .collect::<Result<Vec<i32>, _>>()?
                     },
                 });
@@ -1171,21 +1061,6 @@ impl TaskSpawner {
                             Ok((youtube_video_id, video_title))
                         }).collect::<Result<Vec<(String, String)>, crate::error::AppError>>()?
                     },
-                    mysql(pool) => {
-                        let rows = sqlx::query("SELECT VideoID, YouTubeVideoID, VideoTitle FROM YouTubeVideos WHERE PodcastID = ?")
-                            .bind(channel_id)
-                            .fetch_all(pool)
-                            .await
-                            .map_err(|e| crate::error::AppError::internal(&format!("Failed to get videos: {}", e)))?;
-                        
-                        rows.into_iter().map(|row| {
-                            let youtube_video_id: String = row.try_get("YouTubeVideoID")
-                                .map_err(|e| crate::error::AppError::internal(&format!("Failed to get YouTube video ID: {}", e)))?;
-                            let video_title: String = row.try_get("VideoTitle")
-                                .map_err(|e| crate::error::AppError::internal(&format!("Failed to get video title: {}", e)))?;
-                            Ok((youtube_video_id, video_title))
-                        }).collect::<Result<Vec<(String, String)>, crate::error::AppError>>()?
-                    },
                 });
                 
                 let total_videos = videos_data.len();
@@ -1292,12 +1167,6 @@ impl TaskSpawner {
                             let episode_count: i64 = dialect_match!(&db_pool, {
                                 pg(pool) => {
                                     q::query_scalar(r#"SELECT COUNT(*) FROM "Episodes" WHERE feedid = (SELECT feedid FROM "Podcasts" WHERE podcastid = $1)"#)
-                                        .bind(podcast_id)
-                                        .fetch_one(pool)
-                                        .await?
-                                },
-                                mysql(pool) => {
-                                    sqlx::query_scalar("SELECT COUNT(*) FROM Episodes WHERE FeedID = (SELECT FeedID FROM Podcasts WHERE PodcastID = ?)")
                                         .bind(podcast_id)
                                         .fetch_one(pool)
                                         .await?

@@ -93,23 +93,6 @@ pub async fn get_settings(db_pool: &DatabasePool) -> Result<YtDlpSettings, Strin
                 last_result: r.try_get::<Option<String>, _>("last_result").ok().flatten(),
             })
         },
-        mysql(pool) => {
-            let row = sqlx::query(r#"
-                SELECT YtDlpAutoUpdate AS auto_update, YtDlpChannel AS channel,
-                       CAST(YtDlpLastUpdated AS CHAR) AS last_updated, YtDlpLastResult AS last_result
-                FROM AppSettings LIMIT 1
-            "#)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.to_string())?;
-            let Some(r) = row else { return Ok(YtDlpSettings::default()) };
-            Ok(YtDlpSettings {
-                auto_update: r.try_get::<Option<i32>, _>("auto_update").ok().flatten().unwrap_or(1) == 1,
-                channel: r.try_get::<Option<String>, _>("channel").ok().flatten().unwrap_or_else(|| "stable".into()),
-                last_updated: r.try_get::<Option<String>, _>("last_updated").ok().flatten(),
-                last_result: r.try_get::<Option<String>, _>("last_result").ok().flatten(),
-            })
-        },
     })
 }
 
@@ -126,14 +109,6 @@ pub async fn set_settings(db_pool: &DatabasePool, update: &YtDlpSettingsUpdate) 
                 .await
                 .map_err(|e| e.to_string())?;
         },
-        mysql(pool) => {
-            sqlx::query("UPDATE AppSettings SET YtDlpAutoUpdate = ?, YtDlpChannel = ?")
-                .bind(update.auto_update as i32)
-                .bind(channel)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
     });
     Ok(())
 }
@@ -143,13 +118,6 @@ async fn record_result(db_pool: &DatabasePool, result: &str) -> Result<(), Strin
     dialect_match!(db_pool, {
         pg(pool) => {
             q::query(r#"UPDATE "AppSettings" SET ytdlplastupdated = CURRENT_TIMESTAMP, ytdlplastresult = $1"#)
-                .bind(result)
-                .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
-        },
-        mysql(pool) => {
-            sqlx::query("UPDATE AppSettings SET YtDlpLastUpdated = CURRENT_TIMESTAMP, YtDlpLastResult = ?")
                 .bind(result)
                 .execute(pool)
                 .await

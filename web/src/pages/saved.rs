@@ -3,6 +3,7 @@ use crate::components::audio_player_bar::AudioPlayerBar;
 use crate::components::context::{AppState, CollectionModalState, EpisodeStatusState, FilterState, NotificationState, PodcastFeedState};
 use crate::components::context_menu_button::PageType;
 use crate::components::episode_list_view::EpisodeListView;
+use crate::components::hide_played::{is_played, use_hide_played, HidePlayedChip};
 use crate::components::gen_components::{
     empty_message, Search_nav, UseScrollToTop,
 };
@@ -52,6 +53,8 @@ pub fn saved() -> Html {
     let server_name_sel = use_selector(|s: &AppState| {
         s.auth_details.as_ref().map(|ud| ud.server_name.clone())
     });
+    let completed_sel = use_selector(|s: &EpisodeStatusState| s.completed_episodes.clone());
+    let (hide_played, toggle_hide_played) = use_hide_played("saved");
     let api_key = (*api_key_sel).clone();
     let user_id = (*user_id_sel).clone();
     let server_name = (*server_name_sel).clone();
@@ -560,7 +563,10 @@ pub fn saved() -> Html {
 
     // Client-side filter (search + favorites)
     let search_term = (*episode_search_term).clone();
+    // "Completed" shows only played episodes, so hiding them would empty it.
+    let hiding_played = hide_played && *filter_value != "completed";
     let has_client_filter = !search_term.is_empty()
+        || hiding_played
         || (filter_state.favorites_only && !favorite_podcast_ids.is_empty());
     let display_episodes_rc: Rc<Vec<Episode>> = if has_client_filter {
         let term = search_term.to_lowercase();
@@ -570,6 +576,9 @@ pub fn saved() -> Html {
                 .filter(|ep| {
                     if filter_state.favorites_only && !favorite_podcast_ids.contains(&ep.podcastid)
                     {
+                        return false;
+                    }
+                    if hiding_played && is_played(ep.episodeid, &completed_sel) {
                         return false;
                     }
                     if term.is_empty() {
@@ -898,6 +907,7 @@ pub fn saved() -> Html {
                                         <i class="ph ph-hourglass-medium"></i>
                                         <span>{i18n.t("saved.in_progress")}</span>
                                     </button>
+                                    <HidePlayedChip active={hide_played} onclick={toggle_hide_played.clone()} />
                                 </div>
                             </div>
 

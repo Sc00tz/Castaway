@@ -87,18 +87,6 @@ pub fn websearch_query(terms: &[Term]) -> String {
         .join(" ")
 }
 
-/// The query for MariaDB/MySQL `MATCH ... AGAINST (... IN BOOLEAN MODE)`: every term required,
-/// excluded terms prefixed with `-`. Terms are already stripped of boolean-mode operators.
-pub fn boolean_mode_query(terms: &[Term]) -> String {
-    terms
-        .iter()
-        .map(|t| {
-            let body = if t.phrase { format!("\"{}\"", t.text) } else { t.text.clone() };
-            format!("{}{body}", if t.negate { '-' } else { '+' })
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
 
 /// A place in a transcript where the search terms were said.
 #[derive(Debug, Clone, Serialize, PartialEq, utoipa::ToSchema)]
@@ -119,7 +107,7 @@ struct Segment {
 
 /// Up to `max` moments where the wanted terms appear, and how many times they appear in all.
 /// Uses the timed segments when there are any, otherwise the plain text. Whole-word matches
-/// first; if there are none, any substring (how SQLite matched).
+/// first; if there are none, any substring.
 pub fn find_moments(segments_json: Option<&str>, full_text: Option<&str>, terms: &[Term], max: usize) -> (Vec<Moment>, usize) {
     let wanted = wanted(terms);
     if wanted.is_empty() {
@@ -286,7 +274,6 @@ mod tests {
             ]
         );
         assert_eq!(websearch_query(&t), r#"rust "memory safety" -garbage -"go lang""#);
-        assert_eq!(boolean_mode_query(&t), r#"+rust +"memory safety" -garbage -"go lang""#);
     }
 
     #[test]

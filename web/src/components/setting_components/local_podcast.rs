@@ -455,7 +455,7 @@ pub fn local_podcast() -> Html {
                         </div>
 
                         <div class="settings-row-desc" style="margin-bottom:8px;">
-                            { format!("/opt/pinepods/local-media/{}", *browser_path) }
+                            { format!("/data/local-media/{}", *browser_path) }
                         </div>
 
                         <div style="display:flex; gap:8px; margin-bottom:8px;">

@@ -30,7 +30,7 @@ pub fn credential_key(feed_url: &str, username: Option<&str>, password: Option<&
     hex::encode(key)
 }
 
-/// Feeds.FeedURLHash: the address in the unique key (TEXT can't be indexed on MySQL).
+/// Feeds.FeedURLHash: a hash of the address, kept in the unique key.
 pub fn url_hash(feed_url: &str) -> String {
     crate::services::http::content_hash(feed_url)
 }
@@ -51,12 +51,6 @@ impl DatabasePool {
         let sub: Option<Sub> = dialect_match!(self, {
             pg(pool) => {
                 q::query_as(r#"SELECT feedurl, username, password, userid, feedid FROM "Podcasts" WHERE podcastid = $1"#)
-                    .bind(podcast_id)
-                    .fetch_optional(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query_as("SELECT FeedURL, Username, Password, UserID, FeedID FROM Podcasts WHERE PodcastID = ?")
                     .bind(podcast_id)
                     .fetch_optional(pool)
                     .await?
@@ -87,24 +81,6 @@ impl DatabasePool {
                     .fetch_one(pool)
                     .await?
             },
-            mysql(pool) => {
-                sqlx::query(sqlx::AssertSqlSafe(format!(
-                    "INSERT INTO Feeds (FeedURL, FeedURLHash, CredentialKey, IsYouTubeChannel, {STATE_COLUMNS})
-                     SELECT FeedURL, ?, ?, COALESCE(IsYouTubeChannel, 0), {STATE_VALUES}
-                     FROM Podcasts WHERE PodcastID = ?
-                     ON DUPLICATE KEY UPDATE Feeds.FeedID = Feeds.FeedID"
-                )))
-                .bind(&hash)
-                .bind(&key)
-                .bind(podcast_id)
-                .execute(pool)
-                .await?;
-                sqlx::query_scalar("SELECT FeedID FROM Feeds WHERE FeedURLHash = ? AND CredentialKey = ?")
-                    .bind(&hash)
-                    .bind(&key)
-                    .fetch_one(pool)
-                    .await?
-            },
         });
         if current == Some(feed_id) {
             return Ok(Some(feed_id));
@@ -128,23 +104,6 @@ impl DatabasePool {
                 .await?;
                 tx.commit().await?;
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                sqlx::query("UPDATE Podcasts SET FeedID = ? WHERE PodcastID = ?")
-                    .bind(feed_id)
-                    .bind(podcast_id)
-                    .execute(&mut *tx)
-                    .await?;
-                sqlx::query(
-                    "UPDATE Feeds f JOIN Podcasts p ON p.PodcastID = ? SET f.NextRefreshAt = p.NextRefreshAt
-                     WHERE f.FeedID = ? AND p.NextRefreshAt < f.NextRefreshAt",
-                )
-                .bind(podcast_id)
-                .bind(feed_id)
-                .execute(&mut *tx)
-                .await?;
-                tx.commit().await?;
-            },
         });
         Ok(Some(feed_id))
     }
@@ -154,12 +113,6 @@ impl DatabasePool {
         let current: Option<Option<i32>> = dialect_match!(self, {
             pg(pool) => {
                 q::query_scalar(r#"SELECT feedid FROM "Podcasts" WHERE podcastid = $1"#)
-                    .bind(podcast_id)
-                    .fetch_optional(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar("SELECT FeedID FROM Podcasts WHERE PodcastID = ?")
                     .bind(podcast_id)
                     .fetch_optional(pool)
                     .await?
@@ -180,12 +133,6 @@ impl DatabasePool {
         Ok(dialect_match!(self, {
             pg(pool) => {
                 q::query_scalar(r#"SELECT podcastid FROM "Podcasts" WHERE feedid = $1 ORDER BY podcastid"#)
-                    .bind(feed_id)
-                    .fetch_all(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar("SELECT PodcastID FROM Podcasts WHERE FeedID = ? ORDER BY PodcastID")
                     .bind(feed_id)
                     .fetch_all(pool)
                     .await?
@@ -213,14 +160,6 @@ impl DatabasePool {
                 .fetch_all(pool)
                 .await?
             },
-            mysql(pool) => {
-                sqlx::query_scalar(
-                    "SELECT p.PodcastID FROM Podcasts p LEFT JOIN Feeds f ON f.FeedID = p.FeedID
-                     WHERE p.FeedURL IS NOT NULL AND p.FeedURL <> '' AND (f.FeedID IS NULL OR f.FeedURL <> p.FeedURL)",
-                )
-                .fetch_all(pool)
-                .await?
-            },
         });
         for &id in &ids {
             self.link_feed(id).await?;
@@ -239,15 +178,6 @@ impl DatabasePool {
                 q::query(
                     r#"DELETE FROM "Feeds" f WHERE f.createdat < NOW() - INTERVAL '1 hour'
                        AND NOT EXISTS (SELECT 1 FROM "Podcasts" p WHERE p.feedid = f.feedid)"#,
-                )
-                .execute(pool)
-                .await?
-                .rows_affected()
-            },
-            mysql(pool) => {
-                sqlx::query(
-                    "DELETE FROM Feeds WHERE CreatedAt < NOW() - INTERVAL 1 HOUR
-                     AND NOT EXISTS (SELECT 1 FROM Podcasts p WHERE p.FeedID = Feeds.FeedID)",
                 )
                 .execute(pool)
                 .await?
@@ -282,24 +212,6 @@ impl DatabasePool {
                 .await?
                 .iter()
                 .map(|r| r.try_get("feedid"))
-                .collect::<Result<Vec<i32>, _>>()?
-            },
-            mysql(pool) => {
-                sqlx::query(sqlx::AssertSqlSafe(format!(
-                    "SELECT f.FeedID FROM Feeds f
-                     WHERE EXISTS (SELECT 1 FROM Podcasts p WHERE p.FeedID = f.FeedID AND COALESCE(p.RefreshPodcast, 1) = 1)
-                       AND (f.NextRefreshAt IS NULL OR f.NextRefreshAt <= NOW())
-                       AND (f.RefreshNotBefore IS NULL OR f.RefreshNotBefore <= NOW())
-                       AND (f.ConsecutiveFailures = 0 OR f.LastRefreshAttempt IS NULL
-                            OR f.LastRefreshAttempt < NOW() - INTERVAL ({BACKOFF_STEP_MINUTES} * LEAST(f.ConsecutiveFailures, {BACKOFF_MAX_STEPS})) MINUTE)
-                     ORDER BY f.NextRefreshAt IS NOT NULL, f.NextRefreshAt ASC
-                     LIMIT ?"
-                )))
-                .bind(limit)
-                .fetch_all(pool)
-                .await?
-                .iter()
-                .map(|r| r.try_get("FeedID"))
                 .collect::<Result<Vec<i32>, _>>()?
             },
         });

@@ -1733,7 +1733,9 @@ pub async fn backup_user(
 // Request struct for backup_server
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct BackupServerRequest {
-    pub database_pass: String,
+    /// Ignored, and optional: the server signs in to its database with its own credentials.
+    #[serde(default)]
+    pub database_pass: Option<String>,
 }
 
 // Backup server data - improved streaming approach for large databases
@@ -1746,7 +1748,6 @@ pub struct BackupServerRequest {
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Backup file download", content_type = "application/octet-stream"),
-        (status = 400, description = "Incorrect database password"),
         (status = 401, description = "Invalid or missing API key"),
         (status = 500, description = "Database dump failed"),
     ),
@@ -1769,13 +1770,13 @@ pub async fn backup_server(
 
     // For large databases, we'll implement streaming export instead of subprocess
     // This avoids loading the entire database into memory at once
-    backup_server_streaming(&state, &request.database_pass).await
+    let _ = request.database_pass;
+    backup_server_streaming(&state).await
 }
 
-// Use actual pg_dump/mysqldump for reliable backups
+// Use pg_dump for reliable backups
 async fn backup_server_streaming(
     state: &AppState,
-    database_pass: &str,
 ) -> Result<axum::response::Response, AppError> {
     use axum::response::Response;
     use axum::body::Body;
@@ -1784,24 +1785,6 @@ async fn backup_server_streaming(
     use tokio::process::Command;
     use tokio_util::io::ReaderStream;
 
-    if let crate::database::DatabasePool::Sqlite(_) = &state.db_pool {
-        // Dump to a temp file, then stream it; the file is unlinked once open.
-        let path = std::env::temp_dir().join(format!("pinepods-backup-{}.sql", uuid::Uuid::new_v4()));
-        let result = state.db_pool.sqlite_backup_to(&path).await
-            .expect("SQLite pool")
-            .map_err(|e| e.to_string());
-        let file = match result {
-            Ok(()) => tokio::fs::File::open(&path).await.map_err(|e| format!("Failed to open backup: {}", e)),
-            Err(e) => Err(e),
-        };
-        let _ = tokio::fs::remove_file(&path).await;
-        return Response::builder()
-            .status(200)
-            .header("content-type", "text/plain; charset=utf-8")
-            .header("content-disposition", "attachment; filename=\"pinepods_backup.sql\"")
-            .body(Body::from_stream(ReaderStream::new(file.map_err(|e| AppError::internal(format!("Backup failed: {}", e)))?)))
-            .map_err(|e| AppError::internal(format!("Failed to build response: {}", e)));
-    }
 
     // Get database connection info from config
     let mut cmd = dialect_match!(&state.db_pool, {
@@ -1828,33 +1811,8 @@ async fn backup_server_streaming(
                .arg("--format=plain")
                .arg(&database);
             
-            // Set password via environment variable
-            cmd.env("PGPASSWORD", database_pass);
-            
-            cmd
-        },
-        mysql(_) => {
-            let host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
-            let port = std::env::var("DB_PORT").unwrap_or_else(|_| "3306".to_string());
-            let database = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods".to_string());
-            let username = std::env::var("DB_USER").unwrap_or_else(|_| "root".to_string());
-            
-            let mut cmd = Command::new("mysqldump");
-            cmd.arg("--host").arg(&host)
-               .arg("--port").arg(&port)
-               .arg("--user").arg(&username)
-               .arg(format!("--password={}", database_pass))
-               .arg("--skip-ssl")
-               .arg("--default-auth=mysql_native_password")
-               .arg("--single-transaction")
-               .arg("--routines")
-               .arg("--triggers")
-               .arg("--complete-insert")
-               // Transient login-token tables: never worth backing up (security) and a
-               // frequent source of cross-version schema drift on restore.
-               .arg(format!("--ignore-table={}.Sessions", database))
-               .arg(format!("--ignore-table={}.GpodderSessions", database))
-               .arg(&database);
+            // The server's own database password, so the admin never needs to know it.
+            cmd.env("PGPASSWORD", std::env::var("DB_PASSWORD").unwrap_or_default());
             
             cmd
         },
@@ -1907,12 +1865,12 @@ async fn backup_server_streaming(
     Response::builder()
         .status(200)
         .header("content-type", "text/plain; charset=utf-8")
-        .header("content-disposition", "attachment; filename=\"pinepods_backup.sql\"")
+        .header("content-disposition", "attachment; filename=\"castaway_backup.sql\"")
         .body(body)
         .map_err(|e| AppError::internal(format!("Failed to build response: {}", e)))
 }
 
-/// Last meaningful stderr line from pg_dump/mysqldump (verbose progress lines are noise).
+/// Last meaningful stderr line from pg_dump (verbose progress lines are noise).
 fn last_error_line(stderr: &str) -> &str {
     let lines: Vec<&str> = stderr.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
     lines.iter().rev()
@@ -1929,7 +1887,7 @@ fn backup_failure_error(exited_ok: bool, stderr: &str) -> AppError {
         || lower.contains("access denied")
         || lower.contains("no password supplied")
     {
-        return AppError::bad_request("Incorrect database password");
+        return AppError::internal("Backup failed: the server couldn't sign in to its database");
     }
     let detail = last_error_line(stderr);
     if exited_ok || detail.is_empty() {
@@ -5296,12 +5254,7 @@ pub async fn list_backup_files(
         }
     };
 
-    // SQLite backups need no database password, so the settings page can leave it out.
-    let database_type = match &state.db_pool {
-        crate::database::DatabasePool::Postgres(_) => "postgresql",
-        crate::database::DatabasePool::MySQL(_) => "mysql",
-        crate::database::DatabasePool::Sqlite(_) => "sqlite",
-    };
+    let database_type = "postgresql";
     Ok(Json(serde_json::json!({
         "backup_files": backup_files,
         "database_type": database_type
@@ -5375,7 +5328,7 @@ pub async fn restore_from_backup_file(
                 reporter.update_progress(10.0, Some("Starting restoration from backup file...".to_string())).await?;
                 reporter.update_progress(50.0, Some("Restoring database...".to_string())).await?;
 
-                // Clears existing data, then streams the dump into psql/mysql.
+                // Clears existing data, then streams the dump into psql.
                 let result = db_pool.restore_server_data_from_path(std::path::Path::new(&backup_path)).await;
                 merged.reset();
                 result?;
@@ -5492,7 +5445,6 @@ pub async fn manual_backup_to_directory(
 
     // Clone for the async closure
     let backup_filename_for_closure = backup_filename.clone();
-    let db_pool = state.db_pool.clone();
 
     // Spawn backup task
     let task_id = state.task_spawner.spawn_progress_task(
@@ -5501,78 +5453,42 @@ pub async fn manual_backup_to_directory(
         move |reporter| {
             let backup_path = backup_path.clone();
             let backup_filename = backup_filename_for_closure;
-            let db_pool = db_pool.clone();
             async move {
                 reporter.update_progress(10.0, Some("Starting manual backup...".to_string())).await?;
                 
-                if let Some(result) = db_pool.sqlite_backup_to(std::path::Path::new(&backup_path)).await {
-                    result?;
-                } else {
-                    // Get database credentials from environment
-                    let db_type = std::env::var("DB_TYPE").unwrap_or_else(|_| "postgresql".to_string());
-                    let db_host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
-                    let db_name = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods_database".to_string());
-                    let db_password = std::env::var("DB_PASSWORD")
-                        .map_err(|_| AppError::internal("Database password not found in environment"))?;
-                
-                    reporter.update_progress(30.0, Some("Creating database backup...".to_string())).await?;
-                
-                    // Use appropriate backup command based on database type
-                    let output = if db_type.to_lowercase().contains("mysql") || db_type.to_lowercase().contains("mariadb") {
-                        let db_port = std::env::var("DB_PORT").unwrap_or_else(|_| "3306".to_string());
-                        let db_user = std::env::var("DB_USER").unwrap_or_else(|_| "root".to_string());
-                    
-                        tokio::process::Command::new("mysqldump")
-                            .args(&[
-                                "-h", &db_host,
-                                "-P", &db_port,
-                                "-u", &db_user,
-                                &format!("-p{}", db_password),
-                                "--single-transaction",
-                                "--routines",
-                                "--triggers",
-                                "--ssl-verify-server-cert=0",
-                                // Transient login-token tables: excluded for security and to avoid
-                                // cross-version schema drift on restore.
-                                &format!("--ignore-table={}.Sessions", db_name),
-                                &format!("--ignore-table={}.GpodderSessions", db_name),
-                                "--result-file", &backup_path,
-                                &db_name
-                            ])
-                            .output()
-                            .await
-                            .map_err(|e| AppError::internal(&format!("Failed to execute mysqldump: {}", e)))?
-                    } else {
-                        // PostgreSQL
-                        let db_port = std::env::var("DB_PORT").unwrap_or_else(|_| "5432".to_string());
-                        let db_user = std::env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
-                    
-                        tokio::process::Command::new("pg_dump")
-                            .env("PGPASSWORD", db_password)
-                            .args(&[
-                                "-h", &db_host,
-                                "-p", &db_port,
-                                "-U", &db_user,
-                                "-d", &db_name,
-                                "--clean",
-                                "--if-exists",
-                                "--no-owner",
-                                "--no-privileges",
-                                // Transient login-token tables: excluded for security and to avoid
-                                // cross-version schema drift on restore.
-                                "--exclude-table-data=public.\"Sessions\"",
-                                "--exclude-table-data=public.\"GpodderSessions\"",
-                                "-f", &backup_path
-                            ])
-                            .output()
-                            .await
-                            .map_err(|e| AppError::internal(&format!("Failed to execute pg_dump: {}", e)))?
-                    };
+                let db_host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
+                let db_name = std::env::var("DB_NAME").unwrap_or_else(|_| "castaway".to_string());
+                let db_port = std::env::var("DB_PORT").unwrap_or_else(|_| "5432".to_string());
+                let db_user = std::env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string());
+                let db_password = std::env::var("DB_PASSWORD")
+                    .map_err(|_| AppError::internal("Database password not found in environment"))?;
 
-                    if !output.status.success() {
-                        let error_msg = String::from_utf8_lossy(&output.stderr);
-                        return Err(AppError::internal(&format!("Backup failed: {}", error_msg)));
-                    }
+                reporter.update_progress(30.0, Some("Creating database backup...".to_string())).await?;
+
+                let output = tokio::process::Command::new("pg_dump")
+                    .env("PGPASSWORD", db_password)
+                    .args(&[
+                        "-h", &db_host,
+                        "-p", &db_port,
+                        "-U", &db_user,
+                        "-d", &db_name,
+                        "--clean",
+                        "--if-exists",
+                        "--no-owner",
+                        "--no-privileges",
+                        // Transient login-token tables: excluded for security and to avoid
+                        // cross-version schema drift on restore.
+                        "--exclude-table-data=public.\"Sessions\"",
+                        "--exclude-table-data=public.\"GpodderSessions\"",
+                        "-f", &backup_path
+                    ])
+                    .output()
+                    .await
+                    .map_err(|e| AppError::internal(&format!("Failed to execute pg_dump: {}", e)))?;
+
+                if !output.status.success() {
+                    let error_msg = String::from_utf8_lossy(&output.stderr);
+                    return Err(AppError::internal(&format!("Backup failed: {}", error_msg)));
                 }
 
                 reporter.update_progress(90.0, Some("Finalizing backup...".to_string())).await?;
@@ -6385,12 +6301,11 @@ mod backup_error_tests {
     use super::*;
 
     #[test]
-    fn wrong_password_is_a_bad_request() {
+    fn wrong_password_is_reported() {
         let pg = "pg_dump: last built-in OID is 16383\npg_dump: error: connection to server at \"db\" (172.18.0.2), port 5432 failed: FATAL:  password authentication failed for user \"postgres\"\n";
-        let my = "mysqldump: Got error: 1045: \"Access denied for user 'root'@'172.18.0.3' (using password: YES)\" when trying to connect\n";
-        for stderr in [pg, my] {
+        for stderr in [pg] {
             let err = backup_failure_error(false, stderr);
-            assert!(matches!(err, AppError::BadRequest(ref m) if m == "Incorrect database password"), "{err:?}");
+            assert!(matches!(err, AppError::Internal(ref m) if m.contains("couldn't sign in")), "{err:?}");
         }
     }
 

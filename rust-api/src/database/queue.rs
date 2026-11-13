@@ -112,78 +112,6 @@ impl DatabasePool {
                 tx.commit().await?;
                 Ok(())
             },
-            mysql(pool) => {
-                // First check if already queued
-                let existing = sqlx::query(
-                    "SELECT QueueID FROM EpisodeQueue
-                     WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                )
-                .bind(episode_id)
-                .bind(user_id)
-                .bind(is_youtube)
-                .fetch_optional(pool)
-                .await?;
-
-                if existing.is_some() {
-                    return Ok(()); // Already queued, don't duplicate
-                }
-
-                let mut tx = pool.begin().await?;
-
-                // Resolve the target position for this placement.
-                let insert_pos: i32 = match placement {
-                    QueuePlacement::Top => 1,
-                    QueuePlacement::Bottom => {
-                        let max_pos: i32 = sqlx::query(
-                            "SELECT COALESCE(MAX(QueuePosition), 0) as max_pos FROM EpisodeQueue WHERE UserID = ?"
-                        )
-                        .bind(user_id)
-                        .fetch_one(&mut *tx)
-                        .await?
-                        .try_get("max_pos")?;
-                        max_pos + 1
-                    }
-                    QueuePlacement::Under { playing_episode_id, playing_is_youtube } => {
-                        let anchor: Option<i32> = sqlx::query(
-                            "SELECT QueuePosition FROM EpisodeQueue
-                             WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                        )
-                        .bind(playing_episode_id)
-                        .bind(user_id)
-                        .bind(playing_is_youtube)
-                        .fetch_optional(&mut *tx)
-                        .await?
-                        .map(|row| row.try_get("QueuePosition"))
-                        .transpose()?;
-                        anchor.map(|p| p + 1).unwrap_or(1)
-                    }
-                };
-
-                // Make room: shift everything at/after the insert position down by one.
-                sqlx::query(
-                    "UPDATE EpisodeQueue SET QueuePosition = QueuePosition + 1
-                     WHERE UserID = ? AND QueuePosition >= ?"
-                )
-                .bind(user_id)
-                .bind(insert_pos)
-                .execute(&mut *tx)
-                .await?;
-
-                // Insert new queued episode
-                sqlx::query(
-                    "INSERT INTO EpisodeQueue (EpisodeID, UserID, QueuePosition, is_youtube)
-                     VALUES (?, ?, ?, ?)"
-                )
-                .bind(episode_id)
-                .bind(user_id)
-                .bind(insert_pos)
-                .bind(is_youtube)
-                .execute(&mut *tx)
-                .await?;
-
-                tx.commit().await?;
-                Ok(())
-            },
         })
     }
 
@@ -259,65 +187,6 @@ impl DatabasePool {
                 tx.commit().await?;
                 Ok(())
             },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-
-                let current_pos: Option<i32> = sqlx::query(
-                    "SELECT QueuePosition FROM EpisodeQueue
-                     WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                )
-                .bind(episode_id)
-                .bind(user_id)
-                .bind(is_youtube)
-                .fetch_optional(&mut *tx)
-                .await?
-                .map(|row| row.try_get("QueuePosition"))
-                .transpose()?;
-
-                match current_pos {
-                    Some(pos) if pos > 1 => {
-                        sqlx::query(
-                            "UPDATE EpisodeQueue SET QueuePosition = QueuePosition + 1
-                             WHERE UserID = ? AND QueuePosition < ?"
-                        )
-                        .bind(user_id)
-                        .bind(pos)
-                        .execute(&mut *tx)
-                        .await?;
-                        sqlx::query(
-                            "UPDATE EpisodeQueue SET QueuePosition = 1
-                             WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                        )
-                        .bind(episode_id)
-                        .bind(user_id)
-                        .bind(is_youtube)
-                        .execute(&mut *tx)
-                        .await?;
-                    }
-                    Some(_) => { /* already at position 1 */ }
-                    None => {
-                        sqlx::query(
-                            "UPDATE EpisodeQueue SET QueuePosition = QueuePosition + 1
-                             WHERE UserID = ?"
-                        )
-                        .bind(user_id)
-                        .execute(&mut *tx)
-                        .await?;
-                        sqlx::query(
-                            "INSERT INTO EpisodeQueue (EpisodeID, UserID, QueuePosition, is_youtube)
-                             VALUES (?, ?, 1, ?)"
-                        )
-                        .bind(episode_id)
-                        .bind(user_id)
-                        .bind(is_youtube)
-                        .execute(&mut *tx)
-                        .await?;
-                    }
-                }
-
-                tx.commit().await?;
-                Ok(())
-            },
         })
     }
 
@@ -363,45 +232,6 @@ impl DatabasePool {
 
                 Ok(())
             },
-            mysql(pool) => {
-                // Get the queue position of the episode to be removed
-                let position_row = sqlx::query(
-                    "SELECT QueuePosition FROM EpisodeQueue 
-                     WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                )
-                .bind(episode_id)
-                .bind(user_id)
-                .bind(is_youtube)
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = position_row {
-                    let removed_position: i32 = row.try_get("QueuePosition")?;
-
-                    // Delete the episode from queue
-                    sqlx::query(
-                        "DELETE FROM EpisodeQueue 
-                         WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                    )
-                    .bind(episode_id)
-                    .bind(user_id)
-                    .bind(is_youtube)
-                    .execute(pool)
-                    .await?;
-
-                    // Update positions of all episodes that were after the removed one
-                    sqlx::query(
-                        "UPDATE EpisodeQueue SET QueuePosition = QueuePosition - 1 
-                         WHERE UserID = ? AND QueuePosition > ?"
-                    )
-                    .bind(user_id)
-                    .bind(removed_position)
-                    .execute(pool)
-                    .await?;
-                }
-
-                Ok(())
-            },
         })
     }
 
@@ -409,13 +239,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"DELETE FROM "EpisodeQueue" WHERE userid = $1"#)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                Ok(())
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM EpisodeQueue WHERE UserID = ?")
                     .bind(user_id)
                     .execute(pool)
                     .await?;
@@ -543,122 +366,6 @@ impl DatabasePool {
                 }
                 Ok(episodes)
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT * FROM (
-                        SELECT
-                            Episodes.EpisodeTitle as episodetitle,
-                            Podcasts.PodcastName as podcastname,
-                            Podcasts.PodcastID as podcastid,
-                            Episodes.EpisodePubDate as episodepubdate,
-                            Episodes.EpisodeDescription as episodedescription,
-                            CASE
-                                WHEN Podcasts.UsePodcastCoversCustomized = TRUE AND Podcasts.UsePodcastCovers = TRUE THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = TRUE THEN Podcasts.ArtworkURL
-                                ELSE Episodes.EpisodeArtwork
-                            END as episodeartwork,
-                            Episodes.EpisodeURL as episodeurl,
-                            EpisodeQueue.QueuePosition as queueposition,
-                            Episodes.EpisodeDuration as episodeduration,
-                            EpisodeQueue.QueueDate as queuedate,
-                            UserEpisodeHistory.ListenDuration as listenduration,
-                            Episodes.EpisodeID as episodeid,
-                            COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = Podcasts.UserID), 0) as completed,
-                            CASE WHEN SavedEpisodes.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            TRUE as queued,
-                            CASE WHEN DownloadedEpisodes.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS downloaded,
-                            FALSE as is_youtube,
-                            Episodes.IsVideo as is_video
-                        FROM EpisodeQueue
-                        INNER JOIN Episodes ON EpisodeQueue.EpisodeID = Episodes.EpisodeID
-                        INNER JOIN Podcasts ON Episodes.FeedID = Podcasts.FeedID AND Podcasts.UserID = EpisodeQueue.UserID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN UserEpisodeHistory ON
-                            EpisodeQueue.EpisodeID = UserEpisodeHistory.EpisodeID
-                            AND EpisodeQueue.UserID = UserEpisodeHistory.UserID
-                        LEFT JOIN SavedEpisodes ON
-                            EpisodeQueue.EpisodeID = SavedEpisodes.EpisodeID
-                            AND EpisodeQueue.UserID = SavedEpisodes.UserID
-                        LEFT JOIN DownloadedEpisodes ON
-                            EpisodeQueue.EpisodeID = DownloadedEpisodes.EpisodeID
-                            AND EpisodeQueue.UserID = DownloadedEpisodes.UserID
-                        WHERE EpisodeQueue.UserID = ? AND EpisodeQueue.is_youtube = FALSE
-
-                        UNION ALL
-
-                        SELECT
-                            YouTubeVideos.VideoTitle as episodetitle,
-                            Podcasts.PodcastName as podcastname,
-                            YouTubeVideos.PodcastID as podcastid,
-                            YouTubeVideos.PublishedAt as episodepubdate,
-                            YouTubeVideos.VideoDescription as episodedescription,
-                            CASE 
-                                WHEN Podcasts.UsePodcastCoversCustomized = TRUE AND Podcasts.UsePodcastCovers = TRUE THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = TRUE THEN Podcasts.ArtworkURL
-                                ELSE YouTubeVideos.ThumbnailURL
-                            END as episodeartwork,
-                            YouTubeVideos.VideoURL as episodeurl,
-                            EpisodeQueue.QueuePosition as queueposition,
-                            YouTubeVideos.Duration as episodeduration,
-                            EpisodeQueue.QueueDate as queuedate,
-                            YouTubeVideos.ListenPosition as listenduration,
-                            YouTubeVideos.VideoID as episodeid,
-                            YouTubeVideos.Completed as completed,
-                            CASE WHEN SavedVideos.VideoID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            TRUE as queued,
-                            CASE WHEN DownloadedVideos.VideoID IS NOT NULL THEN TRUE ELSE FALSE END AS downloaded,
-                            TRUE as is_youtube,
-                            TRUE as is_video
-                        FROM EpisodeQueue
-                        INNER JOIN YouTubeVideos ON EpisodeQueue.EpisodeID = YouTubeVideos.VideoID
-                        INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN SavedVideos ON
-                            EpisodeQueue.EpisodeID = SavedVideos.VideoID
-                            AND EpisodeQueue.UserID = SavedVideos.UserID
-                        LEFT JOIN DownloadedVideos ON
-                            EpisodeQueue.EpisodeID = DownloadedVideos.VideoID
-                            AND EpisodeQueue.UserID = DownloadedVideos.UserID
-                        WHERE EpisodeQueue.UserID = ? AND EpisodeQueue.is_youtube = TRUE
-                    ) combined
-                    ORDER BY queueposition ASC"
-                )
-                .bind(user_id)
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-
-                let mut episodes = Vec::new();
-                for row in rows {
-                    episodes.push(crate::models::QueuedEpisode {
-                        episodetitle: row.try_get("episodetitle")?,
-                        podcastname: row.try_get("podcastname")?,
-                        podcastid: row.try_get("podcastid")?,
-                        episodepubdate: {
-                            let dt = row.try_get::<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>, _>("episodepubdate")?;
-                            dt.format("%Y-%m-%dT%H:%M:%S").to_string()
-                        },
-                        episodedescription: row.try_get("episodedescription")?,
-                        episodeartwork: row.try_get("episodeartwork")?,
-                        episodeurl: row.try_get("episodeurl")?,
-                        queueposition: row.try_get("queueposition").ok(),
-                        episodeduration: row.try_get("episodeduration")?,
-                        queuedate: {
-                        let dt = row.try_get::<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>, _>("queuedate")?;
-                        dt.format("%Y-%m-%dT%H:%M:%S").to_string()
-                    },
-                        listenduration: row.try_get("listenduration").ok(),
-                        episodeid: row.try_get("episodeid")?,
-                        completed: row.try_get("completed")?,
-                        saved: row.try_get("saved")?,
-                        queued: row.try_get("queued")?,
-                        downloaded: row.try_get("downloaded")?,
-                        is_youtube: row.try_get("is_youtube")?,
-                        is_video: row.try_get("is_video")?,
-                    });
-                }
-                Ok(episodes)
-            },
         })
     }
 
@@ -697,41 +404,6 @@ impl DatabasePool {
                             q::query(
                                 r#"UPDATE "EpisodeQueue" SET queueposition = $1
                                    WHERE episodeid = $2 AND userid = $3"#
-                            )
-                            .bind(new_position)
-                            .bind(episode_id)
-                            .bind(user_id)
-                            .execute(&mut *tx)
-                            .await?;
-                        }
-                    }
-                }
-
-                tx.commit().await?;
-                Ok(())
-            },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-
-                for (index, (episode_id, is_youtube)) in items.iter().enumerate() {
-                    let new_position = (index + 1) as i32;
-                    match is_youtube {
-                        Some(flag) => {
-                            sqlx::query(
-                                "UPDATE EpisodeQueue SET QueuePosition = ?
-                                 WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                            )
-                            .bind(new_position)
-                            .bind(episode_id)
-                            .bind(user_id)
-                            .bind(flag)
-                            .execute(&mut *tx)
-                            .await?;
-                        }
-                        None => {
-                            sqlx::query(
-                                "UPDATE EpisodeQueue SET QueuePosition = ?
-                                 WHERE EpisodeID = ? AND UserID = ?"
                             )
                             .bind(new_position)
                             .bind(episode_id)
@@ -822,73 +494,6 @@ impl DatabasePool {
                         .await?;
                         match q::query(
                             r#"INSERT INTO "EpisodeQueue" (episodeid, userid, queueposition, is_youtube) VALUES ($1, $2, $3, $4)"#
-                        )
-                        .bind(episode_id)
-                        .bind(user_id)
-                        .bind(next_pos)
-                        .bind(is_youtube)
-                        .execute(&mut *tx)
-                        .await {
-                            Ok(_) => { processed += 1; next_pos += 1; }
-                            Err(_) => failed += 1,
-                        }
-                    }
-                }
-
-                tx.commit().await?;
-            },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-
-                let mut next_pos: i32 = match placement {
-                    QueuePlacement::Top => 1,
-                    QueuePlacement::Bottom => {
-                        let max_pos: i32 = sqlx::query(
-                            "SELECT COALESCE(MAX(QueuePosition), 0) as max_pos FROM EpisodeQueue WHERE UserID = ?"
-                        )
-                        .bind(user_id)
-                        .fetch_one(&mut *tx)
-                        .await?
-                        .try_get("max_pos")?;
-                        max_pos + 1
-                    }
-                    QueuePlacement::Under { playing_episode_id, playing_is_youtube } => {
-                        let anchor: Option<i32> = sqlx::query(
-                            "SELECT QueuePosition FROM EpisodeQueue
-                             WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                        )
-                        .bind(playing_episode_id)
-                        .bind(user_id)
-                        .bind(playing_is_youtube)
-                        .fetch_optional(&mut *tx)
-                        .await?
-                        .map(|row| row.try_get("QueuePosition"))
-                        .transpose()?;
-                        anchor.map(|p| p + 1).unwrap_or(1)
-                    }
-                };
-
-                for episode_id in episode_ids {
-                    let existing = sqlx::query(
-                        "SELECT QueueID FROM EpisodeQueue WHERE EpisodeID = ? AND UserID = ? AND is_youtube = ?"
-                    )
-                    .bind(episode_id)
-                    .bind(user_id)
-                    .bind(is_youtube)
-                    .fetch_optional(&mut *tx)
-                    .await?;
-
-                    if existing.is_none() {
-                        sqlx::query(
-                            "UPDATE EpisodeQueue SET QueuePosition = QueuePosition + 1
-                             WHERE UserID = ? AND QueuePosition >= ?"
-                        )
-                        .bind(user_id)
-                        .bind(next_pos)
-                        .execute(&mut *tx)
-                        .await?;
-                        match sqlx::query(
-                            "INSERT INTO EpisodeQueue (EpisodeID, UserID, QueuePosition, is_youtube) VALUES (?, ?, ?, ?)"
                         )
                         .bind(episode_id)
                         .bind(user_id)

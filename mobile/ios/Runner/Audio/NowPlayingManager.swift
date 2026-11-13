@@ -18,7 +18,7 @@ class NowPlayingManager {
 
     private func createDefaultArtwork() {
         // Try to use the app icon as default artwork
-        if let appIcon = UIImage(named: "AppIcon") ?? UIImage(named: "pinepods-logo") {
+        if let appIcon = UIImage(named: "AppIcon") {
             defaultArtwork = MPMediaItemArtwork(boundsSize: appIcon.size) { _ in
                 return appIcon
             }

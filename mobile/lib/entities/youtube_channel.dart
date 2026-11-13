@@ -27,7 +27,7 @@ class YouTubeChannelResult {
 
   String get url => youtubeChannelUrl(channelId);
 
-  // The search service answers in camelCase, the server's own yt-dlp search in snake_case.
+  // Accepts camelCase and snake_case field names.
   factory YouTubeChannelResult.fromJson(Map<String, dynamic> json) {
     final videos = (json['recentVideos'] ?? json['recent_videos']) as List<dynamic>? ?? const [];
     return YouTubeChannelResult(

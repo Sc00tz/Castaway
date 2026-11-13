@@ -534,16 +534,16 @@ pub fn settings() -> Html {
                             </div>
                             <div class="settings-section">
                                 <div class="settings-section-head">
-                                    <i class="ph ph-broadcast"></i>
+                                    <i class="ph ph-magnifying-glass"></i>
                                     <div>
                                         <div class="settings-section-title-row">
-                                            <div class="settings-section-title">{ &i18n.t("update_services.title") }</div>
-                                            <button class="info-btn" title={i18n.t("update_services.description").to_string()}>{"?"}</button>
+                                            <div class="settings-section-title">{ &i18n.t("podcast_index.title") }</div>
+                                            <button class="info-btn" title={i18n.t("podcast_index.description").to_string()}>{"?"}</button>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="settings-section-body">
-                                    <setting_components::update_services::UpdateServicesSection />
+                                    <setting_components::podcast_index::PodcastIndexSection />
                                 </div>
                             </div>
                             <div class="settings-section">

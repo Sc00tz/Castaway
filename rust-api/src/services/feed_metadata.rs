@@ -337,20 +337,6 @@ impl DatabasePool {
                     .await?
                     .rows_affected()
                 },
-                mysql(pool) => {
-                    let marks = vec!["?"; podcast_ids.len()].join(", ");
-                    let sql = format!(
-                        "UPDATE Podcasts SET {column} = ? \
-                         WHERE PodcastID IN ({marks}) \
-                           AND NOT ({column} <=> ?) \
-                           AND FIND_IN_SET(?, COALESCE(EditedMetadata, '')) = 0"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(value);
-                    for id in podcast_ids {
-                        q = q.bind(id);
-                    }
-                    q.bind(value).bind(column).execute(pool).await?.rows_affected()
-                },
             });
         }
 
@@ -364,15 +350,6 @@ impl DatabasePool {
                         .execute(pool)
                         .await?
                         .rows_affected()
-                },
-                mysql(pool) => {
-                    let marks = vec!["?"; old_artwork.len()].join(", ");
-                    let sql = format!("UPDATE Episodes SET EpisodeArtwork = ? WHERE FeedID = ? AND EpisodeArtwork IN ({marks})");
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(new).bind(feed_id);
-                    for a in &old_artwork {
-                        q = q.bind(a);
-                    }
-                    q.execute(pool).await?.rows_affected()
                 },
             });
             debug!("Feed {}: {} episodes moved to the new podcast artwork", feed_id, n);
@@ -390,15 +367,6 @@ impl DatabasePool {
                     .bind(podcast_ids)
                     .fetch_all(pool)
                     .await?
-            },
-            mysql(pool) => {
-                let marks = vec!["?"; podcast_ids.len()].join(", ");
-                let sql = format!("SELECT DISTINCT ArtworkURL FROM Podcasts WHERE PodcastID IN ({marks}) AND ArtworkURL IS NOT NULL");
-                let mut q = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()));
-                for id in podcast_ids {
-                    q = q.bind(id);
-                }
-                q.fetch_all(pool).await?
             },
         }))
     }
@@ -423,17 +391,6 @@ impl DatabasePool {
                     let cols: Vec<Option<String>> = (0..6).map(|i| r.try_get::<Option<String>, _>(i).ok().flatten()).collect();
                     cols
                 })
-            },
-            mysql(pool) => {
-                sqlx::query(
-                    "SELECT PodcastName, Description, Author, ArtworkURL, WebsiteURL, EditedMetadata
-                     FROM Podcasts WHERE PodcastID = ? AND UserID = ?",
-                )
-                .bind(podcast_id)
-                .bind(user_id)
-                .fetch_optional(pool)
-                .await?
-                .map(|r| (0..6).map(|i| r.try_get::<Option<String>, _>(i).ok().flatten()).collect())
             },
         });
         let Some(current) = current else { return Ok(()) };
@@ -463,14 +420,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"UPDATE "Podcasts" SET editedmetadata = $1 WHERE podcastid = $2 AND userid = $3"#)
-                    .bind(value)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("UPDATE Podcasts SET EditedMetadata = ? WHERE PodcastID = ? AND UserID = ?")
                     .bind(value)
                     .bind(podcast_id)
                     .bind(user_id)

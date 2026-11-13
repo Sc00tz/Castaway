@@ -190,7 +190,7 @@ pub async fn refresh_hosts(
         "refresh_hosts".to_string(),
         0, // System user
         move |reporter| async move {
-            reporter.update_progress(10.0, Some("Syncing people from PodPeopleDB...".to_string())).await?;
+            reporter.update_progress(10.0, Some("Refreshing followed people...".to_string())).await?;
             let result = people_sync_internal(&db_pool, &api).await?;
             reporter.update_progress(100.0, Some("People sync completed".to_string())).await?;
             Ok(result)
@@ -203,23 +203,15 @@ pub async fn refresh_hosts(
     })))
 }
 
-/// Pull community credits from PodPeopleDB for every podcast, then refresh the episodes that
-/// followed people appear in on shows outside each user's library.
+/// Refresh the episodes that followed people appear in on shows outside each user's library.
 pub async fn people_sync_internal(
     db_pool: &crate::database::DatabasePool,
     api: &crate::services::people::Endpoints,
 ) -> AppResult<serde_json::Value> {
-    use crate::services::people::{external, podpeople};
-    let podcasts_updated = if podpeople::sync_enabled() { podpeople::sync(db_pool, api, None).await? } else { 0 };
-    let people_refreshed = external::refresh_followed(db_pool, api).await?;
-    tracing::info!(
-        "People sync: {} podcasts got new PodPeopleDB credits, {} followed people refreshed",
-        podcasts_updated,
-        people_refreshed
-    );
+    let people_refreshed = crate::services::people::external::refresh_followed(db_pool, api).await?;
+    tracing::info!("People sync: {} followed people refreshed", people_refreshed);
     Ok(serde_json::json!({
         "success": true,
-        "podcasts_updated": podcasts_updated,
         "people_refreshed": people_refreshed,
     }))
 }

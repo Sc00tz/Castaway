@@ -1,4 +1,4 @@
-//! Backups and restores with the real dump tools (`pg_dump`/`psql`, `mysqldump`/`mysql`):
+//! Backups and restores with the real dump tools (`pg_dump`/`psql`):
 //! the backup folder, uploading a dump, and scheduled backups with retention.
 
 use std::sync::Arc;
@@ -252,10 +252,7 @@ async fn schedule(app: &TestApp, admin: &TestUser, cron: &str, enabled: bool, ke
 
 /// Make the schedule overdue, as if its last run was long ago.
 async fn make_due(app: &TestApp) {
-    let column = match app.backend() {
-        Backend::Postgres | Backend::Sqlite => "last_run",
-        Backend::MariaDb => "LastRun",
-    };
+    let column = "last_run";
     exec(app, &format!(r#"UPDATE "ScheduledBackups" SET {column} = '2020-01-01 00:00:00'"#)).await;
 }
 
@@ -345,7 +342,6 @@ async fn schedules_can_be_read_back_and_bad_ones_are_refused() {
 /// restore stays running until this is released.
 enum RestoreBlocker {
     Postgres(sqlx::Transaction<'static, sqlx::Postgres>),
-    MariaDb(sqlx::pool::PoolConnection<sqlx::MySql>),
 }
 
 impl RestoreBlocker {
@@ -358,22 +354,12 @@ impl RestoreBlocker {
                 tx.execute(r#"LOCK TABLE "Users" IN ACCESS SHARE MODE"#).await.unwrap();
                 RestoreBlocker::Postgres(tx)
             }
-            DatabasePool::MySQL(pool) => {
-                let mut conn = pool.acquire().await.unwrap();
-                conn.execute("LOCK TABLES Users READ").await.unwrap();
-                RestoreBlocker::MariaDb(conn)
-            }
-            DatabasePool::Sqlite(_) => unreachable!("skipped on SQLite"),
         }
     }
 
     async fn release(self) {
-        use sqlx::Executor;
         match self {
             RestoreBlocker::Postgres(tx) => tx.rollback().await.unwrap(),
-            RestoreBlocker::MariaDb(mut conn) => {
-                conn.execute("UNLOCK TABLES").await.unwrap();
-            }
         }
     }
 }
@@ -381,10 +367,6 @@ impl RestoreBlocker {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_running_restore_is_reported_until_it_finishes() {
     let app = TestApp::new().await;
-    // Holding the restore open needs a table lock, which SQLite doesn't have.
-    if app.backend() == Backend::Sqlite {
-        return;
-    }
     let _backups = BackupEnv::claim(&app).await;
     let admin = app.admin().await.clone();
     let filename = manual_backup(&app, &admin).await;

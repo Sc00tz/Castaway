@@ -2220,8 +2220,7 @@ class PinepodsService {
       throw Exception('Server and API key must be set');
     }
 
-    // Route through the backend search proxy so the configured (possibly
-    // internal-only) SEARCH_API_URL is honored instead of the public default.
+    // The server searches Apple and Podcast Index for us (it holds the Podcast Index key).
     final url = Uri.parse(
       '$_server/api/data/proxy_search?query=${Uri.encodeComponent(query)}&index=${provider.value}',
     );
@@ -3230,21 +3229,7 @@ class PinepodsService {
     return PersonProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  /// Resolve a PodPeopleDB id (e.g. a search result not yet on this server) to a
-  /// Castaway person id.
-  Future<int?> lookupPerson({int? podpeopleId, String? name}) async {
-    final response = await _get(
-      _peopleUrl('lookup', {
-        if (podpeopleId != null) 'podpeople_id': '$podpeopleId',
-        if (name != null) 'name': name,
-      }),
-      headers: _authHeaders,
-    );
-    if (response.statusCode != 200) return null;
-    return (jsonDecode(response.body) as Map<String, dynamic>)['person_id'] as int?;
-  }
-
-  /// People on this server and PodPeopleDB matching [query].
+  /// People this server knows from its feeds, matching [query].
   Future<List<PersonHit>> searchPeople(String query) async {
     final response = await _get(_peopleUrl('search', {'q': query}), headers: _authHeaders);
     if (response.statusCode != 200) return [];
@@ -3267,29 +3252,6 @@ class PinepodsService {
     if (response.statusCode != 200) throw Exception(_errorMessage(response));
     return (jsonDecode(response.body) as List<dynamic>)
         .map((e) => PersonInfo.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// Add people to a podcast (or one of its episodes). They go to PodPeopleDB,
-  /// live right away as unverified. Returns everyone credited afterwards;
-  /// throws with the server's (or PodPeopleDB's) reason on failure.
-  Future<List<CreditedPerson>> contributePeople({
-    required int podcastId,
-    int? episodeId,
-    required List<ContributePerson> people,
-  }) async {
-    final response = await _post(
-      _peopleUrl('contribute'),
-      headers: {..._authHeaders, 'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'podcast_id': podcastId,
-        if (episodeId != null) 'episode_id': episodeId,
-        'people': people.map((p) => p.toJson()).toList(),
-      }),
-    );
-    if (response.statusCode != 200) throw Exception(_errorMessage(response));
-    return (jsonDecode(response.body) as List<dynamic>)
-        .map((e) => CreditedPerson.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

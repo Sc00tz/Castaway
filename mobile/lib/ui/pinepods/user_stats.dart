@@ -207,7 +207,7 @@ class _PinepodsUserStatsState extends State<PinepodsUserStats> {
     return Column(
       children: [
         const SizedBox(height: 8),
-        Image.asset('assets/images/pinepods-logo.png', width: 72, height: 72),
+        Image.asset('assets/images/castaway-logo.png', width: 72, height: 72),
         const SizedBox(height: 12),
         Text(
           L.of(context)!.app_server_versions(Environment.projectVersion, _pinepodsVersion ?? L.of(context)!.unknown),

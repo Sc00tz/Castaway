@@ -38,15 +38,6 @@ impl DatabasePool {
                 .ok_or_else(|| AppError::not_found("Collection not found"))?;
                 Ok((row.try_get("userid")?, row.try_get("isdefault")?))
             },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT UserID, IsDefault FROM Collections WHERE CollectionID = ?")
-                    .bind(collection_id)
-                    .fetch_optional(pool)
-                    .await?
-                    .ok_or_else(|| AppError::not_found("Collection not found"))?;
-                let is_default: i8 = row.try_get("IsDefault")?;
-                Ok((row.try_get("UserID")?, is_default != 0))
-            },
         })
     }
 
@@ -83,28 +74,6 @@ impl DatabasePool {
                 .await?;
                 Ok(row.try_get("collectionid")?)
             },
-            mysql(pool) => {
-                let exists = sqlx::query("SELECT 1 FROM Collections WHERE UserID = ? AND Name = ?")
-                    .bind(req.user_id)
-                    .bind(&req.name)
-                    .fetch_optional(pool)
-                    .await?;
-                if exists.is_some() {
-                    return Err(AppError::conflict("A collection with that name already exists"));
-                }
-
-                let result = sqlx::query(
-                    "INSERT INTO Collections (UserID, Name, Description, Icon, IsDefault, AutoAddCategories) VALUES (?, ?, ?, ?, FALSE, ?)",
-                )
-                .bind(req.user_id)
-                .bind(&req.name)
-                .bind(&req.description)
-                .bind(&icon)
-                .bind(&categories)
-                .execute(pool)
-                .await?;
-                Ok(result.last_insert_id() as i32)
-            },
         })
     }
 
@@ -120,19 +89,6 @@ impl DatabasePool {
                            SELECT 1 FROM "Collections" WHERE userid = $1 AND isdefault = TRUE
                        )"#,
                 )
-                .bind(user_id)
-                .execute(pool)
-                .await?;
-            },
-            mysql(pool) => {
-                sqlx::query(
-                    "INSERT INTO Collections (UserID, Name, IsDefault, Icon)
-                     SELECT ?, 'Saved', TRUE, 'ph-bookmark-simple' FROM DUAL
-                     WHERE NOT EXISTS (
-                         SELECT 1 FROM Collections WHERE UserID = ? AND IsDefault = TRUE
-                     )",
-                )
-                .bind(user_id)
                 .bind(user_id)
                 .execute(pool)
                 .await?;
@@ -194,58 +150,6 @@ impl DatabasePool {
                 }
                 Ok(collections)
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT
-                        c.CollectionID as collectionid,
-                        c.UserID as userid,
-                        c.Name as name,
-                        c.Description as description,
-                        c.IsDefault as isdefault,
-                        c.Icon as icon,
-                        c.AutoAddCategories as autoaddcategories,
-                        c.CreatedAt as createdat,
-                        c.LastUpdated as lastupdated,
-                        CASE
-                            WHEN c.IsDefault THEN (
-                                (SELECT COUNT(*) FROM SavedEpisodes se WHERE se.UserID = c.UserID)
-                                + (SELECT COUNT(*) FROM SavedVideos sv WHERE sv.UserID = c.UserID)
-                            )
-                            ELSE (SELECT COUNT(*) FROM CollectionEpisodes ce WHERE ce.CollectionID = c.CollectionID)
-                        END AS episode_count
-                    FROM Collections c
-                    WHERE c.UserID = ?
-                    ORDER BY c.IsDefault DESC, c.CreatedAt ASC",
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-
-                let mut collections = Vec::new();
-                for row in rows {
-                    let is_default: i8 = row.try_get("isdefault")?;
-                    collections.push(crate::models::Collection {
-                        collection_id: row.try_get("collectionid")?,
-                        user_id: row.try_get("userid")?,
-                        name: row.try_get("name")?,
-                        description: row.try_get("description").ok(),
-                        is_default: is_default != 0,
-                        icon: row.try_get("icon")?,
-                        // TIMESTAMP columns decode as DateTime<Utc> on MySQL (NaiveDateTime is DATETIME).
-                        created_at: row
-                            .try_get::<chrono::DateTime<chrono::Utc>, _>("createdat")?
-                            .format("%Y-%m-%dT%H:%M:%S")
-                            .to_string(),
-                        last_updated: row
-                            .try_get::<chrono::DateTime<chrono::Utc>, _>("lastupdated")?
-                            .format("%Y-%m-%dT%H:%M:%S")
-                            .to_string(),
-                        episode_count: row.try_get("episode_count")?,
-                        auto_add_categories: parse_auto_add_categories(row.try_get("autoaddcategories").ok()),
-                    });
-                }
-                Ok(collections)
-            },
         })
     }
 
@@ -279,19 +183,6 @@ impl DatabasePool {
                         return Err(AppError::conflict("A collection with that name already exists"));
                     }
                 },
-                mysql(pool) => {
-                    let clash = sqlx::query(
-                        "SELECT 1 FROM Collections WHERE UserID = ? AND Name = ? AND CollectionID <> ?",
-                    )
-                    .bind(user_id)
-                    .bind(new_name)
-                    .bind(collection_id)
-                    .fetch_optional(pool)
-                    .await?;
-                    if clash.is_some() {
-                        return Err(AppError::conflict("A collection with that name already exists"));
-                    }
-                },
             })
         }
 
@@ -304,23 +195,6 @@ impl DatabasePool {
                         icon = COALESCE($3, icon),
                         lastupdated = CURRENT_TIMESTAMP
                        WHERE collectionid = $4 AND userid = $5 AND isdefault = FALSE"#,
-                )
-                .bind(&req.name)
-                .bind(&req.description)
-                .bind(&req.icon)
-                .bind(collection_id)
-                .bind(user_id)
-                .execute(pool)
-                .await?;
-            },
-            mysql(pool) => {
-                sqlx::query(
-                    "UPDATE Collections SET
-                        Name = COALESCE(?, Name),
-                        Description = COALESCE(?, Description),
-                        Icon = COALESCE(?, Icon),
-                        LastUpdated = CURRENT_TIMESTAMP
-                     WHERE CollectionID = ? AND UserID = ? AND IsDefault = FALSE",
                 )
                 .bind(&req.name)
                 .bind(&req.description)
@@ -348,17 +222,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
                 },
-                mysql(pool) => {
-                    sqlx::query(
-                        "UPDATE Collections SET AutoAddCategories = ?, LastUpdated = CURRENT_TIMESTAMP
-                         WHERE CollectionID = ? AND UserID = ? AND IsDefault = FALSE",
-                    )
-                    .bind(&categories)
-                    .bind(collection_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                },
             })
         }
         Ok(())
@@ -372,15 +235,6 @@ impl DatabasePool {
                 q::query_scalar(
                     r#"SELECT categories FROM "Podcasts"
                        WHERE userid = $1 AND categories IS NOT NULL AND categories <> ''"#,
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar(
-                    "SELECT Categories FROM Podcasts
-                     WHERE UserID = ? AND Categories IS NOT NULL AND Categories <> ''",
                 )
                 .bind(user_id)
                 .fetch_all(pool)
@@ -421,22 +275,6 @@ impl DatabasePool {
                         r.try_get::<bool, _>("isdefault")?,
                         parse_auto_add_categories(r.try_get("autoaddcategories").ok()),
                         r.try_get::<i32, _>("userid")?,
-                    ),
-                    None => return Ok(()),
-                }
-            },
-            mysql(pool) => {
-                let row = sqlx::query(
-                    "SELECT IsDefault, AutoAddCategories as autoaddcategories, UserID FROM Collections WHERE CollectionID = ?",
-                )
-                .bind(collection_id)
-                .fetch_optional(pool)
-                .await?;
-                match row {
-                    Some(r) => (
-                        r.try_get::<i8, _>("IsDefault")? != 0,
-                        parse_auto_add_categories(r.try_get("autoaddcategories").ok()),
-                        r.try_get::<i32, _>("UserID")?,
                     ),
                     None => return Ok(()),
                 }
@@ -482,35 +320,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
             },
-            mysql(pool) => {
-                let cat_clause: String = std::iter::repeat("LOWER(p.Categories) LIKE LOWER(?)")
-                    .take(categories.len())
-                    .collect::<Vec<_>>()
-                    .join(" OR ");
-                let sql = format!(
-                    "INSERT INTO CollectionEpisodes (CollectionID, EpisodeID)
-                     SELECT ?, e.EpisodeID
-                     FROM Episodes e
-                     JOIN Podcasts p ON e.FeedID = p.FeedID
-                     WHERE ({cat_clause})
-                       AND p.UserID = ?
-                       AND NOT EXISTS (
-                           SELECT 1 FROM CollectionEpisodes ce
-                           WHERE ce.CollectionID = ? AND ce.EpisodeID = e.EpisodeID
-                       )",
-                );
-                let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(collection_id);
-                for cat in &categories {
-                    q = q.bind(format!("%{}%", cat));
-                }
-                q = q.bind(owner).bind(collection_id);
-                q.execute(pool).await?;
-
-                sqlx::query("UPDATE Collections SET LastUpdated = CURRENT_TIMESTAMP WHERE CollectionID = ?")
-                    .bind(collection_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -532,21 +341,6 @@ impl DatabasePool {
                 .fetch_all(pool)
                 .await?,
                 q::query_scalar(r#"SELECT categories FROM "Podcasts" WHERE podcastid = $1 AND userid = $2"#)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?
-                    .flatten(),
-            ),
-            mysql(pool) => (
-                sqlx::query_as(
-                    "SELECT CollectionID, AutoAddCategories FROM Collections
-                     WHERE UserID = ? AND IsDefault = FALSE AND AutoAddCategories IS NOT NULL AND AutoAddCategories <> ''",
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?,
-                sqlx::query_scalar("SELECT Categories FROM Podcasts WHERE PodcastID = ? AND UserID = ?")
                     .bind(podcast_id)
                     .bind(user_id)
                     .fetch_optional(pool)
@@ -577,24 +371,6 @@ impl DatabasePool {
                         .execute(pool)
                         .await?;
                 },
-                mysql(pool) => {
-                    let ids = vec!["?"; episode_ids.len()].join(", ");
-                    let sql = format!(
-                        "INSERT INTO CollectionEpisodes (CollectionID, EpisodeID)
-                         SELECT ?, e.EpisodeID FROM Episodes e
-                         WHERE e.EpisodeID IN ({ids}) AND e.FeedID = (SELECT FeedID FROM Podcasts WHERE PodcastID = ?)
-                           AND NOT EXISTS (SELECT 1 FROM CollectionEpisodes ce WHERE ce.CollectionID = ? AND ce.EpisodeID = e.EpisodeID)"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(collection_id);
-                    for id in episode_ids {
-                        q = q.bind(id);
-                    }
-                    q.bind(podcast_id).bind(collection_id).execute(pool).await?;
-                    sqlx::query("UPDATE Collections SET LastUpdated = CURRENT_TIMESTAMP WHERE CollectionID = ?")
-                        .bind(collection_id)
-                        .execute(pool)
-                        .await?;
-                },
             })
         }
         Ok(())
@@ -611,13 +387,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"DELETE FROM "Collections" WHERE collectionid = $1 AND userid = $2 AND isdefault = FALSE"#)
-                    .bind(collection_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM Collections WHERE CollectionID = ? AND UserID = ? AND IsDefault = FALSE")
                     .bind(collection_id)
                     .bind(user_id)
                     .execute(pool)
@@ -660,21 +429,6 @@ impl DatabasePool {
                         .bind(collection_id).execute(pool).await?;
                 }
             },
-            mysql(pool) => {
-                let existing = if is_youtube {
-                    sqlx::query("SELECT 1 FROM CollectionEpisodes WHERE CollectionID = ? AND VideoID = ?")
-                        .bind(collection_id).bind(episode_id).fetch_optional(pool).await?
-                } else {
-                    sqlx::query("SELECT 1 FROM CollectionEpisodes WHERE CollectionID = ? AND EpisodeID = ?")
-                        .bind(collection_id).bind(episode_id).fetch_optional(pool).await?
-                };
-                if existing.is_none() {
-                    sqlx::query("INSERT INTO CollectionEpisodes (CollectionID, EpisodeID, VideoID) VALUES (?, ?, ?)")
-                        .bind(collection_id).bind(ep_col).bind(vid_col).execute(pool).await?;
-                    sqlx::query("UPDATE Collections SET LastUpdated = CURRENT_TIMESTAMP WHERE CollectionID = ?")
-                        .bind(collection_id).execute(pool).await?;
-                }
-            },
         });
         Ok(())
     }
@@ -700,15 +454,6 @@ impl DatabasePool {
                         .bind(collection_id).bind(episode_id).execute(pool).await?;
                 } else {
                     q::query(r#"DELETE FROM "CollectionEpisodes" WHERE collectionid = $1 AND episodeid = $2"#)
-                        .bind(collection_id).bind(episode_id).execute(pool).await?;
-                }
-            },
-            mysql(pool) => {
-                if is_youtube {
-                    sqlx::query("DELETE FROM CollectionEpisodes WHERE CollectionID = ? AND VideoID = ?")
-                        .bind(collection_id).bind(episode_id).execute(pool).await?;
-                } else {
-                    sqlx::query("DELETE FROM CollectionEpisodes WHERE CollectionID = ? AND EpisodeID = ?")
                         .bind(collection_id).bind(episode_id).execute(pool).await?;
                 }
             },
@@ -769,41 +514,6 @@ impl DatabasePool {
                 };
                 if saved.is_some() {
                     if let Some(row) = q::query(r#"SELECT collectionid FROM "Collections" WHERE userid = $1 AND isdefault = TRUE"#)
-                        .bind(user_id).fetch_optional(pool).await?
-                    {
-                        ids.push(row.try_get("collectionid")?);
-                    }
-                }
-            },
-            mysql(pool) => {
-                let rows = if is_youtube {
-                    sqlx::query(
-                        "SELECT ce.CollectionID as collectionid FROM CollectionEpisodes ce
-                         JOIN Collections c ON ce.CollectionID = c.CollectionID
-                         WHERE c.UserID = ? AND ce.VideoID = ?",
-                    )
-                    .bind(user_id).bind(episode_id).fetch_all(pool).await?
-                } else {
-                    sqlx::query(
-                        "SELECT ce.CollectionID as collectionid FROM CollectionEpisodes ce
-                         JOIN Collections c ON ce.CollectionID = c.CollectionID
-                         WHERE c.UserID = ? AND ce.EpisodeID = ?",
-                    )
-                    .bind(user_id).bind(episode_id).fetch_all(pool).await?
-                };
-                for row in rows {
-                    ids.push(row.try_get("collectionid")?);
-                }
-
-                let saved = if is_youtube {
-                    sqlx::query("SELECT 1 FROM SavedVideos WHERE UserID = ? AND VideoID = ?")
-                        .bind(user_id).bind(episode_id).fetch_optional(pool).await?
-                } else {
-                    sqlx::query("SELECT 1 FROM SavedEpisodes WHERE UserID = ? AND EpisodeID = ?")
-                        .bind(user_id).bind(episode_id).fetch_optional(pool).await?
-                };
-                if saved.is_some() {
-                    if let Some(row) = sqlx::query("SELECT CollectionID as collectionid FROM Collections WHERE UserID = ? AND IsDefault = TRUE")
                         .bind(user_id).fetch_optional(pool).await?
                     {
                         ids.push(row.try_get("collectionid")?);
@@ -976,147 +686,6 @@ impl DatabasePool {
                 }
                 Ok((episodes, total))
             },
-            mysql(pool) => {
-                let mysql_filter = match filter {
-                    "completed"   => " WHERE completed = 1",
-                    "in_progress" => " WHERE completed = 0 AND listenduration IS NOT NULL AND listenduration > 0",
-                    _             => "",
-                };
-                let sql = format!(
-                    "SELECT *, COUNT(*) OVER() AS total_count FROM (
-                        SELECT
-                            Podcasts.PodcastName as podcastname,
-                            Episodes.EpisodeTitle as episodetitle,
-                            Episodes.EpisodePubDate as episodepubdate,
-                            Episodes.EpisodeDescription as episodedescription,
-                            Episodes.EpisodeID as episodeid,
-                            CASE
-                                WHEN Podcasts.UsePodcastCoversCustomized = 1 AND Podcasts.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                ELSE Episodes.EpisodeArtwork
-                            END as episodeartwork,
-                            Episodes.EpisodeURL as episodeurl,
-                            Episodes.EpisodeDuration as episodeduration,
-                            Podcasts.WebsiteURL as websiteurl,
-                            UserEpisodeHistory.ListenDuration as listenduration,
-                            COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = Podcasts.UserID), 0) as completed,
-                            CASE WHEN SavedEpisodes.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            CASE WHEN EpisodeQueue.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS queued,
-                            CASE WHEN DownloadedEpisodes.EpisodeID IS NOT NULL THEN TRUE ELSE FALSE END AS downloaded,
-                            FALSE as is_youtube,
-                            Podcasts.PodcastID as podcastid,
-                            CollectionEpisodes.AddedAt as savedate
-                        FROM CollectionEpisodes
-                        INNER JOIN Episodes ON CollectionEpisodes.EpisodeID = Episodes.EpisodeID
-                        INNER JOIN Podcasts ON Episodes.FeedID = Podcasts.FeedID
-                            AND Podcasts.UserID = (SELECT UserID FROM Collections WHERE CollectionID = CollectionEpisodes.CollectionID)
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN UserEpisodeHistory ON
-                            CollectionEpisodes.EpisodeID = UserEpisodeHistory.EpisodeID
-                            AND UserEpisodeHistory.UserID = ?
-                        LEFT JOIN EpisodeQueue ON
-                            CollectionEpisodes.EpisodeID = EpisodeQueue.EpisodeID
-                            AND EpisodeQueue.UserID = ?
-                            AND EpisodeQueue.is_youtube = FALSE
-                        LEFT JOIN DownloadedEpisodes ON
-                            CollectionEpisodes.EpisodeID = DownloadedEpisodes.EpisodeID
-                            AND DownloadedEpisodes.UserID = ?
-                        LEFT JOIN SavedEpisodes ON
-                            CollectionEpisodes.EpisodeID = SavedEpisodes.EpisodeID
-                            AND SavedEpisodes.UserID = ?
-                        WHERE CollectionEpisodes.CollectionID = ? AND CollectionEpisodes.EpisodeID IS NOT NULL
-
-                        UNION ALL
-
-                        SELECT
-                            Podcasts.PodcastName as podcastname,
-                            YouTubeVideos.VideoTitle as episodetitle,
-                            YouTubeVideos.PublishedAt as episodepubdate,
-                            YouTubeVideos.VideoDescription as episodedescription,
-                            YouTubeVideos.VideoID as episodeid,
-                            CASE
-                                WHEN Podcasts.UsePodcastCoversCustomized = 1 AND Podcasts.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                WHEN Users.UsePodcastCovers = 1 THEN Podcasts.ArtworkURL
-                                ELSE YouTubeVideos.ThumbnailURL
-                            END as episodeartwork,
-                            YouTubeVideos.VideoURL as episodeurl,
-                            YouTubeVideos.Duration as episodeduration,
-                            Podcasts.WebsiteURL as websiteurl,
-                            YouTubeVideos.ListenPosition as listenduration,
-                            YouTubeVideos.Completed as completed,
-                            CASE WHEN SavedVideos.VideoID IS NOT NULL THEN TRUE ELSE FALSE END AS saved,
-                            CASE WHEN EpisodeQueue.EpisodeID IS NOT NULL AND EpisodeQueue.is_youtube = TRUE THEN TRUE ELSE FALSE END AS queued,
-                            CASE WHEN DownloadedVideos.VideoID IS NOT NULL THEN TRUE ELSE FALSE END AS downloaded,
-                            TRUE as is_youtube,
-                            Podcasts.PodcastID as podcastid,
-                            CollectionEpisodes.AddedAt as savedate
-                        FROM CollectionEpisodes
-                        INNER JOIN YouTubeVideos ON CollectionEpisodes.VideoID = YouTubeVideos.VideoID
-                        INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                        LEFT JOIN Users ON Podcasts.UserID = Users.UserID
-                        LEFT JOIN EpisodeQueue ON
-                            CollectionEpisodes.VideoID = EpisodeQueue.EpisodeID
-                            AND EpisodeQueue.UserID = ?
-                            AND EpisodeQueue.is_youtube = TRUE
-                        LEFT JOIN DownloadedVideos ON
-                            CollectionEpisodes.VideoID = DownloadedVideos.VideoID
-                            AND DownloadedVideos.UserID = ?
-                        LEFT JOIN SavedVideos ON
-                            CollectionEpisodes.VideoID = SavedVideos.VideoID
-                            AND SavedVideos.UserID = ?
-                        WHERE CollectionEpisodes.CollectionID = ? AND CollectionEpisodes.VideoID IS NOT NULL
-                    ) combined{mysql_filter}
-                    ORDER BY {order_col} {order_dir}
-                    LIMIT ? OFFSET ?"
-                );
-
-                let rows = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
-                    .bind(user_id)
-                    .bind(user_id)
-                    .bind(user_id)
-                    .bind(user_id)
-                    .bind(collection_id)
-                    .bind(user_id)
-                    .bind(user_id)
-                    .bind(user_id)
-                    .bind(collection_id)
-                    .bind(limit)
-                    .bind(offset)
-                    .fetch_all(pool)
-                    .await?;
-
-                let total: i64 = rows.first()
-                    .and_then(|r| r.try_get::<i64, _>("total_count").ok())
-                    .unwrap_or(0);
-
-                let mut episodes = Vec::new();
-                for row in rows {
-                    episodes.push(crate::models::SavedEpisode {
-                        episodetitle: row.try_get("episodetitle")?,
-                        podcastname: row.try_get("podcastname")?,
-                        episodepubdate: {
-                            let naive = row.try_get::<chrono::NaiveDateTime, _>("episodepubdate")?;
-                            naive.format("%Y-%m-%dT%H:%M:%S").to_string()
-                        },
-                        episodedescription: row.try_get("episodedescription")?,
-                        episodeartwork: row.try_get("episodeartwork")?,
-                        episodeurl: row.try_get("episodeurl")?,
-                        episodeduration: row.try_get("episodeduration")?,
-                        listenduration: row.try_get("listenduration").ok(),
-                        episodeid: row.try_get("episodeid")?,
-                        websiteurl: row.try_get("websiteurl")?,
-                        completed: row.try_get("completed")?,
-                        saved: row.try_get("saved")?,
-                        queued: row.try_get("queued")?,
-                        downloaded: row.try_get("downloaded")?,
-                        is_youtube: row.try_get("is_youtube")?,
-                        podcastid: row.try_get("podcastid").ok(),
-                        savedate: row.try_get::<chrono::NaiveDateTime, _>("savedate").ok()
-                            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string()),
-                    });
-                }
-                Ok((episodes, total))
-            },
         })
     }
 
@@ -1129,14 +698,6 @@ impl DatabasePool {
                     .fetch_optional(pool)
                     .await?;
                 row.and_then(|r| r.try_get::<Option<String>, _>("collection_add_ui").ok().flatten())
-                    .unwrap_or_else(|| "modal".to_string())
-            },
-            mysql(pool) => {
-                let row = sqlx::query("SELECT CollectionAddUI FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                row.and_then(|r| r.try_get::<Option<String>, _>("CollectionAddUI").ok().flatten())
                     .unwrap_or_else(|| "modal".to_string())
             },
         });
@@ -1162,28 +723,6 @@ impl DatabasePool {
                     result.rows_affected() > 0
                 } else {
                     let result = q::query(r#"INSERT INTO "UserSettings" (userid, collection_add_ui, theme) VALUES ($1, $2, 'Nordic')"#)
-                        .bind(user_id)
-                        .bind(mode)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                }
-            },
-            mysql(pool) => {
-                let existing = sqlx::query("SELECT COUNT(*) as count FROM UserSettings WHERE UserID = ?")
-                    .bind(user_id)
-                    .fetch_one(pool)
-                    .await?;
-                let count: i64 = existing.try_get("count")?;
-                if count > 0 {
-                    let result = sqlx::query("UPDATE UserSettings SET CollectionAddUI = ? WHERE UserID = ?")
-                        .bind(mode)
-                        .bind(user_id)
-                        .execute(pool)
-                        .await?;
-                    result.rows_affected() > 0
-                } else {
-                    let result = sqlx::query("INSERT INTO UserSettings (UserID, CollectionAddUI, Theme) VALUES (?, ?, 'Nordic')")
                         .bind(user_id)
                         .bind(mode)
                         .execute(pool)

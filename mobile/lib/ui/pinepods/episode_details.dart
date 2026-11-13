@@ -16,7 +16,6 @@ import 'package:pinepods_mobile/ui/widgets/episode_description.dart';
 import 'package:pinepods_mobile/ui/pinepods/podcast_details.dart';
 import 'package:pinepods_mobile/ui/pinepods/podcast_nav.dart';
 import 'package:pinepods_mobile/ui/pinepods/episode_ai_section.dart';
-import 'package:pinepods_mobile/ui/pinepods/people/add_people_sheet.dart';
 import 'package:pinepods_mobile/ui/pinepods/people/people_widgets.dart';
 import 'package:pinepods_mobile/ui/utils/player_utils.dart';
 import 'package:pinepods_mobile/ui/utils/local_download_utils.dart';
@@ -52,7 +51,6 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
   String _errorMessage = '';
   List<CreditedPerson> _people = [];
   // True once people loaded from a server that supports adding them.
-  bool _canAddPeople = false;
   bool _isDownloadedLocally = false;
   int? _userId; // set once credentials are established in _loadEpisodeDetails
 
@@ -308,10 +306,7 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
       final people = await _pinepodsService.getEpisodePeople(episode.episodeId);
       if (people != null) {
         if (mounted) {
-          setState(() {
-            _people = people;
-            _canAddPeople = true;
-          });
+          setState(() => _people = people);
         }
         return;
       }
@@ -325,13 +320,6 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
     } catch (e) {
       debugPrint('Error loading episode people: $e');
     }
-  }
-
-  Future<void> _addPeople() async {
-    final podcastId = _episode?.podcastId;
-    if (podcastId == null || podcastId <= 0) return;
-    final added = await showAddPeopleSheet(context, podcastId: podcastId, episodeId: _episode!.episodeId);
-    if (added != null && mounted) setState(() => _people = added);
   }
 
   bool _isCurrentEpisodePlaying() {
@@ -813,14 +801,9 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
                           _buildPlayButton(accent),
                           const SizedBox(height: 12),
                           _buildActionStrip(theme, accent),
-                          if (_people.isNotEmpty || _canAddPeople) ...[
+                          if (_people.isNotEmpty) ...[
                             const SizedBox(height: 20),
-                            PeopleStrip(
-                              title: L.of(context)!.in_this_episode,
-                              people: _people,
-                              onAdd: _canAddPeople && (_episode!.podcastId ?? 0) > 0 ? _addPeople : null,
-                              emptyPrompt: L.of(context)!.episode_people_empty_prompt,
-                            ),
+                            PeopleStrip(title: L.of(context)!.in_this_episode, people: _people),
                           ],
                           const SizedBox(height: 24),
                           Text(

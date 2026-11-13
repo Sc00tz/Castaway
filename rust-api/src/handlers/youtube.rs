@@ -731,22 +731,6 @@ async fn heal_channel_metadata(state: &AppState, podcast_id: i32, video: &VideoD
             .await
             .map(|r| r.rows_affected())
         },
-        mysql(pool) => {
-            sqlx::query(r#"
-                UPDATE Podcasts
-                SET PodcastName = CASE WHEN PodcastName = '' OR PodcastName IS NULL THEN ? ELSE PodcastName END,
-                    ArtworkURL  = CASE WHEN ArtworkURL  = '' OR ArtworkURL  IS NULL THEN ? ELSE ArtworkURL  END,
-                    Author      = CASE WHEN Author      = '' OR Author      IS NULL THEN ? ELSE Author      END
-                WHERE PodcastID = ?
-            "#)
-            .bind(&video.channel)
-            .bind(&video.thumbnail)
-            .bind(&video.channel)
-            .bind(podcast_id)
-            .execute(pool)
-            .await
-            .map(|r| r.rows_affected())
-        },
     });
     if let Err(e) = result {
         warn!("Updating metadata of YouTube podcast {} failed: {}", podcast_id, e);

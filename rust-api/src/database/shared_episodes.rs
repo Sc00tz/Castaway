@@ -16,14 +16,6 @@ impl DatabasePool {
                 
                 tracing::info!("Cleaned up {} expired SharedEpisodes records", result.rows_affected());
             },
-            mysql(pool) => {
-                let result = sqlx::query("DELETE FROM SharedEpisodes WHERE ExpirationDate < ?")
-                    .bind(now)
-                    .execute(pool)
-                    .await?;
-                
-                tracing::info!("Cleaned up {} expired SharedEpisodes records", result.rows_affected());
-            },
         });
         Ok(())
     }
@@ -51,25 +43,6 @@ impl DatabasePool {
                     }
                 }
             },
-            mysql(pool) => {
-                let result = sqlx::query(
-                    "INSERT INTO SharedEpisodes (EpisodeID, SharedBy, ShareCode, ExpirationDate) VALUES (?, ?, ?, ?)"
-                )
-                .bind(episode_id)
-                .bind(shared_by)
-                .bind(share_code)
-                .bind(expiration_date)
-                .execute(pool)
-                .await;
-
-                match result {
-                    Ok(_) => Ok(true),
-                    Err(e) => {
-                        tracing::error!("Error sharing episode: {}", e);
-                        Ok(false)
-                    }
-                }
-            },
         })
     }
 
@@ -81,17 +54,6 @@ impl DatabasePool {
                     SELECT episodeid FROM "SharedEpisodes" 
                     WHERE sharecode = $1 AND expirationdate > NOW()
                 "#)
-                .bind(share_code)
-                .fetch_optional(pool)
-                .await?;
-                
-                Ok(result.map(|row| row.0))
-            },
-            mysql(pool) => {
-                let result = sqlx::query_as::<_, (i32,)>(
-                    "SELECT EpisodeID FROM SharedEpisodes 
-                     WHERE ShareCode = ? AND ExpirationDate > NOW()"
-                )
                 .bind(share_code)
                 .fetch_optional(pool)
                 .await?;
@@ -203,105 +165,6 @@ impl DatabasePool {
                     }
                 }
             },
-            mysql(pool) => {
-                // First try regular episodes
-                let row = sqlx::query(
-                    "SELECT 
-                        Podcasts.PodcastID, 
-                        Podcasts.FeedURL,
-                        Podcasts.PodcastName, 
-                        Podcasts.ArtworkURL,
-                        Episodes.EpisodeTitle,
-                        Episodes.EpisodePubDate,
-                        Episodes.EpisodeDescription,
-                        Episodes.EpisodeArtwork,
-                        Episodes.EpisodeURL,
-                        Episodes.EpisodeDuration,
-                        Episodes.EpisodeID,
-                        Podcasts.WebsiteURL,
-                        COALESCE((SELECT ues.Completed FROM UserEpisodeState ues WHERE ues.EpisodeID = Episodes.EpisodeID AND ues.UserID = Podcasts.UserID), 0) AS Completed,
-                        FALSE as is_youtube
-                    FROM Episodes
-                    INNER JOIN Podcasts ON Episodes.FeedID = Podcasts.FeedID
-                    WHERE Episodes.EpisodeID = ? ORDER BY Podcasts.PodcastID LIMIT 1"
-                )
-                .bind(episode_id)
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = row {
-                    let episodepubdate = row.try_get::<chrono::NaiveDateTime, _>("EpisodePubDate")?
-                        .format("%Y-%m-%dT%H:%M:%S").to_string();
-                    
-                    Ok(serde_json::json!({
-                        "podcastid": row.try_get::<i32, _>("PodcastID")?,
-                        "feedurl": row.try_get::<Option<String>, _>("FeedURL")?,
-                        "podcastname": row.try_get::<String, _>("PodcastName")?,
-                        "artworkurl": row.try_get::<Option<String>, _>("ArtworkURL")?,
-                        "episodetitle": row.try_get::<String, _>("EpisodeTitle")?,
-                        "episodepubdate": episodepubdate,
-                        "episodedescription": row.try_get::<Option<String>, _>("EpisodeDescription")?,
-                        "episodeartwork": row.try_get::<Option<String>, _>("EpisodeArtwork")?,
-                        "episodeurl": row.try_get::<String, _>("EpisodeURL")?,
-                        "episodeduration": row.try_get::<Option<i32>, _>("EpisodeDuration")?,
-                        "episodeid": row.try_get::<i32, _>("EpisodeID")?,
-                        "websiteurl": row.try_get::<Option<String>, _>("WebsiteURL")?,
-                        "listenduration": None::<i32>, // No user-specific data for shared episodes
-                        "completed": row.try_get::<Option<bool>, _>("Completed")?,
-                        "is_youtube": false
-                    }))
-                } else {
-                    // Try YouTube videos
-                    let row = sqlx::query(
-                        "SELECT 
-                            Podcasts.PodcastID, 
-                            Podcasts.FeedURL,
-                            Podcasts.PodcastName, 
-                            Podcasts.ArtworkURL,
-                            YouTubeVideos.VideoTitle as EpisodeTitle,
-                            YouTubeVideos.PublishedAt as EpisodePubDate,
-                            YouTubeVideos.VideoDescription as EpisodeDescription,
-                            YouTubeVideos.ThumbnailURL as EpisodeArtwork,
-                            YouTubeVideos.VideoURL as EpisodeURL,
-                            YouTubeVideos.Duration as EpisodeDuration,
-                            YouTubeVideos.VideoID as EpisodeID,
-                            Podcasts.WebsiteURL,
-                            YouTubeVideos.Completed,
-                            TRUE as is_youtube
-                        FROM YouTubeVideos
-                        INNER JOIN Podcasts ON YouTubeVideos.PodcastID = Podcasts.PodcastID
-                        WHERE YouTubeVideos.VideoID = ?"
-                    )
-                    .bind(episode_id)
-                    .fetch_optional(pool)
-                    .await?;
-
-                    if let Some(row) = row {
-                        let episodepubdate = row.try_get::<chrono::NaiveDateTime, _>("EpisodePubDate")?
-                            .format("%Y-%m-%dT%H:%M:%S").to_string();
-                        
-                        Ok(serde_json::json!({
-                            "podcastid": row.try_get::<i32, _>("PodcastID")?,
-                            "feedurl": row.try_get::<Option<String>, _>("FeedURL")?,
-                            "podcastname": row.try_get::<String, _>("PodcastName")?,
-                            "artworkurl": row.try_get::<Option<String>, _>("ArtworkURL")?,
-                            "episodetitle": row.try_get::<String, _>("EpisodeTitle")?,
-                            "episodepubdate": episodepubdate,
-                            "episodedescription": row.try_get::<Option<String>, _>("EpisodeDescription")?,
-                            "episodeartwork": row.try_get::<Option<String>, _>("EpisodeArtwork")?,
-                            "episodeurl": row.try_get::<String, _>("EpisodeURL")?,
-                            "episodeduration": row.try_get::<Option<i32>, _>("EpisodeDuration")?,
-                            "episodeid": row.try_get::<i32, _>("EpisodeID")?,
-                            "websiteurl": row.try_get::<Option<String>, _>("WebsiteURL")?,
-                            "listenposition": None::<i32>, // No user-specific data for shared episodes  
-                            "completed": row.try_get::<Option<bool>, _>("Completed")?,
-                            "is_youtube": true
-                        }))
-                    } else {
-                        Err(AppError::not_found("Episode not found"))
-                    }
-                }
-            },
         })
     }
 
@@ -341,39 +204,6 @@ impl DatabasePool {
                 }).collect();
                 Ok(result)
             },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT
-                        se.ShareCode AS sharecode,
-                        se.ExpirationDate AS expirationdate,
-                        COALESCE(e.EpisodeTitle, ye.VideoTitle) AS episodetitle,
-                        COALESCE(p.PodcastName, yp.PodcastName) AS podcastname
-                    FROM SharedEpisodes se
-                    LEFT JOIN Episodes e ON se.EpisodeID = e.EpisodeID
-                    LEFT JOIN Podcasts p ON e.FeedID = p.FeedID AND p.UserID = se.SharedBy
-                    LEFT JOIN YouTubeVideos ye ON se.EpisodeID = ye.VideoID
-                    LEFT JOIN Podcasts yp ON ye.PodcastID = yp.PodcastID
-                    WHERE se.SharedBy = ?
-                    ORDER BY se.ExpirationDate DESC"
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-
-                let result = rows.iter().map(|row| {
-                    let sharecode: String = row.try_get("sharecode").unwrap_or_default();
-                    let expiration: chrono::NaiveDateTime = row.try_get("expirationdate").unwrap_or_else(|_| chrono::Utc::now().naive_utc());
-                    let episode_title: String = row.try_get("episodetitle").unwrap_or_else(|_| "Unknown".to_string());
-                    let podcast_name: String = row.try_get("podcastname").unwrap_or_else(|_| "Unknown".to_string());
-                    serde_json::json!({
-                        "share_code": sharecode,
-                        "expiration_date": expiration.format("%Y-%m-%d %H:%M UTC").to_string(),
-                        "episode_title": episode_title,
-                        "podcast_name": podcast_name,
-                    })
-                }).collect();
-                Ok(result)
-            },
         })
     }
 
@@ -382,14 +212,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 let result = q::query(r#"DELETE FROM "SharedEpisodes" WHERE sharecode = $1 AND sharedby = $2"#)
-                    .bind(share_code)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-                Ok(result.rows_affected() > 0)
-            },
-            mysql(pool) => {
-                let result = sqlx::query("DELETE FROM SharedEpisodes WHERE ShareCode = ? AND SharedBy = ?")
                     .bind(share_code)
                     .bind(user_id)
                     .execute(pool)
@@ -426,17 +248,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?;
                 Ok(true)
-            },
-            mysql(pool) => {
-                let result = sqlx::query(
-                    "UPDATE SharedEpisodes SET ExpirationDate = DATE_ADD(ExpirationDate, INTERVAL ? DAY) WHERE ShareCode = ? AND SharedBy = ?"
-                )
-                .bind(days)
-                .bind(share_code)
-                .bind(user_id)
-                .execute(pool)
-                .await?;
-                Ok(result.rows_affected() > 0)
             },
         })
     }

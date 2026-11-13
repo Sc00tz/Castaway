@@ -67,7 +67,6 @@ impl Default for RawAiSettings {
 
 async fn read_row(db_pool: &DatabasePool) -> Result<RawAiSettings, String> {
     // The two SELECTs differ only by table-name quoting; mapping happens per-arm because the
-    // Postgres and MySQL row types are distinct.
     dialect_match!(db_pool, {
         pg(pool) => {
             let row = q::query(r#"
@@ -75,27 +74,6 @@ async fn read_row(db_pool: &DatabasePool) -> Result<RawAiSettings, String> {
                        LlmModel AS llm_model, LlmUrl AS llm_url, LlmApiKey AS llm_api_key,
                        WhisperDevice AS whisper_device, WhisperComputeType AS whisper_compute_type
                 FROM "AISettings" WHERE AISettingsID = 1
-            "#)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| e.to_string())?;
-            let Some(r) = row else { return Ok(RawAiSettings::default()) };
-            Ok(RawAiSettings {
-                transcription_model: r.try_get("transcription_model").unwrap_or_else(|_| "base".into()),
-                llm_backend: r.try_get("llm_backend").unwrap_or_else(|_| "local".into()),
-                llm_model: r.try_get("llm_model").ok().flatten(),
-                llm_url: r.try_get("llm_url").ok().flatten(),
-                llm_api_key: r.try_get("llm_api_key").ok().flatten(),
-                whisper_device: r.try_get("whisper_device").unwrap_or_else(|_| "cpu".into()),
-                whisper_compute_type: r.try_get("whisper_compute_type").unwrap_or_else(|_| "int8".into()),
-            })
-        },
-        mysql(pool) => {
-            let row = sqlx::query(r#"
-                SELECT TranscriptionModel AS transcription_model, LlmBackend AS llm_backend,
-                       LlmModel AS llm_model, LlmUrl AS llm_url, LlmApiKey AS llm_api_key,
-                       WhisperDevice AS whisper_device, WhisperComputeType AS whisper_compute_type
-                FROM AISettings WHERE AISettingsID = 1
             "#)
             .fetch_optional(pool)
             .await
@@ -179,30 +157,6 @@ pub async fn set_ai_settings(db_pool: &DatabasePool, update: AiSettingsUpdate) -
                     q::query(r#"
                         UPDATE "AISettings" SET TranscriptionModel=$1, LlmBackend=$2, LlmModel=$3,
                             LlmUrl=$4, WhisperDevice=$5, WhisperComputeType=$6,
-                            UpdatedAt=CURRENT_TIMESTAMP WHERE AISettingsID = 1
-                    "#)
-                    .bind(&update.transcription_model).bind(&update.llm_backend).bind(&update.llm_model)
-                    .bind(&update.llm_url).bind(&device).bind(&compute)
-                    .execute(pool).await.map_err(|e| e.to_string())?;
-                }
-            }
-        },
-        mysql(pool) => {
-            match &new_key {
-                Some(key) => {
-                    sqlx::query(r#"
-                        UPDATE AISettings SET TranscriptionModel=?, LlmBackend=?, LlmModel=?,
-                            LlmUrl=?, LlmApiKey=?, WhisperDevice=?, WhisperComputeType=?,
-                            UpdatedAt=CURRENT_TIMESTAMP WHERE AISettingsID = 1
-                    "#)
-                    .bind(&update.transcription_model).bind(&update.llm_backend).bind(&update.llm_model)
-                    .bind(&update.llm_url).bind(key).bind(&device).bind(&compute)
-                    .execute(pool).await.map_err(|e| e.to_string())?;
-                }
-                None => {
-                    sqlx::query(r#"
-                        UPDATE AISettings SET TranscriptionModel=?, LlmBackend=?, LlmModel=?,
-                            LlmUrl=?, WhisperDevice=?, WhisperComputeType=?,
                             UpdatedAt=CURRENT_TIMESTAMP WHERE AISettingsID = 1
                     "#)
                     .bind(&update.transcription_model).bind(&update.llm_backend).bind(&update.llm_model)

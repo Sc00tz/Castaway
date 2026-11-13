@@ -314,3 +314,38 @@ async fn auto_play_next_skips_finished_episodes() {
         .ok_json();
     assert_eq!(next["episodeid"], ids[2], "{next}");
 }
+
+/// Positions and completion changes share one clock, so "the newest position wins" holds even
+/// when the database server's own time zone isn't UTC (the built-in database takes the
+/// container's TZ). Every session is pinned to UTC.
+#[tokio::test(flavor = "multi_thread")]
+async fn sessions_use_utc_whatever_the_database_time_zone() {
+    let app = TestApp::new().await;
+    exec(&app, &format!(r#"ALTER DATABASE "{}" SET timezone = 'Pacific/Kiritimati'"#, app.db_name)).await;
+    let fresh = pinepods_api::database::DatabasePool::new(&app.state.config).await.unwrap();
+    let pinepods_api::database::DatabasePool::Postgres(pool) = &fresh;
+    let tz: String = sqlx::query_scalar("SELECT current_setting('TimeZone')").fetch_one(pool).await.unwrap();
+    assert_eq!(tz, "UTC");
+
+    // And the user-visible rule: progress saved right after un-marking an episode sticks.
+    let user = app.user("tz").await;
+    let url = app.feed("tz.xml", &Feed::with_episodes("TZ Show", 1));
+    let pod = app.subscribe(&user, &url, 1).await;
+    let ep = app.episode_id(&user, pod, "Episode 1").await;
+    let mark = |path: &'static str| {
+        let (app, user) = (&app, &user);
+        async move {
+            app.post(path).key(user).json(&json!({ "episode_id": ep, "user_id": user.id, "is_youtube": false })).send().await.assert_ok();
+        }
+    };
+    mark("/api/data/mark_episode_completed").await;
+    mark("/api/data/mark_episode_uncompleted").await;
+    app.post("/api/data/record_listen_duration")
+        .key(&user)
+        .json(&json!({ "episode_id": ep, "user_id": user.id, "listen_duration": 42.0, "is_youtube": false }))
+        .send()
+        .await
+        .assert_ok();
+    let stored = int(&app, &format!(r#"SELECT listenduration FROM "UserEpisodeHistory" WHERE episodeid = {ep} AND userid = {}"#, user.id)).await;
+    assert_eq!(stored, Some(42));
+}

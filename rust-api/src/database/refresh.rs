@@ -13,14 +13,6 @@ pub(super) fn pg_refresh_targets(n: usize) -> [(&'static str, String); 2] {
     ]
 }
 
-pub(super) fn mysql_refresh_targets(ids: usize) -> [(&'static str, String); 2] {
-    let marks = vec!["?"; ids].join(", ");
-    [
-        ("Podcasts", format!("PodcastID IN ({marks})")),
-        ("Feeds", format!("FeedID IN (SELECT FeedID FROM Podcasts WHERE PodcastID IN ({marks}))")),
-    ]
-}
-
 #[derive(Debug, Clone)]
 pub struct EpisodeData {
     pub title: String,
@@ -112,7 +104,7 @@ pub(super) struct ExistingEpisodes {
     by_id: std::collections::HashMap<i32, ExistingEp>,
 }
 
-dialect_fn!([pg_existing_from_row, lite_existing_from_row]
+dialect_fn!([pg_existing_from_row]
     pub(super) fn(row: &q::Row) -> ExistingEp {
     ExistingEp {
         guid: row.try_get::<Option<String>, _>("episodeguid").ok().flatten(),
@@ -124,18 +116,6 @@ dialect_fn!([pg_existing_from_row, lite_existing_from_row]
         is_video: row.try_get::<Option<bool>, _>("is_video").ok().flatten().unwrap_or(false),
     }
 });
-
-pub(super) fn mysql_existing_from_row(row: &sqlx::mysql::MySqlRow) -> ExistingEp {
-    ExistingEp {
-        guid: row.try_get::<Option<String>, _>("EpisodeGUID").ok().flatten(),
-        title: row.try_get::<Option<String>, _>("EpisodeTitle").ok().flatten().unwrap_or_default(),
-        description: row.try_get::<Option<String>, _>("EpisodeDescription").ok().flatten().unwrap_or_default(),
-        url: row.try_get::<Option<String>, _>("EpisodeURL").ok().flatten().unwrap_or_default(),
-        artwork: row.try_get::<Option<String>, _>("EpisodeArtwork").ok().flatten().unwrap_or_default(),
-        duration: row.try_get::<Option<i32>, _>("EpisodeDuration").ok().flatten().unwrap_or(0),
-        is_video: row.try_get::<Option<bool>, _>("IsVideo").ok().flatten().unwrap_or(false),
-    }
-}
 
 impl DatabasePool {
     // Get user podcasts for refresh - matches Python refresh logic
@@ -192,61 +172,6 @@ impl DatabasePool {
                         recently_refreshed: row.try_get("recently_refreshed").unwrap_or(false),
                         throttled: row.try_get("throttled").unwrap_or(false),
                         auto_refresh: row.try_get("auto_refresh").unwrap_or(true),
-                    });
-                }
-                Ok(podcasts)
-            },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT 
-                        PodcastID as id,
-                        FeedID as feed_id,
-                        PodcastName as name,
-                        FeedURL as feed_url,
-                        ArtworkURL as artwork_url,
-                        IsYouTubeChannel as is_youtube,
-                        AutoDownload as auto_download,
-                        AutoQueue as auto_queue,
-                        Username as username,
-                        Password as password,
-                        FeedCutoffDays as feed_cutoff_days,
-                        UserID as user_id,
-                        FeedETag as etag,
-                        FeedLastModified as last_modified,
-                        FeedContentHash as content_hash,
-                        RefreshIntervalMinutes as refresh_interval,
-                        (LastRefreshSuccess IS NOT NULL AND LastRefreshSuccess > NOW() - INTERVAL 2 MINUTE) as recently_refreshed,
-                        (RefreshNotBefore IS NOT NULL AND RefreshNotBefore > NOW()) as throttled,
-                        COALESCE(RefreshPodcast, 1) as auto_refresh
-                    FROM Podcasts 
-                    WHERE UserID = ?"
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-                
-                let mut podcasts = Vec::new();
-                for row in rows {
-                    podcasts.push(crate::handlers::refresh::PodcastForRefresh {
-                        id: row.try_get("id")?,
-                        feed_id: row.try_get("feed_id")?,
-                        name: row.try_get("name")?,
-                        feed_url: row.try_get("feed_url")?,
-                        artwork_url: row.try_get("artwork_url").unwrap_or_default(),
-                        is_youtube: row.try_get("is_youtube")?,
-                        auto_download: row.try_get("auto_download")?,
-                        auto_queue: row.try_get("auto_queue").unwrap_or(false),
-                        username: row.try_get("username").ok(),
-                        password: row.try_get("password").ok(),
-                        feed_cutoff_days: row.try_get("feed_cutoff_days").ok(),
-                        user_id: row.try_get("user_id")?,
-                        etag: row.try_get("etag").ok().flatten(),
-                        last_modified: row.try_get("last_modified").ok().flatten(),
-                        content_hash: row.try_get("content_hash").ok().flatten(),
-                        refresh_interval: row.try_get("refresh_interval").ok().flatten(),
-                        recently_refreshed: row.try_get::<i64, _>("recently_refreshed").unwrap_or(0) != 0,
-                        throttled: row.try_get::<i64, _>("throttled").unwrap_or(0) != 0,
-                        auto_refresh: row.try_get::<i64, _>("auto_refresh").map(|v| v != 0).unwrap_or(true),
                     });
                 }
                 Ok(podcasts)
@@ -308,7 +233,6 @@ impl DatabasePool {
         if let Err(e) = self.set_refresh_schedule(&[podcast_id], next).await {
             warn!("Scheduling the next refresh of podcast {} failed: {}", podcast_id, e);
         }
-        crate::services::people::podpeople::queue_sync(podcast_id);
 
         // Get the actual first episode ID (earliest by pub date)
         let first_id = self.get_first_episode_id(podcast_id, false).await?;
@@ -455,26 +379,6 @@ impl DatabasePool {
                                        episodeartwork = $4, episodepubdate = $5, episodeduration = $6,
                                        is_video = $7, episodeguid = COALESCE($8, episodeguid)
                                    WHERE episodeid = $9"#,
-                            )
-                            .bind(&ep.title)
-                            .bind(&ep.description)
-                            .bind(&ep.url)
-                            .bind(artwork)
-                            .bind(ep.pub_date)
-                            .bind(ep.duration)
-                            .bind(ep.is_video)
-                            .bind(ep.guid.as_deref())
-                            .bind(episode_id)
-                            .execute(pool)
-                            .await?;
-                        },
-                        mysql(pool) => {
-                            sqlx::query(
-                                "UPDATE Episodes
-                                 SET EpisodeTitle = ?, EpisodeDescription = ?, EpisodeURL = ?,
-                                     EpisodeArtwork = ?, EpisodePubDate = ?, EpisodeDuration = ?,
-                                     IsVideo = ?, EpisodeGUID = COALESCE(?, EpisodeGUID)
-                                 WHERE EpisodeID = ?",
                             )
                             .bind(&ep.title)
                             .bind(&ep.description)
@@ -675,35 +579,6 @@ impl DatabasePool {
                 }
                 tx.commit().await?;
             },
-            mysql(pool) => {
-                // Row by row inside one transaction: a multi-row INSERT IGNORE can't say which rows
-                // were skipped or which ids the others got (auto-increment may interleave with a
-                // concurrent refresh), and the transaction makes per-row cost small.
-                let mut tx = pool.begin().await?;
-                for (i, r) in rows.iter().enumerate() {
-                    let result = sqlx::query(
-                        "INSERT IGNORE INTO Episodes
-                         (PodcastID, FeedID, EpisodeTitle, EpisodeDescription, EpisodeURL, EpisodeArtwork, EpisodePubDate, EpisodeDuration, IsVideo, EpisodeGUID)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    )
-                    .bind(podcast_id)
-                    .bind(feed_id)
-                    .bind(&r.ep.title)
-                    .bind(&r.ep.description)
-                    .bind(&r.ep.url)
-                    .bind(r.artwork)
-                    .bind(r.ep.pub_date)
-                    .bind(r.duration)
-                    .bind(r.ep.is_video)
-                    .bind(r.ep.guid.as_deref())
-                    .execute(&mut *tx)
-                    .await?;
-                    if result.rows_affected() == 1 {
-                        inserted.push((i, result.last_insert_id() as i32));
-                    }
-                }
-                tx.commit().await?;
-            },
         });
         if inserted.len() < rows.len() {
             debug!(
@@ -748,13 +623,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?;
             },
-            mysql(pool) => {
-                sqlx::query("UPDATE Episodes SET EpisodeDuration = ? WHERE EpisodeID = ? AND COALESCE(EpisodeDuration, 0) = 0")
-                    .bind(duration)
-                    .bind(episode_id)
-                    .execute(pool)
-                    .await?;
-            },
         });
         Ok(())
     }
@@ -786,7 +654,7 @@ impl DatabasePool {
                     .await?;
                     for row in rows {
                         if let Ok(id) = row.try_get::<i32, _>("episodeid") {
-                            let ex = q::pick(pg_existing_from_row, lite_existing_from_row)(&row);
+                            let ex = pg_existing_from_row(&row);
                             if let Some(g) = ex.guid.clone() { out.guid_to_id.insert(g, id); }
                             out.by_id.insert(id, ex);
                         }
@@ -807,7 +675,7 @@ impl DatabasePool {
                     for row in rows {
                         if let (Ok(id), Ok(base)) = (row.try_get::<i32, _>("episodeid"), row.try_get::<String, _>("url_base")) {
                             out.url_to_id.insert(base, id);
-                            out.by_id.entry(id).or_insert_with(|| q::pick(pg_existing_from_row, lite_existing_from_row)(&row));
+                            out.by_id.entry(id).or_insert_with(|| pg_existing_from_row(&row));
                         }
                     }
                 }
@@ -825,65 +693,7 @@ impl DatabasePool {
                     for row in rows {
                         if let (Ok(id), Ok(t)) = (row.try_get::<i32, _>("episodeid"), row.try_get::<String, _>("episodetitle")) {
                             out.title_to_id.insert(t, id);
-                            out.by_id.entry(id).or_insert_with(|| q::pick(pg_existing_from_row, lite_existing_from_row)(&row));
-                        }
-                    }
-                }
-            },
-            mysql(pool) => {
-                if !guids.is_empty() {
-                    let placeholders = guids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-                    let sql = format!(
-                        "SELECT EpisodeID, EpisodeGUID, EpisodeTitle, EpisodeDescription, EpisodeURL, \
-                         EpisodeArtwork, EpisodeDuration, IsVideo \
-                         FROM Episodes WHERE FeedID = ? AND EpisodeGUID IN ({})",
-                        placeholders
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(feed_id);
-                    for g in guids { q = q.bind(g); }
-                    let rows = q.fetch_all(pool).await?;
-                    for row in rows {
-                        if let Ok(id) = row.try_get::<i32, _>("EpisodeID") {
-                            let ex = mysql_existing_from_row(&row);
-                            if let Some(g) = ex.guid.clone() { out.guid_to_id.insert(g, id); }
-                            out.by_id.insert(id, ex);
-                        }
-                    }
-                }
-                if !url_bases.is_empty() {
-                    let placeholders = url_bases.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-                    let sql = format!(
-                        "SELECT EpisodeID, EpisodeGUID, EpisodeTitle, EpisodeDescription, EpisodeURL, \
-                         EpisodeArtwork, EpisodeDuration, IsVideo, \
-                         SUBSTRING_INDEX(EpisodeURL, '?', 1) AS url_base \
-                         FROM Episodes WHERE FeedID = ? AND SUBSTRING_INDEX(EpisodeURL, '?', 1) IN ({})",
-                        placeholders
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(feed_id);
-                    for base in url_bases { q = q.bind(base); }
-                    let rows = q.fetch_all(pool).await?;
-                    for row in rows {
-                        if let (Ok(id), Ok(base)) = (row.try_get::<i32, _>("EpisodeID"), row.try_get::<String, _>("url_base")) {
-                            out.url_to_id.insert(base, id);
-                            out.by_id.entry(id).or_insert_with(|| mysql_existing_from_row(&row));
-                        }
-                    }
-                }
-                if !titles_no_url.is_empty() {
-                    let placeholders = titles_no_url.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-                    let sql = format!(
-                        "SELECT EpisodeID, EpisodeGUID, EpisodeTitle, EpisodeDescription, EpisodeURL, \
-                         EpisodeArtwork, EpisodeDuration, IsVideo \
-                         FROM Episodes WHERE FeedID = ? AND EpisodeTitle IN ({})",
-                        placeholders
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(feed_id);
-                    for t in titles_no_url { q = q.bind(t); }
-                    let rows = q.fetch_all(pool).await?;
-                    for row in rows {
-                        if let (Ok(id), Ok(t)) = (row.try_get::<i32, _>("EpisodeID"), row.try_get::<String, _>("EpisodeTitle")) {
-                            out.title_to_id.insert(t, id);
-                            out.by_id.entry(id).or_insert_with(|| mysql_existing_from_row(&row));
+                            out.by_id.entry(id).or_insert_with(|| pg_existing_from_row(&row));
                         }
                     }
                 }
@@ -1004,20 +814,6 @@ impl DatabasePool {
                     .await?;
                 }
             },
-            mysql(pool) => {
-                for (table, rows) in mysql_refresh_targets(podcast_ids.len()) {
-                    let sql = format!(
-                        "UPDATE {table} SET FeedETag = ?, FeedLastModified = ?, \
-                         FeedContentHash = COALESCE(?, FeedContentHash) WHERE {rows}"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
-                        .bind(etag)
-                        .bind(last_modified)
-                        .bind(content_hash);
-                    for id in podcast_ids { q = q.bind(id); }
-                    q.execute(pool).await?;
-                }
-            },
         });
         Ok(())
     }
@@ -1048,21 +844,6 @@ impl DatabasePool {
                     .await?;
                 }
             },
-            mysql(pool) => {
-                for (table, rows) in mysql_refresh_targets(podcast_ids.len()) {
-                    let notified = if table == "Podcasts" { "ProblemNotified = FALSE, " } else { "" };
-                    let sql = format!(
-                        "UPDATE {table} SET LastRefreshAttempt = NOW(), LastRefreshSuccess = NOW(), \
-                         ConsecutiveFailures = 0, LastErrorMessage = NULL, RefreshNotBefore = NULL, \
-                         FailingSince = NULL, LastErrorKind = NULL, {notified}\
-                         RefreshIntervalMinutes = ?, NextRefreshAt = NOW() + INTERVAL ? SECOND \
-                         WHERE {rows}"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(next.interval_minutes).bind(next.next_in_secs);
-                    for id in podcast_ids { q = q.bind(id); }
-                    q.execute(pool).await?;
-                }
-            },
         });
         Ok(())
     }
@@ -1087,16 +868,6 @@ impl DatabasePool {
                     .await?;
                 }
             },
-            mysql(pool) => {
-                for (table, rows) in mysql_refresh_targets(podcast_ids.len()) {
-                    let sql = format!(
-                        "UPDATE {table} SET RefreshIntervalMinutes = ?, NextRefreshAt = NOW() + INTERVAL ? SECOND WHERE {rows}"
-                    );
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(next.interval_minutes).bind(next.next_in_secs);
-                    for id in podcast_ids { q = q.bind(id); }
-                    q.execute(pool).await?;
-                }
-            },
         });
         Ok(())
     }
@@ -1108,15 +879,6 @@ impl DatabasePool {
             pg(pool) => {
                 q::query_scalar(sqlx::AssertSqlSafe(format!(
                     r#"SELECT {column} FROM "{table}" WHERE podcastid = $1 AND {column} IS NOT NULL ORDER BY {column} DESC LIMIT $2"#
-                )))
-                .bind(podcast_id)
-                .bind(limit)
-                .fetch_all(pool)
-                .await?
-            },
-            mysql(pool) => {
-                sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                    "SELECT {column} FROM {table} WHERE PodcastID = ? AND {column} IS NOT NULL ORDER BY {column} DESC LIMIT ?"
                 )))
                 .bind(podcast_id)
                 .bind(limit)
@@ -1173,26 +935,6 @@ impl DatabasePool {
                     .bind(kind.as_str())
                     .execute(pool)
                     .await?;
-                }
-            },
-            mysql(pool) => {
-                for (table, rows) in mysql_refresh_targets(podcast_ids.len()) {
-                    // NextRefreshAt first: MySQL assigns left to right, so it still sees the old count.
-                    let sql = format!(
-                        "UPDATE {table} SET NextRefreshAt = NOW() + INTERVAL GREATEST( \
-                             COALESCE(RefreshIntervalMinutes, {DEFAULT_MINUTES}) * 60, \
-                             {BACKOFF_STEP_MINUTES} * 60 * LEAST(COALESCE(ConsecutiveFailures, 0) + 1, {BACKOFF_MAX_STEPS}), \
-                             COALESCE(?, 0)) SECOND, \
-                         LastRefreshAttempt = NOW(), \
-                         ConsecutiveFailures = COALESCE(ConsecutiveFailures, 0) + 1, LastErrorMessage = ?, \
-                         RefreshNotBefore = NOW() + INTERVAL ? SECOND, \
-                         FailingSince = COALESCE(FailingSince, NOW()), LastErrorKind = ? \
-                         WHERE {rows}"
-                    );
-                    // NOW() + INTERVAL NULL SECOND is NULL, which clears the hold as intended.
-                    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(wait_secs).bind(error).bind(wait_secs).bind(kind.as_str());
-                    for id in podcast_ids { q = q.bind(id); }
-                    q.execute(pool).await?;
                 }
             },
         });
@@ -1288,21 +1030,6 @@ impl DatabasePool {
                 if let Some(row) = result {
                     let username: Option<String> = row.try_get("username").ok().flatten();
                     let password: Option<String> = row.try_get("password").ok().flatten();
-                    Ok((username, password))
-                } else {
-                    Ok((None, None))
-                }
-            },
-            mysql(pool) => {
-                let result = sqlx::query("SELECT Username, Password FROM Podcasts WHERE FeedURL = ? AND UserID = ? LIMIT 1")
-                    .bind(feed_url)
-                    .bind(user_id)
-                    .fetch_optional(pool)
-                    .await?;
-                
-                if let Some(row) = result {
-                    let username: Option<String> = row.try_get("Username").ok().flatten();
-                    let password: Option<String> = row.try_get("Password").ok().flatten();
                     Ok((username, password))
                 } else {
                     Ok((None, None))

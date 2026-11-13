@@ -14,11 +14,6 @@ pub struct Config {
     pub api: ApiConfig,
 }
 
-/// The hosted search and podcast-people services, used unless SEARCH_API_URL / PEOPLE_API_URL
-/// point elsewhere.
-pub const DEFAULT_SEARCH_API_URL: &str = "https://search.pinepods.online/api/search";
-pub const DEFAULT_PEOPLE_API_URL: &str = "https://people.pinepods.online";
-
 /// An environment variable, treating blank as unset (the process supervisor passes unset
 /// variables through as empty strings).
 pub fn env_value(name: &str) -> Option<String> {
@@ -39,15 +34,16 @@ pub const YOUTUBE_FEED_URL: &str = "https://www.youtube.com/feeds/videos.xml?cha
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiConfig {
-    pub search_api_url: String,
-    pub people_api_url: String,
+    /// Apple's iTunes Search API.
+    pub itunes_search_url: String,
+    /// Podcast Index API base, e.g. https://api.podcastindex.org/api/1.0.
+    pub podcast_index_url: String,
     /// A YouTube channel's RSS feed, with `{channel_id}` in place of the channel.
     pub youtube_feed_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    pub db_type: String,
     pub host: String,
     pub port: u16,
     pub username: String,
@@ -187,21 +183,21 @@ impl Config {
         // Load environment variables
         dotenvy::dotenv().ok();
         
-        // Validate required database environment variables
+        // Castaway runs on PostgreSQL only.
+        if let Some(db_type) = env_value("DB_TYPE") {
+            if !matches!(db_type.to_ascii_lowercase().as_str(), "postgresql" | "postgres") {
+                return Err(AppError::Config(format!(
+                    "DB_TYPE={db_type} isn't supported: Castaway uses PostgreSQL only."
+                )));
+            }
+        }
         let db_required_vars = [
-            ("DB_TYPE", "Database type (e.g., postgresql, mariadb)"),
-            ("DB_HOST", "Database host (e.g., localhost, db)"),
-            ("DB_PORT", "Database port (e.g., 5432 for PostgreSQL, 3306 for MariaDB)"),
+            ("DB_HOST", "PostgreSQL host (e.g., localhost, db)"),
+            ("DB_PORT", "PostgreSQL port (e.g., 5432)"),
             ("DB_USER", "Database username"),
             ("DB_PASSWORD", "Database password"),
             ("DB_NAME", "Database name"),
         ];
-
-        // SQLite needs only DB_TYPE and the database file (DB_PATH). With no database server
-        // configured at all, SQLite is the default.
-        let db_type = env_value("DB_TYPE").or_else(|| env_value("DB_HOST").is_none().then(|| "sqlite".to_string()));
-        let is_sqlite = db_type.as_deref().is_some_and(|t| t.eq_ignore_ascii_case("sqlite"));
-        let db_required_vars: &[(&str, &str)] = if is_sqlite { &[] } else { &db_required_vars };
 
         let mut missing_db_vars = Vec::new();
         for (var_name, description) in db_required_vars {
@@ -217,34 +213,21 @@ impl Config {
             )));
         }
 
-        let database = if is_sqlite {
-            DatabaseConfig {
-                db_type: "sqlite".to_string(),
-                host: String::new(),
-                port: 0,
-                username: String::new(),
-                password: String::new(),
-                // For SQLite, `name` is the database file.
-                name: env_value("DB_PATH").unwrap_or_else(|| "/opt/pinepods/data/pinepods.db".to_string()),
-                max_connections: 8,
-                min_connections: 1,
-            }
-        } else { DatabaseConfig {
-            db_type: env_value("DB_TYPE").unwrap(),
+        let database = DatabaseConfig {
             host: env_value("DB_HOST").unwrap(),
             port: {
                 let port_str = env_value("DB_PORT").unwrap();
                 port_str.trim().parse()
-                    .map_err(|_e| AppError::Config(format!("Invalid DB_PORT '{}': Must be a valid port number (e.g., 5432 for PostgreSQL, 3306 for MariaDB)", port_str)))?
+                    .map_err(|_e| AppError::Config(format!("Invalid DB_PORT '{}': Must be a valid port number (e.g., 5432)", port_str)))?
             },
             username: env_value("DB_USER").unwrap(),
             password: env_value("DB_PASSWORD").unwrap(),
             name: env_value("DB_NAME").unwrap(),
             max_connections: 32,
             min_connections: 1,
-        } };
+        };
 
-        let redis = Self::redis_from_env(is_sqlite)?;
+        let redis = Self::redis_from_env()?;
 
         let server = ServerConfig {
             port: 8032, // Fixed port for internal API
@@ -307,8 +290,8 @@ impl Config {
         };
 
         let api = ApiConfig {
-            search_api_url: env_value("SEARCH_API_URL").unwrap_or_else(|| DEFAULT_SEARCH_API_URL.to_string()),
-            people_api_url: env_value("PEOPLE_API_URL").unwrap_or_else(|| DEFAULT_PEOPLE_API_URL.to_string()),
+            itunes_search_url: crate::services::directory::DEFAULT_ITUNES_SEARCH_URL.to_string(),
+            podcast_index_url: crate::services::directory::DEFAULT_PODCAST_INDEX_URL.to_string(),
             youtube_feed_url: YOUTUBE_FEED_URL.to_string(),
         };
 
@@ -329,9 +312,9 @@ impl Config {
     }
 
     /// Valkey/Redis settings, from VALKEY_* (or REDIS_*; VALKEY_* wins). `VALKEY_MODE` is
-    /// `memory` or `valkey`; unset, a configured URL or host means Valkey, and otherwise SQLite
-    /// installs keep this state in memory while the others require Valkey.
-    fn redis_from_env(is_sqlite: bool) -> AppResult<Option<RedisConfig>> {
+    /// `memory` or `valkey`; unset, a configured URL or host means Valkey, and otherwise it's
+    /// required. (The container sets VALKEY_MODE=memory when it runs its built-in database.)
+    fn redis_from_env() -> AppResult<Option<RedisConfig>> {
         let configured = valkey_env("URL").is_some() || valkey_env("HOST").is_some();
         let mode = valkey_env("MODE").map(|m| m.to_ascii_lowercase());
         match mode.as_deref() {
@@ -340,7 +323,6 @@ impl Config {
             Some(other) => {
                 return Err(AppError::Config(format!("Invalid VALKEY_MODE '{other}': use 'memory' or 'valkey'")));
             }
-            None if !configured && is_sqlite => return Ok(None),
             None => {}
         }
         if !configured {

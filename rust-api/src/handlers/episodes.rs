@@ -409,37 +409,6 @@ pub async fn download_episode_file(
                 row.try_get::<Option<i32>, _>("episodeduration")?
             )
         },
-        mysql(pool) => {
-            let row = sqlx::query("
-                SELECT e.EpisodeURL, e.EpisodeTitle, p.PodcastName,
-                       e.EpisodePubDate, p.Author, e.EpisodeArtwork, p.ArtworkURL,
-                       e.EpisodeDescription, p.Username, p.Password,
-                       p.FeedURL, e.EpisodeGUID, e.EpisodeDuration
-                FROM Episodes e
-                JOIN Podcasts p ON e.FeedID = p.FeedID AND p.UserID = ?
-                WHERE e.EpisodeID = ?
-            ")
-            .bind(user_id)
-            .bind(episode_id)
-            .fetch_one(pool)
-            .await?;
-
-            (
-                row.try_get::<String, _>("EpisodeURL")?,
-                row.try_get::<String, _>("EpisodeTitle")?,
-                row.try_get::<String, _>("PodcastName")?,
-                row.try_get::<Option<chrono::NaiveDateTime>, _>("EpisodePubDate")?,
-                row.try_get::<Option<String>, _>("Author")?,
-                row.try_get::<Option<String>, _>("EpisodeArtwork")?,
-                row.try_get::<Option<String>, _>("ArtworkURL")?,
-                row.try_get::<Option<String>, _>("EpisodeDescription")?,
-                row.try_get::<Option<String>, _>("Username")?,
-                row.try_get::<Option<String>, _>("Password")?,
-                row.try_get::<Option<String>, _>("FeedURL")?,
-                row.try_get::<Option<String>, _>("EpisodeGUID")?,
-                row.try_get::<Option<i32>, _>("EpisodeDuration")?
-            )
-        },
     });
 
     let (episode_url, episode_title, podcast_name, pub_date, author, episode_artwork, artwork_url, description, feed_username, feed_password, feed_url, episode_guid, episode_duration) = episode_info;

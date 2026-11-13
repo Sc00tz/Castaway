@@ -241,35 +241,6 @@ impl DatabasePool {
                 .await?;
                 Ok(rows.into_iter().map(problem_feed).collect())
             },
-            mysql(pool) => {
-                let placeholders = vec!["?"; podcast_ids.len()].join(", ");
-                let sql = format!(
-                    "SELECT PodcastID, UserID, PodcastName, ArtworkURL, LastErrorKind FROM Podcasts
-                     WHERE PodcastID IN ({placeholders}) AND NOT ProblemNotified AND FailingSince IS NOT NULL
-                       AND COALESCE(RefreshPodcast, 1) = 1
-                       AND COALESCE(LastErrorKind, 'other') <> 'throttled'
-                       AND (FailingSince <= NOW() - INTERVAL ? HOUR
-                            OR (LastErrorKind = 'gone' AND ConsecutiveFailures >= ?))"
-                );
-                let mut q = sqlx::query_as::<_, ProblemRow>(sqlx::AssertSqlSafe(sql.as_str()));
-                for id in podcast_ids {
-                    q = q.bind(id);
-                }
-                let candidates = q.bind(hours).bind(GONE_AFTER_FAILURES).fetch_all(pool).await?;
-                let mut reported = Vec::new();
-                for row in candidates {
-                    // Only the update that flips the flag reports, so two refreshes can't both.
-                    let n = sqlx::query("UPDATE Podcasts SET ProblemNotified = TRUE WHERE PodcastID = ? AND NOT ProblemNotified")
-                        .bind(row.0)
-                        .execute(pool)
-                        .await?
-                        .rows_affected();
-                    if n == 1 {
-                        reported.push(problem_feed(row));
-                    }
-                }
-                Ok(reported)
-            },
         })
     }
 
@@ -286,18 +257,6 @@ impl DatabasePool {
             .bind(podcast_ids)
             .fetch_all(pool)
             .await?,
-            mysql(pool) => {
-                let sql = format!(
-                    "SELECT PodcastID, UserID, PodcastName, ArtworkURL, LastErrorKind FROM Podcasts
-                     WHERE PodcastID IN ({}) AND ProblemNotified",
-                    vec!["?"; podcast_ids.len()].join(", ")
-                );
-                let mut q = sqlx::query_as::<_, ProblemRow>(sqlx::AssertSqlSafe(sql.as_str()));
-                for id in podcast_ids {
-                    q = q.bind(id);
-                }
-                q.fetch_all(pool).await?
-            },
         });
         Ok(rows.into_iter().map(problem_feed).collect())
     }
@@ -319,22 +278,6 @@ impl DatabasePool {
             .bind(user_id)
             .fetch_all(pool)
             .await?,
-            mysql(pool) => sqlx::query_as::<_, (i32, String, String, Option<String>, Option<String>, Option<String>, i32, Option<i64>, Option<i64>, i8)>(
-                "SELECT PodcastID, PodcastName, FeedURL, ArtworkURL, LastErrorKind, LastErrorMessage,
-                        COALESCE(ConsecutiveFailures, 0),
-                        CAST(TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', FailingSince) AS SIGNED),
-                        CAST(TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', LastRefreshAttempt) AS SIGNED),
-                        ProblemNotified
-                 FROM Podcasts
-                 WHERE UserID = ? AND COALESCE(ConsecutiveFailures, 0) > 0 AND COALESCE(RefreshPodcast, 1) = 1
-                 ORDER BY FailingSince IS NULL, FailingSince, PodcastName",
-            )
-            .bind(user_id)
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .map(|r| (r.0, r.1, r.2, r.3, r.4, r.5, r.6, r.7, r.8, r.9 != 0))
-            .collect(),
         });
         Ok(rows.into_iter().map(failing_feed).collect())
     }

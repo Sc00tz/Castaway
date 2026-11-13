@@ -56,7 +56,6 @@ impl MergedEpisodes {
             pg(pool) => {
                 q::query_scalar::<i32>(r#"SELECT 1 FROM "EpisodeIDAliases" LIMIT 1"#).fetch_optional(pool).await
             },
-            mysql(pool) => sqlx::query_scalar::<_, i32>("SELECT 1 FROM EpisodeIDAliases LIMIT 1").fetch_optional(pool).await,
         });
         match found {
             Ok(row) => {
@@ -82,15 +81,6 @@ pub async fn current_ids(merged: &MergedEpisodes, db: &DatabasePool, ids: &[i32]
                 .bind(ids)
                 .fetch_all(pool)
                 .await?
-        },
-        mysql(pool) => {
-            let marks = vec!["?"; ids.len()].join(", ");
-            let sql = format!("SELECT OldEpisodeID, EpisodeID FROM EpisodeIDAliases WHERE OldEpisodeID IN ({marks})");
-            let mut q = sqlx::query_as(sqlx::AssertSqlSafe(sql));
-            for id in ids {
-                q = q.bind(id);
-            }
-            q.fetch_all(pool).await?
         },
     });
     Ok(rows.into_iter().collect())

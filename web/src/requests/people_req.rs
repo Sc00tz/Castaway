@@ -12,7 +12,6 @@ use crate::requests::episode::Episode;
 pub struct CreditedPerson {
     /// Castaway person id; use it for the person page and follows.
     pub id: i32,
-    pub podpeople_id: Option<i32>,
     pub name: String,
     pub img: Option<String>,
     pub href: Option<String>,
@@ -24,8 +23,6 @@ pub struct CreditedPerson {
     pub scope: String,
     pub episode_count: i64,
     pub sources: Vec<String>,
-    /// False while every credit is an unreviewed community submission.
-    pub verified: bool,
     pub followed: bool,
 }
 
@@ -48,7 +45,6 @@ impl PodcastCredits {
 #[serde(default)]
 pub struct PersonInfo {
     pub id: i32,
-    pub podpeople_id: Option<i32>,
     pub name: String,
     pub img: Option<String>,
     pub href: Option<String>,
@@ -114,44 +110,11 @@ pub struct PersonProfile {
     pub refreshing: bool,
 }
 
-/// A people search result, from this server or PodPeopleDB.
-#[derive(Deserialize, Clone, PartialEq, Debug, Default)]
-#[serde(default)]
-pub struct PersonHit {
-    pub person_id: Option<i32>,
-    pub podpeople_id: Option<i64>,
-    pub name: String,
-    pub img: Option<String>,
-    /// A few podcasts they're known for, to tell namesakes apart.
-    pub known_for: Option<String>,
-    pub followed: bool,
-}
-
-#[derive(Serialize, Clone, PartialEq, Debug, Default)]
-pub struct ContributePerson {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub person_id: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub podpeople_id: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
-}
-
-#[derive(Serialize, Clone, PartialEq, Debug)]
-pub struct ContributeRequest {
-    pub podcast_id: i32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub episode_id: Option<i32>,
-    pub people: Vec<ContributePerson>,
-}
-
 fn people_url(server_name: &str, path: &str) -> String {
     format!("{}/api/data/people/{}", server_name.trim_end_matches('/'), path)
 }
 
-/// The server's error message ("Bad request: PodPeopleDB didn't accept that: ...") without the
+/// The server's error message without the
 /// status prefix, falling back to the status text.
 async fn error_from(response: Response, what: &str) -> Error {
     let status = response.status();
@@ -204,26 +167,12 @@ struct LookupResponse {
     person_id: i32,
 }
 
-/// Resolve a PodPeopleDB id or a name to a Castaway person id.
-pub async fn call_lookup_person(
-    server_name: &str,
-    api_key: &str,
-    podpeople_id: Option<i64>,
-    name: Option<&str>,
-) -> Result<i32, Error> {
-    let query = match (podpeople_id, name) {
-        (Some(id), _) => format!("podpeople_id={}", id),
-        (None, Some(name)) => format!("name={}", urlencoding::encode(name)),
-        (None, None) => return Err(Error::msg("Nothing to look up")),
-    };
+/// Resolve a name to a Castaway person id.
+pub async fn call_lookup_person(server_name: &str, api_key: &str, name: &str) -> Result<i32, Error> {
+    let query = format!("name={}", urlencoding::encode(name));
     let found: LookupResponse =
         get_json(&people_url(server_name, &format!("lookup?{}", query)), api_key, "Person not found").await?;
     Ok(found.person_id)
-}
-
-pub async fn call_search_people(server_name: &str, api_key: &str, query: &str) -> Result<Vec<PersonHit>, Error> {
-    let url = people_url(server_name, &format!("search?q={}", urlencoding::encode(query)));
-    get_json(&url, api_key, "Search failed").await
 }
 
 pub async fn call_get_followed_people(server_name: &str, api_key: &str) -> Result<Vec<PersonInfo>, Error> {
@@ -241,101 +190,3 @@ pub async fn call_set_following(server_name: &str, api_key: &str, person_id: i32
     Ok(())
 }
 
-/// Add people to a podcast (or one of its episodes). Returns everyone on it afterwards.
-pub async fn call_contribute_people(
-    server_name: &str,
-    api_key: &str,
-    request: &ContributeRequest,
-) -> Result<Vec<CreditedPerson>, Error> {
-    let response = Request::post(&people_url(server_name, "contribute"))
-        .header("Api-Key", api_key)
-        .header("Content-Type", "application/json")
-        .body(serde_json::to_string(request)?)?
-        .send()
-        .await?;
-    if !response.ok() {
-        return Err(error_from(response, "Couldn't add people").await);
-    }
-    Ok(response.json::<Vec<CreditedPerson>>().await?)
-}
-
-// --- Discovery (PodPeopleDB, proxied through the Castaway backend) ---
-
-#[derive(Deserialize, Clone, PartialEq, Debug, Default)]
-pub struct DiscoverHost {
-    #[serde(default)]
-    pub id: i32,
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub img: String,
-    #[serde(default, alias = "podcastCount")]
-    pub podcast_count: i32,
-}
-
-#[derive(Deserialize, Clone, PartialEq, Debug, Default)]
-pub struct DiscoverPodcast {
-    #[serde(default)]
-    pub podcast_id: i32,
-    #[serde(default)]
-    pub title: String,
-    #[serde(default)]
-    pub host_count: i32,
-    #[serde(default)]
-    pub description: String,
-}
-
-#[derive(Deserialize, Clone, PartialEq, Debug, Default)]
-pub struct DiscoverStats {
-    #[serde(default)]
-    pub total_hosts: i32,
-    #[serde(default)]
-    pub total_podcasts: i32,
-    #[serde(default)]
-    pub approved_hosts: i32,
-    #[serde(default)]
-    pub episodes_with_guests: i32,
-}
-
-async fn discover_get(server_name: &str, api_key: &str, kind: &str, limit: Option<i32>) -> Result<String, Error> {
-    let mut url = format!(
-        "{}/api/data/podpeople/discover?kind={}",
-        server_name, kind
-    );
-    if let Some(l) = limit {
-        url.push_str(&format!("&limit={}", l));
-    }
-    let response = Request::get(&url).header("Api-Key", api_key).send().await?;
-    if !response.ok() {
-        return Err(Error::msg(format!(
-            "Failed to fetch discover {}: {}",
-            kind,
-            response.status_text()
-        )));
-    }
-    Ok(response.text().await?)
-}
-
-#[allow(dead_code)]
-pub async fn call_discover_top_hosts(server_name: &str, api_key: &str, limit: i32) -> Result<Vec<DiscoverHost>, Error> {
-    let text = discover_get(server_name, api_key, "top-hosts", Some(limit)).await?;
-    Ok(serde_json::from_str(&text)?)
-}
-
-#[allow(dead_code)]
-pub async fn call_discover_recent_hosts(server_name: &str, api_key: &str, limit: i32) -> Result<Vec<DiscoverHost>, Error> {
-    let text = discover_get(server_name, api_key, "recent-hosts", Some(limit)).await?;
-    Ok(serde_json::from_str(&text)?)
-}
-
-#[allow(dead_code)]
-pub async fn call_discover_popular_podcasts(server_name: &str, api_key: &str, limit: i32) -> Result<Vec<DiscoverPodcast>, Error> {
-    let text = discover_get(server_name, api_key, "popular-podcasts", Some(limit)).await?;
-    Ok(serde_json::from_str(&text)?)
-}
-
-#[allow(dead_code)]
-pub async fn call_discover_stats(server_name: &str, api_key: &str) -> Result<DiscoverStats, Error> {
-    let text = discover_get(server_name, api_key, "stats", None).await?;
-    Ok(serde_json::from_str(&text)?)
-}

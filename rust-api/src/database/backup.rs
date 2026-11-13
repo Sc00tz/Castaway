@@ -112,63 +112,7 @@ where
     Ok(())
 }
 
-/// Stream a mysqldump file from `reader` to `writer`, dropping the data-loading statements
-/// (`INSERT INTO` / `LOCK TABLES`) for any table in `skip_tables`. mysqldump quotes table
-/// names with backticks (`` `Sessions` ``), and `--complete-insert` emits one statement per
-/// line, so a prefix match per line is sufficient. Secondary to the Postgres path.
-pub(super) async fn stream_mysql_dump_skipping_tables<R, W>(
-    reader: R,
-    writer: &mut W,
-    skip_tables: &[&str],
-) -> std::io::Result<()>
-where
-    R: tokio::io::AsyncRead + Unpin,
-    W: tokio::io::AsyncWrite + Unpin,
-{
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-
-    let prefixes: Vec<String> = skip_tables
-        .iter()
-        .flat_map(|t| {
-            vec![
-                format!("INSERT INTO `{}`", t),
-                format!("LOCK TABLES `{}`", t),
-            ]
-        })
-        .collect();
-
-    let mut buf_reader = BufReader::new(reader);
-    let mut line: Vec<u8> = Vec::new();
-
-    loop {
-        line.clear();
-        if buf_reader.read_until(b'\n', &mut line).await? == 0 {
-            break;
-        }
-        let trimmed = trim_line_eol(&line);
-        // Only the INSERT/LOCK statements start with these prefixes, so checking the prefix is
-        // cheap and avoids inspecting (and allocating for) every data line.
-        let drop_line = (trimmed.starts_with(b"INSERT INTO `") || trimmed.starts_with(b"LOCK TABLES `"))
-            && {
-                let text = String::from_utf8_lossy(trimmed);
-                prefixes.iter().any(|p| text.starts_with(p.as_str()))
-            };
-        if !drop_line {
-            writer.write_all(&line).await?;
-        }
-    }
-    Ok(())
-}
-
 impl DatabasePool {
-    /// Write a SQLite server backup to `path`; `None` when this isn't a SQLite database
-    /// (the others are backed up with pg_dump / mysqldump).
-    pub async fn sqlite_backup_to(&self, path: &std::path::Path) -> Option<AppResult<()>> {
-        match self {
-            DatabasePool::Sqlite(pool) => Some(super::sqlite_backup::dump(pool, path).await),
-            _ => None,
-        }
-    }
 
     // Backup user data - matches Python backup_user function exactly
     pub async fn backup_user(&self, user_id: i32) -> AppResult<String> {
@@ -186,23 +130,6 @@ impl DatabasePool {
                     podcasts.push((
                         row.try_get::<String, _>("podcastname")?,
                         row.try_get::<String, _>("feedurl")?,
-                    ));
-                }
-                podcasts
-            },
-            mysql(pool) => {
-                let rows = sqlx::query(
-                    "SELECT PodcastName, FeedURL FROM Podcasts WHERE UserID = ? AND (Username IS NULL OR Username = '') AND (Password IS NULL OR Password = '')"
-                )
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?;
-
-                let mut podcasts = Vec::new();
-                for row in rows {
-                    podcasts.push((
-                        row.try_get::<String, _>("PodcastName")?,
-                        row.try_get::<String, _>("FeedURL")?,
                     ));
                 }
                 podcasts
@@ -249,7 +176,7 @@ impl DatabasePool {
     // Add more database operations as needed...
 
     // Restore server data from an on-disk SQL dump, streaming the file into the
-    // psql/mysql client so memory usage stays bounded regardless of dump size.
+    // psql client so memory usage stays bounded regardless of dump size.
     //
     // Postgres restores are fully atomic: the truncate + data load run inside a single
     // psql transaction (--single-transaction + ON_ERROR_STOP), so a failure rolls back
@@ -258,19 +185,6 @@ impl DatabasePool {
     // appears empty mid-restore (which previously triggered the "create first user" flow
     // and a write race that corrupted the restore).
     pub async fn restore_server_data_from_path(&self, path: &std::path::Path) -> AppResult<()> {
-        // A SQLite backup only restores on SQLite, and SQLite only restores its own backups.
-        let sqlite_file = super::sqlite_backup::is_sqlite_backup(path).await?;
-        if let DatabasePool::Sqlite(pool) = self {
-            if !sqlite_file {
-                return Err(AppError::bad_request(
-                    "This backup came from a PostgreSQL or MySQL server. A SQLite server can only restore its own backups.",
-                ));
-            }
-            return super::sqlite_backup::restore(pool, path).await;
-        }
-        if sqlite_file {
-            return Err(AppError::bad_request("This is a SQLite backup and can only be restored on a SQLite server."));
-        }
 
         // Transient auth tables that hold only disposable login tokens. They are never worth
         // restoring, and historically their schema has drifted (e.g. an upgraded instance can
@@ -392,160 +306,11 @@ impl DatabasePool {
                 }
                 tracing::info!("psql restore completed successfully");
             },
-            mysql(_) => {
-                // MySQL TRUNCATE/DDL auto-commits, so the load can't be a single atomic
-                // transaction like Postgres. Clear via transactional DELETE (FK checks
-                // off) first, then stream the dump; mysql stops on the first error.
-                self.clear_all_data().await?;
-
-                let host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
-                let port = std::env::var("DB_PORT").unwrap_or_else(|_| "3306".to_string());
-                let database = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods".to_string());
-                let username = std::env::var("DB_USER").unwrap_or_else(|_| "root".to_string());
-                let password = std::env::var("DB_PASSWORD").unwrap_or_else(|_| "password".to_string());
-
-                let mut cmd = Command::new("mysql");
-                cmd.arg("--host").arg(&host)
-                   .arg("--port").arg(&port)
-                   .arg("--user").arg(&username)
-                   .arg(format!("--password={}", password))
-                   .arg("--skip-ssl")
-                   .arg("--default-auth=mysql_native_password")
-                   .arg(&database)
-                   .stdin(std::process::Stdio::piped())
-                   .stdout(std::process::Stdio::piped())
-                   .stderr(std::process::Stdio::piped());
-
-                let mut child = cmd.spawn()
-                    .map_err(|e| AppError::internal(&format!("Failed to start mysql: {}", e)))?;
-
-                // Drain stdin/stdout/stderr concurrently. Writing the whole dump first and
-                // only reading mysql's output afterward deadlocks on large restores once
-                // mysql's ~64KB output pipe fills and it stops reading stdin (see the
-                // Postgres branch above for the full explanation).
-                let mut stdin = child.stdin.take()
-                    .ok_or_else(|| AppError::internal("mysql stdin was not piped"))?;
-                let mut stdout = child.stdout.take()
-                    .ok_or_else(|| AppError::internal("mysql stdout was not piped"))?;
-                let mut stderr_pipe = child.stderr.take()
-                    .ok_or_else(|| AppError::internal("mysql stderr was not piped"))?;
-
-                let path_buf = path.to_path_buf();
-                let writer = async move {
-                    let file = tokio::fs::File::open(&path_buf).await
-                        .map_err(|e| AppError::internal(&format!("Failed to open backup file: {}", e)))?;
-                    // Drop INSERT/LOCK statements for the transient session tables so a
-                    // legacy/mismatched schema can't abort the load (see the Postgres branch).
-                    stream_mysql_dump_skipping_tables(file, &mut stdin, SKIP_TABLES).await
-                        .map_err(|e| AppError::internal(&format!("Failed to stream SQL to mysql: {}", e)))?;
-                    // Drop stdin to signal EOF to mysql.
-                    drop(stdin);
-                    Ok::<(), AppError>(())
-                };
-
-                use tokio::io::AsyncReadExt;
-                let read_out = async move {
-                    let mut buf = Vec::new();
-                    let _ = stdout.read_to_end(&mut buf).await;
-                    buf
-                };
-                let read_err = async move {
-                    let mut buf = Vec::new();
-                    let _ = stderr_pipe.read_to_end(&mut buf).await;
-                    buf
-                };
-
-                let (write_res, _out, err_buf) = tokio::join!(writer, read_out, read_err);
-
-                let status = child.wait().await
-                    .map_err(|e| AppError::internal(&format!("Failed to wait for mysql: {}", e)))?;
-
-                // mysql in batch mode stops on the first error and exits non-zero
-                // (no --force), so a non-zero status means the restore did not complete.
-                let stderr = String::from_utf8_lossy(&err_buf);
-                if !status.success() {
-                    return Err(AppError::internal(&format!("mysql restore failed: {}", stderr.trim())));
-                }
-                write_res?;
-                if !stderr.trim().is_empty() {
-                    tracing::warn!("mysql restore reported messages: {}", stderr.trim());
-                }
-                tracing::info!("mysql restore completed successfully");
-            },
         });
 
         Ok(())
     }
 
-    // Clear all data from tables while preserving schema
-    pub(super) async fn clear_all_data(&self) -> AppResult<()> {
-        dialect_match!(self, {
-            pg(pool) => {
-                // Disable foreign key constraints temporarily
-                q::query("SET session_replication_role = replica;").execute(pool).await?;
-                
-                // Get all table names
-                let tables = q::query(r#"
-                    SELECT tablename FROM pg_tables 
-                    WHERE schemaname = 'public' 
-                    AND tablename NOT LIKE '%_seq'
-                "#)
-                .fetch_all(pool)
-                .await?;
-                
-                // Clear each table
-                for table in tables {
-                    let table_name: String = table.try_get("tablename")?;
-                    let query = format!(r#"TRUNCATE TABLE "{}" RESTART IDENTITY CASCADE"#, table_name);
-                    q::query(sqlx::AssertSqlSafe(query.as_str())).execute(pool).await?;
-                }
-                
-                // Re-enable foreign key constraints
-                q::query("SET session_replication_role = DEFAULT;").execute(pool).await?;
-            },
-            mysql(pool) => {
-                // Run the whole clear on ONE pinned connection. `SET FOREIGN_KEY_CHECKS = 0` is
-                // a session variable, so issuing each statement via `.execute(pool)` (which can
-                // hand back a different pooled connection each time) leaves FK checks ON for the
-                // DELETEs -- and a DELETE on a parent table then fails with ERROR 1451, aborting
-                // the restore before the dump is ever loaded. Acquiring a single connection keeps
-                // FK checks disabled across every DELETE.
-                let mut conn = pool.acquire().await?;
-
-                // Disable foreign key checks
-                sqlx::query("SET FOREIGN_KEY_CHECKS = 0;").execute(&mut *conn).await?;
-
-                // Get all table names
-                let database = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods".to_string());
-                let tables_query = format!(r#"
-                    SELECT TABLE_NAME FROM information_schema.TABLES
-                    WHERE TABLE_SCHEMA = '{}' AND TABLE_TYPE = 'BASE TABLE'
-                "#, database);
-                let tables = sqlx::query(sqlx::AssertSqlSafe(tables_query.as_str()))
-                .fetch_all(&mut *conn)
-                .await?;
-
-                // Clear each table
-                for table in tables {
-                    // Handle both VARCHAR and VARBINARY cases for TABLE_NAME
-                    let table_name: String = if let Ok(name) = table.try_get::<String, _>("TABLE_NAME") {
-                        name
-                    } else if let Ok(name_bytes) = table.try_get::<Vec<u8>, _>("TABLE_NAME") {
-                        String::from_utf8(name_bytes).map_err(|_| AppError::internal("Invalid table name encoding"))?
-                    } else {
-                        return Err(AppError::internal("Could not retrieve table name"));
-                    };
-                    // Use DELETE instead of TRUNCATE to avoid foreign key constraint issues
-                    let query = format!("DELETE FROM `{}`", table_name);
-                    sqlx::query(sqlx::AssertSqlSafe(query.as_str())).execute(&mut *conn).await?;
-                }
-
-                // Re-enable foreign key checks
-                sqlx::query("SET FOREIGN_KEY_CHECKS = 1;").execute(&mut *conn).await?;
-            },
-        });
-        Ok(())
-    }
 
     // Set scheduled backup configuration. retention_count: None/Some(0) = keep all backups.
     pub async fn set_scheduled_backup(&self, user_id: i32, cron_schedule: &str, enabled: bool, retention_count: Option<i32>) -> AppResult<()> {
@@ -560,23 +325,6 @@ impl DatabasePool {
                         enabled = EXCLUDED.enabled,
                         retention_count = EXCLUDED.retention_count,
                         updated_at = NOW()
-                "#)
-                .bind(user_id)
-                .bind(cron_schedule)
-                .bind(enabled)
-                .bind(retention_count)
-                .execute(pool)
-                .await?;
-            },
-            mysql(pool) => {
-                sqlx::query(r#"
-                    INSERT INTO ScheduledBackups (UserID, CronSchedule, Enabled, RetentionCount, CreatedAt, UpdatedAt)
-                    VALUES (?, ?, ?, ?, NOW(), NOW())
-                    ON DUPLICATE KEY UPDATE
-                        CronSchedule = VALUES(CronSchedule),
-                        Enabled = VALUES(Enabled),
-                        RetentionCount = VALUES(RetentionCount),
-                        UpdatedAt = NOW()
                 "#)
                 .bind(user_id)
                 .bind(cron_schedule)
@@ -620,37 +368,6 @@ impl DatabasePool {
                     }))
                 }
             },
-            mysql(pool) => {
-                let row = sqlx::query(r#"
-                    SELECT CronSchedule, Enabled, RetentionCount, CreatedAt, UpdatedAt
-                    FROM ScheduledBackups
-                    WHERE UserID = ?
-                "#)
-                .bind(user_id)
-                .fetch_optional(pool)
-                .await?;
-
-                if let Some(row) = row {
-                    let created_datetime = row.try_get::<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>, _>("CreatedAt")?;
-                    let updated_datetime = row.try_get::<sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>, _>("UpdatedAt")?;
-
-                    Ok(serde_json::json!({
-                        "schedule": row.try_get::<String, _>("CronSchedule")?,
-                        "enabled": row.try_get::<bool, _>("Enabled")?,
-                        "retention_count": row.try_get::<Option<i32>, _>("RetentionCount")?,
-                        "created_at": created_datetime.format("%Y-%m-%dT%H:%M:%S").to_string(),
-                        "updated_at": updated_datetime.format("%Y-%m-%dT%H:%M:%S").to_string()
-                    }))
-                } else {
-                    Ok(serde_json::json!({
-                        "schedule": null,
-                        "enabled": false,
-                        "retention_count": null,
-                        "created_at": null,
-                        "updated_at": null
-                    }))
-                }
-            },
         })
     }
 
@@ -677,24 +394,6 @@ impl DatabasePool {
                     });
                 }
             },
-            mysql(pool) => {
-                let rows = sqlx::query(r#"
-                    SELECT UserID, CronSchedule, RetentionCount, LastRun
-                    FROM ScheduledBackups
-                    WHERE Enabled = TRUE
-                "#)
-                .fetch_all(pool)
-                .await?;
-
-                for row in rows {
-                    backups.push(ScheduledBackupRow {
-                        user_id: row.try_get::<i32, _>("UserID")?,
-                        cron_schedule: row.try_get::<String, _>("CronSchedule")?,
-                        retention_count: row.try_get::<Option<i32>, _>("RetentionCount")?,
-                        last_run: row.try_get::<Option<DateTime<Utc>>, _>("LastRun")?,
-                    });
-                }
-            },
         });
         Ok(backups)
     }
@@ -705,13 +404,6 @@ impl DatabasePool {
             pg(pool) => {
                 q::query(r#"UPDATE "ScheduledBackups" SET last_run = $1 WHERE userid = $2"#)
                     .bind(ts.naive_utc())
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query(r#"UPDATE ScheduledBackups SET LastRun = ? WHERE UserID = ?"#)
-                    .bind(ts)
                     .bind(user_id)
                     .execute(pool)
                     .await?;
@@ -735,9 +427,6 @@ impl DatabasePool {
             return Err(AppError::internal(&format!("Failed to create backup directory: {}", e)));
         }
 
-        if let Some(result) = self.sqlite_backup_to(std::path::Path::new(&backup_path)).await {
-            return result.map(|_| backup_filename);
-        }
 
         // Get database password from environment
         let db_password = std::env::var("DB_PASSWORD")
@@ -776,35 +465,6 @@ impl DatabasePool {
                     return Err(AppError::internal(&format!("Backup failed: {}", error_msg)));
                 }
             },
-            mysql(_) => {
-                let db_host = std::env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
-                let db_port = std::env::var("DB_PORT").unwrap_or_else(|_| "3306".to_string());
-                let db_user = std::env::var("DB_USER").unwrap_or_else(|_| "mysql".to_string());
-                let db_name = std::env::var("DB_NAME").unwrap_or_else(|_| "pinepods_database".to_string());
-
-                let mut cmd = Command::new("mysqldump");
-                cmd.arg("-h").arg(&db_host)
-                   .arg("-P").arg(&db_port)
-                   .arg("-u").arg(&db_user)
-                   .arg(format!("-p{}", &db_password))
-                   .arg(&db_name)
-                   .arg("--result-file").arg(&backup_path)
-                   .arg("--single-transaction")
-                   .arg("--routines")
-                   .arg("--triggers")
-                   // Transient login-token tables: excluded for security and to avoid
-                   // cross-version schema drift on restore.
-                   .arg(format!("--ignore-table={}.Sessions", db_name))
-                   .arg(format!("--ignore-table={}.GpodderSessions", db_name));
-
-                let output = cmd.output().await
-                    .map_err(|e| AppError::internal(&format!("Failed to execute backup: {}", e)))?;
-
-                if !output.status.success() {
-                    let error_msg = String::from_utf8_lossy(&output.stderr);
-                    return Err(AppError::internal(&format!("Backup failed: {}", error_msg)));
-                }
-            },
         });
 
         Ok(backup_filename)
@@ -813,7 +473,7 @@ impl DatabasePool {
 
 #[cfg(test)]
 mod restore_filter_tests {
-    use super::{stream_mysql_dump_skipping_tables, stream_pg_dump_skipping_tables};
+    use super::stream_pg_dump_skipping_tables;
 
     async fn run_pg(input: &str, skip: &[&str]) -> String {
         let mut out: Vec<u8> = Vec::new();
@@ -863,23 +523,4 @@ mod restore_filter_tests {
         assert!(out.contains("\n1\n"));
     }
 
-    #[tokio::test]
-    async fn mysql_strips_skipped_table_inserts() {
-        let input = concat!(
-            "INSERT INTO `Podcasts` (id) VALUES (1);\n",
-            "LOCK TABLES `Sessions` WRITE;\n",
-            "INSERT INTO `Sessions` (sessionid) VALUES (1);\n",
-            "UNLOCK TABLES;\n",
-            "INSERT INTO `Episodes` (id) VALUES (9);\n",
-        );
-        let mut out: Vec<u8> = Vec::new();
-        stream_mysql_dump_skipping_tables(input.as_bytes(), &mut out, &["Sessions"])
-            .await
-            .unwrap();
-        let out = String::from_utf8(out).unwrap();
-        assert!(out.contains("INSERT INTO `Podcasts`"));
-        assert!(out.contains("INSERT INTO `Episodes`"));
-        assert!(!out.contains("INSERT INTO `Sessions`"));
-        assert!(!out.contains("LOCK TABLES `Sessions`"));
-    }
 }

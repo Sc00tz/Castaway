@@ -19,6 +19,8 @@ import 'package:pinepods_mobile/ui/widgets/podcast_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:pinepods_mobile/ui/widgets/hide_played.dart';
+import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
 
 const int _pageSize = 50;
 
@@ -41,7 +43,10 @@ class PersonPage extends StatefulWidget {
 
 enum _Tab { library, elsewhere }
 
-class _PersonPageState extends State<PersonPage> {
+class _PersonPageState extends State<PersonPage> with HidePlayed<PersonPage> {
+  @override
+  String get hidePlayedKey => 'person_hide_played';
+
   PersonProfile? _profile;
   List<PinepodsEpisode> _episodes = [];
   bool _hasMore = false;
@@ -55,6 +60,7 @@ class _PersonPageState extends State<PersonPage> {
   @override
   void initState() {
     super.initState();
+    loadHidePlayed();
     _load();
   }
 
@@ -346,6 +352,7 @@ class _PersonPageState extends State<PersonPage> {
               _tabChosen = true;
             }),
           ),
+          SizedBox(height: ListToolbar.height, child: ListToolbar<void>(filters: [hidePlayedFilter(context)])),
           if (profile.refreshing && _tab == _Tab.elsewhere)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -357,8 +364,16 @@ class _PersonPageState extends State<PersonPage> {
   }
 
   List<Widget> _episodeList(PersonProfile profile) {
-    final episodes = _tab == _Tab.library ? _episodes : profile.externalEpisodes;
-    if (episodes.isEmpty) {
+    final all = _tab == _Tab.library ? _episodes : profile.externalEpisodes;
+    final episodes = withoutPlayed(all, (e) => e.completed);
+    if (all.isNotEmpty && episodes.isEmpty && !(_tab == _Tab.library && _hasMore)) {
+      return [
+        SliverToBoxAdapter(
+          child: SoftEmptyState(icon: PhosphorIconsRegular.checkCircle, title: L.of(context)!.no_episodes_match_filter),
+        ),
+      ];
+    }
+    if (all.isEmpty) {
       final message = _tab == _Tab.library
           ? L.of(context)!.no_episodes_with_person(profile.person.name)
           : profile.refreshing

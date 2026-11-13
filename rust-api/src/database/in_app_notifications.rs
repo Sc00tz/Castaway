@@ -37,21 +37,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?;
             },
-            mysql(pool) => {
-                sqlx::query(
-                    "INSERT INTO InAppNotifications (NotificationID, UserID, Payload, IsRead, CreatedAt, ExpiresAt)
-                     VALUES (?, ?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE Payload = VALUES(Payload), IsRead = VALUES(IsRead), ExpiresAt = VALUES(ExpiresAt)",
-                )
-                .bind(n.id)
-                .bind(n.user_id)
-                .bind(n.payload)
-                .bind(n.read)
-                .bind(n.created_at)
-                .bind(n.expires_at)
-                .execute(pool)
-                .await?;
-            },
         });
         Ok(())
     }
@@ -67,17 +52,6 @@ impl DatabasePool {
                     .execute(pool)
                     .await?;
                 q::query_scalar::<String>(r#"SELECT payload FROM "InAppNotifications" WHERE userid = $1"#)
-                    .bind(user_id)
-                    .fetch_all(pool)
-                    .await?
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM InAppNotifications WHERE UserID = ? AND ExpiresAt <= ?")
-                    .bind(user_id)
-                    .bind(now)
-                    .execute(pool)
-                    .await?;
-                sqlx::query_scalar::<_, String>("SELECT Payload FROM InAppNotifications WHERE UserID = ?")
                     .bind(user_id)
                     .fetch_all(pool)
                     .await?
@@ -100,16 +74,6 @@ impl DatabasePool {
                 .fetch_optional(pool)
                 .await?
             },
-            mysql(pool) => {
-                sqlx::query_scalar::<_, String>(
-                    "SELECT Payload FROM InAppNotifications WHERE UserID = ? AND NotificationID = ? AND ExpiresAt > ?",
-                )
-                .bind(user_id)
-                .bind(id)
-                .bind(now)
-                .fetch_optional(pool)
-                .await?
-            },
         });
         Ok(payload)
     }
@@ -118,13 +82,6 @@ impl DatabasePool {
         dialect_match!(self, {
             pg(pool) => {
                 q::query(r#"DELETE FROM "InAppNotifications" WHERE userid = $1 AND notificationid = $2"#)
-                    .bind(user_id)
-                    .bind(id)
-                    .execute(pool)
-                    .await?;
-            },
-            mysql(pool) => {
-                sqlx::query("DELETE FROM InAppNotifications WHERE UserID = ? AND NotificationID = ?")
                     .bind(user_id)
                     .bind(id)
                     .execute(pool)
@@ -144,14 +101,6 @@ impl DatabasePool {
                     r#"DELETE FROM "InAppNotifications" WHERE userid = $1"#
                 };
                 q::query(sql).bind(user_id).execute(pool).await?;
-            },
-            mysql(pool) => {
-                let sql = if read_only {
-                    "DELETE FROM InAppNotifications WHERE UserID = ? AND IsRead = 1"
-                } else {
-                    "DELETE FROM InAppNotifications WHERE UserID = ?"
-                };
-                sqlx::query(sql).bind(user_id).execute(pool).await?;
             },
         });
         Ok(())

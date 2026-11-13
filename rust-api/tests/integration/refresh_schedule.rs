@@ -10,11 +10,7 @@ use crate::harness::*;
 
 /// Seconds from now until the podcast's next refresh.
 async fn due_in(app: &TestApp, pod: i32) -> i64 {
-    let sql = match app.backend() {
-        Backend::Postgres => format!(r#"SELECT CAST(EXTRACT(EPOCH FROM (nextrefreshat - NOW())) AS BIGINT) FROM "Podcasts" WHERE podcastid = {pod}"#),
-        Backend::MariaDb => format!("SELECT TIMESTAMPDIFF(SECOND, NOW(), NextRefreshAt) FROM Podcasts WHERE PodcastID = {pod}"),
-        Backend::Sqlite => format!(r#"SELECT CAST(ROUND((julianday(nextrefreshat) - julianday('now')) * 86400) AS INTEGER) FROM "Podcasts" WHERE podcastid = {pod}"#),
-    };
+    let sql = format!(r#"SELECT CAST(EXTRACT(EPOCH FROM (nextrefreshat - NOW())) AS BIGINT) FROM "Podcasts" WHERE podcastid = {pod}"#);
     int(app, &sql).await.unwrap_or_else(|| panic!("podcast {pod} has no next refresh"))
 }
 
@@ -199,33 +195,3 @@ async fn a_manual_refresh_fetches_now_and_reschedules() {
     assert_about(due_in(&app, pod).await, 15);
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn upgrading_backfills_intervals_and_spreads_the_first_refreshes() {
-    let app = TestApp::new().await;
-    if app.upgrade_tests_unsupported() {
-        return;
-    }
-    let user = app.user("upgrader").await;
-    let daily = subscribe(&app, &user, &app.feed("daily.xml", &spaced("Daily", 10, Duration::hours(3), Duration::days(1))), 10).await;
-    let dormant = subscribe(&app, &user, &app.feed("old.xml", &spaced("Old", 4, Duration::days(200), Duration::days(7))), 4).await;
-    let single = subscribe(&app, &user, &app.feed("one.xml", &spaced("One", 1, Duration::days(2), Duration::days(1))), 1).await;
-
-    // The columns as before the upgrade: not there.
-    exec(&app, r#"ALTER TABLE "Podcasts" DROP COLUMN NextRefreshAt, DROP COLUMN RefreshIntervalMinutes"#).await;
-    rerun_migrations(&app, &["075"]).await;
-
-    assert_eq!(interval(&app, daily).await, Some(180));
-    assert_eq!(interval(&app, dormant).await, Some(24 * 60));
-    assert_eq!(interval(&app, single).await, Some(60));
-    for pod in [daily, dormant, single] {
-        let secs = due_in(&app, pod).await;
-        assert!((-5..30 * 60).contains(&secs), "first refresh within the old 30 minute cycle: {secs}s");
-    }
-
-    // A row added later waits a few minutes for its import to schedule it.
-    exec(&app, &format!(r#"INSERT INTO "Podcasts" (PodcastName, FeedURL, UserID) VALUES ('New', 'https://example.invalid/new.xml', {})"#, user.id)).await;
-    let new = int(&app, r#"SELECT PodcastID FROM "Podcasts" WHERE PodcastName = 'New'"#).await.unwrap() as i32;
-    let secs = due_in(&app, new).await;
-    assert!((4 * 60..=5 * 60 + 5).contains(&secs), "{secs}s");
-    assert_eq!(interval(&app, new).await, None);
-}

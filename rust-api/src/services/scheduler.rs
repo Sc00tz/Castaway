@@ -236,7 +236,7 @@ impl BackgroundScheduler {
     async fn refresh_recommendations_internal(state: &Arc<AppState>) -> AppResult<()> {
         let user_ids = state.db_pool.get_recommendation_cache_user_ids().await?;
         for uid in user_ids {
-            match crate::services::recommendations::generate_recommendations(&state.db_pool, uid, 24).await {
+            match crate::services::recommendations::generate_recommendations(&state.db_pool, &state.config.api, uid, 24).await {
                 Ok(recs) => {
                     if let Ok(json) = serde_json::to_string(&recs) {
                         if let Err(e) = state.db_pool.upsert_recommendation_cache(uid, &json).await {
@@ -424,11 +424,8 @@ impl BackgroundScheduler {
 
         guarded(JobKind::Refresh, run_refresh_job(&state)).await;
 
-        // People: drop old host-feed placeholders, backfill stored tags, first PodPeopleDB sync.
-        tokio::spawn(crate::services::people::startup(
-            state.db_pool.clone(),
-            crate::services::people::Endpoints::from_config(&state.config),
-        ));
+        // People: drop old host-feed placeholders and backfill stored tags.
+        tokio::spawn(crate::services::people::startup(state.db_pool.clone()));
     }
 }
 

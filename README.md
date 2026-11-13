@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="240" src="./images/pinepods-logo.jpeg" alt="Castaway logo">
+  <img width="240" src="./images/castaway-logo.jpeg" alt="Castaway logo">
 </p>
 
 <h1 align="center">Castaway</h1>
@@ -38,41 +38,37 @@ Castaway is based on [PinePods](https://github.com/madeofpendletonwool/PinePods)
 |---|---|
 | **Listen** | Audio **and video** podcasts, variable speed, chapters, transcripts, downloads, a persistent queue, serial auto-play and per-podcast auto-download. |
 | **Organize** | Subscriptions, smart and manual playlists, saved episodes, favorites, full history, and podcasts from local files. |
-| **Discover** | Search Podcast Index, iTunes and YouTube, search inside your own library, and follow podcast hosts. |
+| **Discover** | Search Podcast Index and iTunes, search inside your own library, and follow podcast hosts. |
 | **Sync & apps** | Built-in **gpodder server** (AntennaPod and others), OIDC single sign-on, MFA, and web, desktop and mobile apps with CarPlay and Android Auto. |
 | **Make it yours** | Built-in themes plus a custom theme creator, listening stats, OPML import and export, and push notifications (ntfy or webhook). |
 
 ## Quick start
 
-Castaway needs a database (PostgreSQL) and a Valkey or Redis server. The easiest way to run
-it is Docker Compose.
-
-The repo root has a ready-made [`docker-compose.yml`](docker-compose.yml) that pulls the
-published image (`ghcr.io/sc00tz/castaway`, built by GitHub for x86_64 and ARM64) and
-runs it with PostgreSQL and Valkey. On your Docker host:
+Castaway runs as a single container: the web app, the server and its PostgreSQL database are
+all inside the image (`ghcr.io/sc00tz/castaway`, built by GitHub for x86_64 and ARM64). On
+your Docker host:
 
 ```bash
 mkdir castaway && cd castaway
 curl -fsSLO https://raw.githubusercontent.com/Sc00tz/Castaway/main/docker-compose.yml
 curl -fsSL https://raw.githubusercontent.com/Sc00tz/Castaway/main/.env.example -o .env
-# edit .env: set CASTAWAY_URL, DB_PASSWORD (openssl rand -base64 24) and DATA_DIR
+# edit .env: set CASTAWAY_URL and DATA_DIR
 docker compose up -d
 ```
 
 Then open your `CASTAWAY_URL` and create your first admin account. To update later:
 `docker compose pull && docker compose up -d`.
 
-More complete examples, including SQLite, the optional AI sidecar, single sign-on settings
-and allowing feeds hosted on your own network, are in
-[`deployment/docker/compose-files`](deployment/docker/compose-files).
+**Search:** Apple Podcasts search works right away. For Podcast Index search, finding a host's
+other shows, and the Discover page's trending lists, get a free API key at
+[api.podcastindex.org](https://api.podcastindex.org) and enter it under Settings → Podcast Index.
+Searches go from your server straight to Apple and Podcast Index; the key never leaves the server.
 
-### Moving from PinePods
+Everything Castaway keeps is in `DATA_DIR`: `postgres/` (the database), `downloads/` and
+`backups/`. Back up that folder and you've backed up Castaway.
 
-Castaway reads a PinePods database as-is. Point the `castaway` service at your existing
-database and download folders, with the same `DB_NAME`, and it picks up where PinePods
-left off. Some internal names, such as `pinepods_database` and the `/opt/pinepods` paths
-inside the container, keep their PinePods names for exactly this reason. Back up your
-database first.
+To use a PostgreSQL server you already run instead of the built-in one, set `DB_HOST`,
+`DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` on the container.
 
 ## Apps
 

@@ -19,8 +19,6 @@ pub mod youtube;
 #[allow(unused_imports)]
 pub use app::{hash_password, TestApp, TestUser};
 #[allow(unused_imports)]
-pub use env::Backend;
-#[allow(unused_imports)]
 pub use fixtures::Fixture;
 #[allow(unused_imports)]
 pub use rss::{Episode, Feed};
@@ -29,4 +27,4 @@ pub use flows::eventually;
 #[allow(unused_imports)]
 pub use serde_json::{json, Value};
 #[allow(unused_imports)]
-pub use sql::{exec, int, rerun_migrations, set_next_refresh, set_refresh_state, text};
+pub use sql::{exec, int, set_next_refresh, set_refresh_state, text};

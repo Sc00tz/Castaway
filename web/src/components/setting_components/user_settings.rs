@@ -328,7 +328,7 @@ pub fn user_settings() -> Html {
                     <form class="space-y-4" action="#">
                         <div>
                             <label for="username" style="display:block;font-size:13px;font-weight:500;color:var(--text-color);margin-bottom:6px;">{i18n.t("settings.username")}</label>
-                            <input oninput={on_username_change.clone()} placeholder="pinepods_user1" type="text" id="username" name="username" class="input" required=true />
+                            <input oninput={on_username_change.clone()} placeholder="castaway_user1" type="text" id="username" name="username" class="input" required=true />
                             {
                                 match *username_error {
                                     username_error_notice::Hidden => html! {},
@@ -947,7 +947,7 @@ pub fn user_settings() -> Html {
                     <form class="space-y-4" action="#">
                         <div>
                             <label for="username" style="display:block;font-size:13px;font-weight:500;color:var(--text-color);margin-bottom:6px;">{i18n.t("settings.username")}</label>
-                            <input oninput={on_username_change.clone()} value={new_username.to_string()} placeholder="pinepods_user1" type="text" id="username" name="username" class="input" required=true />
+                            <input oninput={on_username_change.clone()} value={new_username.to_string()} placeholder="castaway_user1" type="text" id="username" name="username" class="input" required=true />
                             {
                                 match *username_error {
                                     username_error_notice::Hidden => html! {},

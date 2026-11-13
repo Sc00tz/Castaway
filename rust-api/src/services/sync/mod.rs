@@ -58,7 +58,7 @@ impl SyncOrigin {
 
 /// The pinepods device: `GpodderDevices.SystemRole` value and preferred name/caption/type.
 pub const PINEPODS_ROLE: &str = "pinepods";
-pub const PINEPODS_DEVICE_NAME: &str = "pinepods";
+pub const PINEPODS_DEVICE_NAME: &str = "castaway";
 pub const PINEPODS_DEVICE_CAPTION: &str = "Castaway";
 pub const PINEPODS_DEVICE_TYPE: &str = "server";
 

@@ -76,14 +76,6 @@ impl DatabasePool {
             .bind(user_id)
             .fetch_all(pool)
             .await?,
-            mysql(pool) => sqlx::query_as(
-                "SELECT PodcastID, FeedURL FROM Podcasts WHERE UserID = ? AND FeedURL IS NOT NULL
-                 UNION ALL SELECT PodcastID, FeedURL FROM PodcastFeedAliases WHERE UserID = ?",
-            )
-            .bind(user_id)
-            .bind(user_id)
-            .fetch_all(pool)
-            .await?,
         }))
     }
 
@@ -100,10 +92,6 @@ impl DatabasePool {
         let ids: HashSet<i32> = all.iter().filter(|(_, u)| named.contains(&feed_url_key(u))).map(|(id, _)| *id).collect();
         let own: Vec<(i32, String)> = dialect_match!(self, {
             pg(pool) => q::query_as(r#"SELECT podcastid, feedurl FROM "Podcasts" WHERE userid = $1 AND feedurl IS NOT NULL"#)
-                .bind(user_id)
-                .fetch_all(pool)
-                .await?,
-            mysql(pool) => sqlx::query_as("SELECT PodcastID, FeedURL FROM Podcasts WHERE UserID = ? AND FeedURL IS NOT NULL")
                 .bind(user_id)
                 .fetch_all(pool)
                 .await?,
@@ -136,19 +124,6 @@ impl DatabasePool {
                 .execute(pool)
                 .await?;
             },
-            mysql(pool) => {
-                sqlx::query(
-                    "INSERT IGNORE INTO PodcastFeedAliases (PodcastID, UserID, FeedURL)
-                     SELECT ?, ?, ? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM Podcasts WHERE PodcastID = ? AND FeedURL = ?)",
-                )
-                .bind(podcast_id)
-                .bind(user_id)
-                .bind(url)
-                .bind(podcast_id)
-                .bind(url)
-                .execute(pool)
-                .await?;
-            },
         });
         Ok(())
     }
@@ -167,13 +142,6 @@ impl DatabasePool {
             pg(pool) => q::query_as(
                 r#"SELECT p.podcastid, p.podcastname, p.podcastguid, (SELECT COUNT(*) FROM "Episodes" e WHERE e.feedid = p.feedid)
                    FROM "Podcasts" p WHERE p.userid = $1 AND NOT COALESCE(p.isyoutubechannel, FALSE)"#,
-            )
-            .bind(user_id)
-            .fetch_all(pool)
-            .await?,
-            mysql(pool) => sqlx::query_as(
-                "SELECT p.PodcastID, p.PodcastName, p.PodcastGUID, CAST((SELECT COUNT(*) FROM Episodes e WHERE e.FeedID = p.FeedID) AS SIGNED)
-                 FROM Podcasts p WHERE p.UserID = ? AND COALESCE(p.IsYouTubeChannel, 0) = 0",
             )
             .bind(user_id)
             .fetch_all(pool)
@@ -212,22 +180,6 @@ impl DatabasePool {
             .bind(&feed.episode_urls)
             .fetch_one(pool)
             .await?,
-            mysql(pool) => {
-                // Only the newest episodes are compared, to keep the statement small.
-                let guids: Vec<&String> = feed.episode_guids.iter().take(200).collect();
-                let urls: Vec<&String> = feed.episode_urls.iter().take(200).collect();
-                let list = |n: usize| if n == 0 { "NULL".to_string() } else { vec!["?"; n].join(", ") };
-                let sql = format!(
-                    "SELECT COUNT(*) FROM Episodes WHERE FeedID = (SELECT FeedID FROM Podcasts WHERE PodcastID = ?) AND (EpisodeGUID IN ({}) OR EpisodeURL IN ({}))",
-                    list(guids.len()),
-                    list(urls.len())
-                );
-                let mut q = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str())).bind(podcast_id);
-                for v in guids.into_iter().chain(urls) {
-                    q = q.bind(v);
-                }
-                q.fetch_one(pool).await?
-            },
         });
         Ok(count as usize)
     }
@@ -238,13 +190,6 @@ impl DatabasePool {
         let old: Option<String> = dialect_match!(self, {
             pg(pool) => q::query_scalar(
                 r#"SELECT feedurl FROM "Podcasts" WHERE podcastid = $1 AND userid = $2 AND COALESCE(consecutivefailures, 0) > 0"#,
-            )
-            .bind(podcast_id)
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await?,
-            mysql(pool) => sqlx::query_scalar(
-                "SELECT FeedURL FROM Podcasts WHERE PodcastID = ? AND UserID = ? AND COALESCE(ConsecutiveFailures, 0) > 0",
             )
             .bind(podcast_id)
             .bind(user_id)
@@ -269,28 +214,6 @@ impl DatabasePool {
                 .execute(&mut *tx)
                 .await?;
                 q::query(r#"INSERT INTO "PodcastFeedAliases" (podcastid, userid, feedurl) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"#)
-                    .bind(podcast_id)
-                    .bind(user_id)
-                    .bind(&old)
-                    .execute(&mut *tx)
-                    .await?;
-                tx.commit().await?;
-            },
-            mysql(pool) => {
-                let mut tx = pool.begin().await?;
-                sqlx::query("DELETE FROM PodcastFeedAliases WHERE UserID = ? AND FeedURLHash = SHA2(?, 256)")
-                    .bind(user_id)
-                    .bind(url)
-                    .execute(&mut *tx)
-                    .await?;
-                sqlx::query(
-                    "UPDATE Podcasts SET FeedURL = ?, FeedETag = NULL, FeedLastModified = NULL, FeedContentHash = NULL WHERE PodcastID = ?",
-                )
-                .bind(url)
-                .bind(podcast_id)
-                .execute(&mut *tx)
-                .await?;
-                sqlx::query("INSERT IGNORE INTO PodcastFeedAliases (PodcastID, UserID, FeedURL) VALUES (?, ?, ?)")
                     .bind(podcast_id)
                     .bind(user_id)
                     .bind(&old)

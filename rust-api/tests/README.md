@@ -1,34 +1,29 @@
 # rust-api integration tests
 
 Every test boots the real axum router (`pinepods_api::create_app`) against its **own freshly
-migrated database** (Postgres, MariaDB or SQLite) plus Valkey (SQLite runs use the in-memory
-store instead, as a SQLite install does by default), and drives it over HTTP exactly as the
+migrated PostgreSQL database** plus Valkey, and drives it over HTTP exactly as the
 web and mobile clients do. Nothing is mocked except the outside internet.
 
 ## Running
 
 ```sh
-scripts/integration-tests.sh                    # every backend, every test
-scripts/integration-tests.sh --db postgres      # one backend (postgres | mariadb | sqlite)
+scripts/integration-tests.sh                    # every test
 scripts/integration-tests.sh -- queue           # extra args go to `cargo test` (name filter)
 scripts/integration-tests.sh -- accounts -- --nocapture
 scripts/integration-tests.sh down               # stop the throwaway containers
 scripts/integration-tests.sh --gpodder mock -- gpodder # gpodder protocol tests (rust | mock)
 ```
 
-The script starts Postgres, MariaDB and Valkey from `tests/docker-compose.yml` (off-default
-ports, tmpfs storage) and builds a Python venv under `target/` for the migration runner. CI
-(`.github/workflows/rust-api-tests.yml`) runs the same thing as a matrix over the three databases,
-using service containers (`PINEPODS_TEST_EXTERNAL_SERVICES=1`).
+The script starts PostgreSQL and Valkey from `tests/docker-compose.yml` (off-default ports,
+tmpfs storage). CI (`.github/workflows/rust-api-tests.yml`) runs the same thing using service
+containers (`PINEPODS_TEST_EXTERNAL_SERVICES=1`).
 
 Useful environment variables:
 
 | Variable | Meaning |
 |---|---|
-| `PINEPODS_TEST_DB_TYPE` | `postgresql`, `mariadb` or `sqlite` (set by the script) |
 | `PINEPODS_TEST_DB_HOST` / `_PORT` / `_USER` / `_PASSWORD` | database server |
 | `PINEPODS_TEST_VALKEY_HOST` / `_PORT` | Valkey server |
-| `PINEPODS_TEST_PYTHON` | Python used to run `startup/setup_database_new.py` |
 | `PINEPODS_TEST_KEEP_DB` | keep each test's database afterwards for inspection |
 | `PINEPODS_TEST_EXTERNAL_SERVICES` | don't start containers; use the ones above |
 | `PINEPODS_TEST_GPODDER` | gpodder server the protocol tests talk to: `rust` (default), `mock` |
@@ -36,18 +31,11 @@ Useful environment variables:
 
 ## How it works
 
-- **Schema.** On first use the harness runs the real migrations (`startup/setup_database_new.py`)
-  once into a template database named after a hash of the migration files, so a migration change
-  rebuilds it automatically. Each test then clones the template (`CREATE DATABASE … TEMPLATE` on
-  Postgres, a table copy on MariaDB, a file copy on SQLite) and drops its clone when the `TestApp`
-  is dropped. The SQLite template lives under `target/sqlite-templates`.
-- **SQLite.** SQLite runs the PostgreSQL query arms through a SQL translation layer
-  (`src/database/dialect.rs`), so a new query needs no SQLite code of its own, but run
-  `--db sqlite` to check it translates. Tests that replay old migrations skip SQLite
-  (`app.upgrade_tests_unsupported()`): new SQLite databases start from a schema baseline.
-  `schema_baseline.rs` fails (on Postgres) when the migrations no longer match that baseline;
-  regenerate it with `python -m database_functions.sqlite_baseline <dsn of a freshly migrated
-  Postgres database>`.
+- **Schema.** On first use the harness runs the server's own migrations (`rust-api/migrations`,
+  applied by `src/database/migrate.rs`) once into a template database named after a hash of the
+  migration files, so a migration change rebuilds it automatically. Each test then clones the
+  template (`CREATE DATABASE … TEMPLATE`) and drops its clone when the `TestApp` is dropped.
+  `migrations.rs` covers a fresh install, a restart, and adopting a PinePods-era database.
 - **Isolation.** Tests run in parallel. Each gets its own database, a unique tag used in
   usernames and fixture paths, and an ID range (sequences / `AUTO_INCREMENT` offset per test) so
   keys in the shared Valkey never collide.
@@ -130,9 +118,9 @@ Library assertions are skipped against `mock`, which has no Castaway database be
 ## Files, mail, AI and sockets
 
 - **Files.** `PINEPODS_DATA_DIR` and `PINEPODS_WEB_ROOT` move the server's storage, so tests use a
-  sandbox instead of `/opt/pinepods` (`harness/files.rs`). They're process-wide: tests tell their
+  sandbox instead of `/data` (`harness/files.rs`). They're process-wide: tests tell their
   files apart by unique podcast and folder names.
-- **Backups** run the real `pg_dump`/`psql`/`mysqldump`/`mysql`. They read `DB_*` from the
+- **Backups** run the real `pg_dump`/`psql`. They read `DB_*` from the
   environment and share a folder, so those tests take turns through `BackupEnv`. Without the tools
   installed, the script runs the ones inside the test containers.
 - **AI** uses a stand-in sidecar with the real protocol (`harness/mock_ai.rs`). Tests choose the

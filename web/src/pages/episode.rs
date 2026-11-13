@@ -9,10 +9,10 @@ use crate::components::gen_funcs::{
     format_datetime, format_time, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
 use crate::components::loading::Loading;
-use crate::components::people::{AddPeopleSheet, PeopleLayout, PeopleStrip};
+use crate::components::people::{PeopleLayout, PeopleStrip};
 use crate::components::safehtml::SafeHtml;
 use crate::components::transcript_hits::{highlight_terms, play_from};
-use crate::requests::people_req::{call_get_episode_people, CreditedPerson};
+use crate::requests::people_req::call_get_episode_people;
 use crate::requests::pod_req;
 use crate::requests::pod_req::{
     call_check_podcast, call_create_share_link, call_download_episode, call_download_episode_file,
@@ -1561,11 +1561,6 @@ pub fn epsiode() -> Html {
 
     //let episode_id = state.selected_episode_id.clone();
     let ep_in_db = use_state(|| false);
-    let show_add_people = use_state(|| false);
-    let open_add_people = {
-        let show_add_people = show_add_people.clone();
-        Callback::from(move |_: ()| show_add_people.set(true))
-    };
     let episode_people_loaded = audio_state.episode_page_people.is_some();
     let episode_people_rc = Rc::new(audio_state.episode_page_people.clone().unwrap_or_default());
     let ep_2_loading = use_state(|| true);
@@ -2795,7 +2790,6 @@ pub fn epsiode() -> Html {
                                                 people={episode_people_rc.clone()}
                                                 layout={PeopleLayout::Chips}
                                                 label={i18n_in_this_episode.clone()}
-                                                on_add={episode_people_loaded.then(|| open_add_people.clone())}
                                                 empty_text={i18n.t("people.none_on_episode")}
                                                 class={classes!("ep-mobile-hosts")}
                                             />
@@ -3147,7 +3141,6 @@ pub fn epsiode() -> Html {
                                                         <PeopleStrip
                                                             people={episode_people_rc.clone()}
                                                             layout={PeopleLayout::Cards}
-                                                            on_add={Some(open_add_people.clone())}
                                                             empty_text={i18n.t("people.none_on_episode")}
                                                         />
                                                     </div>
@@ -3157,20 +3150,6 @@ pub fn epsiode() -> Html {
                                         }
                                     }}
 
-                                    { if *show_add_people && *ep_in_db {
-                                        let show_add_people = show_add_people.clone();
-                                        let dispatch = audio_dispatch.clone();
-                                        html! {
-                                            <AddPeopleSheet
-                                                podcast_id={episode.podcastid}
-                                                episode_id={Some(episode.episodeid)}
-                                                on_close={Callback::from(move |_: ()| show_add_people.set(false))}
-                                                on_added={Callback::from(move |people: Vec<CreditedPerson>| {
-                                                    dispatch.reduce_mut(|state| state.episode_page_people = Some(people));
-                                                })}
-                                            />
-                                        }
-                                    } else { html! {} } }
 
                                     // ===== TRANSCRIPT MODAL =====
                                     { if let Some(show_modal) = episode_detail_state.show_transcript_modal {
