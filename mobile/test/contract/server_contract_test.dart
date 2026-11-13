@@ -219,12 +219,6 @@ void main() {
       expect(await service.getUserTheme(_userId), 'Nordic');
     });
 
-    test('AI status reads as off without a sidecar', () async {
-      final status = await service.getAiStatus();
-      expect(status.available, isFalse);
-      expect(status.downloadsEnabled, isTrue);
-    });
-
     test('a share link can be created', () async {
       expect(await service.createShareLink(episodes.first), isNotEmpty);
     });

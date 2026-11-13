@@ -48,12 +48,6 @@ class PinepodsAudioService {
   /// Optional: a null service, or one that isn't connected, never affects playback.
   NowPlayingService? _nowPlayingService;
 
-  /// AI transcript lines for the playing episode; empty when it has none.
-  final ValueNotifier<List<TranscriptCue>> transcriptCues = ValueNotifier(const []);
-
-  /// Ad ranges (seconds) being skipped in the playing episode.
-  final ValueNotifier<List<({double start, double end})>> skippedAds = ValueNotifier(const []);
-
   /// Public getters used by the now-playing reporter.
   int? get currentEpisodeId => _currentEpisodeId;
   int? get currentPodcastId => _currentPodcastId;
@@ -216,8 +210,6 @@ class PinepodsAudioService {
       _currentArtwork = pinepodsEpisode.episodeArtwork;
       final knownPodcastId = pinepodsEpisode.podcastId;
       _currentPodcastId = knownPodcastId != null && knownPodcastId > 0 ? knownPodcastId : null;
-      transcriptCues.value = const [];
-      skippedAds.value = const [];
 
       // Is there a local download for this episode? If so we play the on-disk
       // file and tolerate the server being unreachable for everything else.
@@ -486,15 +478,6 @@ class PinepodsAudioService {
         }
       }
 
-      Future<void> loadTranscript() async {
-        try {
-          final transcript = await _pinepodsService.getEpisodeTranscript(episodeId, userId);
-          if (transcript != null && stillPlaying()) transcriptCues.value = transcript.cues;
-        } catch (e) {
-          log.fine('Could not load transcript (continuing): $e');
-        }
-      }
-
       Future<void> countPlay() async {
         try {
           await _pinepodsService.incrementPlayed(userId);
@@ -505,13 +488,10 @@ class PinepodsAudioService {
 
       await Future.wait([
         lateSettings(),
-        // Silence (#727) + ad-skip (#790): fetch and apply the server-detected
-        // skip ranges for this episode. Decoupled from the silence toggle so
-        // ads skip even when silence-trim is off.
+        // Silence (#727): fetch and apply the server-detected skip ranges.
         refreshSkipSegments(episodeId, userId, podcastId),
         episodeDetails(),
         anchorInQueue(),
-        loadTranscript(),
         countPlay(),
       ]);
     } catch (e) {
@@ -529,8 +509,6 @@ class PinepodsAudioService {
     _stopPeriodicUpdates();
     _currentEpisodeId = null;
     _currentPodcastId = null;
-    transcriptCues.value = const [];
-    skippedAds.value = const [];
     _currentEpisodeDuration = null;
     _currentTitle = pinepodsEpisode.episodeTitle;
     _currentArtwork = pinepodsEpisode.episodeArtwork;
@@ -545,7 +523,7 @@ class PinepodsAudioService {
     await _audioPlayerService.playEpisode(episode: episode, resume: false, playbackSpeed: null);
     // Drop skip ranges left over from the previous episode.
     await _audioPlayerService.applyEpisodeSkipSegments(
-        silenceEnabled: false, silenceRanges: const [], adRanges: const []);
+        silenceEnabled: false, silenceRanges: const []);
     _isPlaying = true;
   }
 
@@ -579,87 +557,29 @@ class PinepodsAudioService {
     );
   }
 
-  /// Fetch the server-detected skip segments for an episode and push the active
-  /// ranges to the native player. Silence (#727) honors the per-podcast toggle
-  /// (Android ORs it with the user's global preference on the DSP path); ad
-  /// ranges (#790) are gated on the server-resolved per-user status
-  /// (active/confirmed => skip) and are independent of the silence toggle.
+  /// Fetch the server-detected silence ranges for an episode and push them to
+  /// the native player, honoring the podcast's silence-trim setting (Android
+  /// ORs it with the user's global preference on the DSP path).
   ///
-  /// Safe to call again mid-episode (e.g. after a Confirm/Deny/Detect in the UI)
-  /// to re-supply the native layer — do NOT cache a one-time snapshot.
-  ///
-  /// Ad times only fit the copy of the audio they were found on (dynamically
-  /// inserted ads differ between fetches), so ads are held back unless the
-  /// playing copy is the user's matching server download or has the same length
-  /// as the analyzed one.
+  /// Safe to call again mid-episode to re-supply the native layer.
   Future<void> refreshSkipSegments(int episodeId, int userId, int podcastId) async {
     try {
       final trimSettings = await _pinepodsService.getSilenceTrim(userId, podcastId);
-      final info = await _pinepodsService.getEpisodeSkipInfo(episodeId, userId);
-      final fetched = info.segments;
-
+      final segments = await _pinepodsService.getEpisodeSkipSegments(episodeId, userId);
       final silenceRanges = trimSettings.enabled
-          ? fetched
+          ? segments
               .where((s) => s.kind == 'silence')
               .map((s) => {'start': s.startTime, 'end': s.endTime})
               .toList()
           : <Map<String, double>>[];
-      final adRanges = fetched
-          .where((s) => s.isActiveAd)
-          .map((s) => {'start': s.startTime, 'end': s.endTime})
-          .toList();
-      final adAudio = info.adAudio;
-      final url = _audioPlayerService.nowPlaying?.contentUrl ?? '';
-      final playingServerCopy = url.contains('/api/data/stream/');
-      final adsFitNow = adAudio == null ||
-          adAudio.fits(0, playingServerCopy: playingServerCopy);
-
-      Future<void> apply(List<Map<String, double>> ads) {
-        skippedAds.value = [for (final a in ads) (start: a['start']!, end: a['end']!)];
-        return _audioPlayerService.applyEpisodeSkipSegments(
-          silenceEnabled: trimSettings.enabled,
-          silenceRanges: silenceRanges,
-          adRanges: ads,
-        );
-      }
 
       if (_currentEpisodeId != episodeId) return;
-      await apply(adsFitNow ? adRanges : []);
-
-      // The length decides whether the ads fit; it arrives once the player has
-      // loaded the episode, so add the ads then without holding up playback.
-      if (!adsFitNow && adRanges.isNotEmpty) {
-        unawaited(_playbackLength(url).then((length) async {
-          if (_currentEpisodeId != episodeId) return;
-          if (length != null &&
-              adAudio.fits(length, playingServerCopy: playingServerCopy)) {
-            await apply(adRanges);
-          } else {
-            log.info('Holding back ad skips for episode $episodeId: the playing '
-                "copy doesn't match the one ads were detected on "
-                '(${adAudio.download}, length $length vs ${adAudio.analyzedDuration})');
-          }
-        }));
-      }
+      await _audioPlayerService.applyEpisodeSkipSegments(
+        silenceEnabled: trimSettings.enabled,
+        silenceRanges: silenceRanges,
+      );
     } catch (e) {
       log.fine('Could not apply skip segments (continuing): $e');
-    }
-  }
-
-  /// The length (seconds) the player reports for [contentUrl], or null if it
-  /// doesn't within 30s.
-  Future<double?> _playbackLength(String contentUrl) async {
-    final positions = _audioPlayerService.playPosition;
-    if (positions == null) return null;
-    try {
-      final state = await positions
-          .where((p) =>
-              p.length.inMilliseconds > 0 && p.episode?.contentUrl == contentUrl)
-          .first
-          .timeout(const Duration(seconds: 30));
-      return state.length.inMilliseconds / 1000.0;
-    } catch (_) {
-      return null;
     }
   }
 

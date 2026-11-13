@@ -477,154 +477,6 @@
         ]
       }
     },
-    "/api/data/adjust_ad_segment_review": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Confirm or deny a detected ad segment (per-user)",
-        "operationId": "adjust_ad_segment_review",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdSegmentReviewRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/adjust_ad_skip_auto_activate": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Set per-podcast ad-skip auto-activate",
-        "operationId": "adjust_ad_skip_auto_activate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdSkipAutoActivateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/adjust_auto_ad_detect": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Set per-podcast auto-ad-detect",
-        "operationId": "adjust_auto_ad_detect",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AutoAdDetectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/adjust_auto_transcribe": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Set per-podcast auto-transcribe",
-        "operationId": "adjust_auto_transcribe",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AutoTranscribeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
     "/api/data/adjust_silence_trim": {
       "post": {
         "tags": [
@@ -706,190 +558,6 @@
         ],
         "summary": "Self service status",
         "operationId": "self_service_status",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/ai_models": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "List models installed in the AI sidecar (admin)",
-        "operationId": "get_ai_models",
-        "parameters": [
-          {
-            "name": "remote_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "403": {
-            "description": "Admin access required"
-          },
-          "503": {
-            "description": "AI service unavailable"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/ai_pull_model": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Pull a model into the AI sidecar (admin)",
-        "operationId": "ai_pull_model",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiPullModelRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "403": {
-            "description": "Admin access required"
-          },
-          "503": {
-            "description": "AI service unavailable"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/ai_settings": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Get global AI settings (admin)",
-        "operationId": "get_ai_settings",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "403": {
-            "description": "Admin access required"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Update global AI settings (admin)",
-        "operationId": "update_ai_settings",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiSettingsUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "403": {
-            "description": "Admin access required"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/ai_status": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Whether the optional AI sidecar is available",
-        "operationId": "ai_status",
         "responses": {
           "200": {
             "description": "Success",
@@ -1200,52 +868,6 @@
           },
           "401": {
             "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/bulk_transcribe_episodes": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Queue transcriptions for several episodes (AI sidecar)",
-        "operationId": "bulk_transcribe_episodes",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BulkTranscribeEpisodesRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Queued; one task id per episode",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "400": {
-            "description": "No episodes given"
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "404": {
-            "description": "An episode isn't one of the user's"
-          },
-          "503": {
-            "description": "AI service unavailable"
           }
         },
         "security": [
@@ -2538,46 +2160,6 @@
         ]
       }
     },
-    "/api/data/detect_ads": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Detect ads for an episode (AI sidecar)",
-        "operationId": "detect_ads",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DetectAdsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "503": {
-            "description": "AI service unavailable"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
     "/api/data/detect_local_cover": {
       "get": {
         "tags": [
@@ -3198,116 +2780,6 @@
         ]
       }
     },
-    "/api/data/episode_transcript": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Get the stored (generated) transcript for an episode",
-        "operationId": "get_episode_transcript",
-        "parameters": [
-          {
-            "name": "episode_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/episode_transcript_export": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Download the generated transcript as SRT, WebVTT or plain text",
-        "operationId": "export_episode_transcript",
-        "parameters": [
-          {
-            "name": "episode_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "description": "File format: srt, vtt or txt.",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "File formats a generated transcript can be downloaded as.",
-              "enum": [
-                "srt",
-                "vtt",
-                "txt"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The transcript file",
-            "content": {
-              "text/plain": {}
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "404": {
-            "description": "No finished transcript for this episode"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
     "/api/data/extend_shared_link": {
       "put": {
         "tags": [
@@ -3795,53 +3267,6 @@
         ]
       }
     },
-    "/api/data/get_ad_skip_auto_activate": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Get per-podcast ad-skip auto-activate setting",
-        "operationId": "get_ad_skip_auto_activate",
-        "parameters": [
-          {
-            "name": "podcast_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
     "/api/data/get_api_info/{user_id}": {
       "get": {
         "tags": [
@@ -3853,53 +3278,6 @@
           {
             "name": "user_id",
             "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/get_auto_ad_detect": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Get per-podcast auto-ad-detect setting",
-        "operationId": "get_auto_ad_detect",
-        "parameters": [
-          {
-            "name": "podcast_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4142,53 +3520,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/AutoQueueStatusResponse"
                 }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/get_auto_transcribe": {
-      "get": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Get per-podcast auto-transcribe setting",
-        "operationId": "get_auto_transcribe",
-        "parameters": [
-          {
-            "name": "podcast_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           },
@@ -9863,46 +9194,6 @@
         ]
       }
     },
-    "/api/data/transcribe_episode": {
-      "post": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Transcribe an episode (AI sidecar)",
-        "operationId": "transcribe_episode",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TranscribeEpisodeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          },
-          "503": {
-            "description": "AI service unavailable"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
     "/api/data/transcripts/search": {
       "get": {
         "tags": [
@@ -13191,47 +12482,6 @@
   },
   "components": {
     "schemas": {
-      "AdSegmentReviewRequest": {
-        "type": "object",
-        "required": [
-          "segment_id",
-          "user_id",
-          "status"
-        ],
-        "properties": {
-          "segment_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "AdSkipAutoActivateRequest": {
-        "type": "object",
-        "required": [
-          "podcast_id",
-          "user_id"
-        ],
-        "properties": {
-          "podcast_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        }
-      },
       "AddCategoryData": {
         "type": "object",
         "required": [
@@ -13382,88 +12632,6 @@
           }
         }
       },
-      "AiPullModelRequest": {
-        "type": "object",
-        "required": [
-          "kind",
-          "model"
-        ],
-        "properties": {
-          "kind": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "repo": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "filename": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "AiSettingsUpdate": {
-        "type": "object",
-        "description": "Update payload from the settings page. `llm_api_key` is only written when `Some(non-empty)`,\nso leaving the field blank preserves the stored key; `clear_api_key` removes it.",
-        "required": [
-          "transcription_model",
-          "llm_backend"
-        ],
-        "properties": {
-          "transcription_model": {
-            "type": "string"
-          },
-          "llm_backend": {
-            "type": "string"
-          },
-          "llm_model": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "llm_url": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "llm_api_key": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "clear_api_key": {
-            "type": "boolean"
-          },
-          "whisper_device": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "whisper_compute_type": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
       "AppPasswordEntry": {
         "type": "object",
         "required": [
@@ -13493,26 +12661,6 @@
             ],
             "format": "int64",
             "description": "Unix seconds; null if never used."
-          }
-        }
-      },
-      "AutoAdDetectRequest": {
-        "type": "object",
-        "required": [
-          "podcast_id",
-          "user_id"
-        ],
-        "properties": {
-          "podcast_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "enabled": {
-            "type": "boolean"
           }
         }
       },
@@ -13675,26 +12823,6 @@
           }
         }
       },
-      "AutoTranscribeRequest": {
-        "type": "object",
-        "required": [
-          "podcast_id",
-          "user_id"
-        ],
-        "properties": {
-          "podcast_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        }
-      },
       "AvailableLanguage": {
         "type": "object",
         "required": [
@@ -13840,30 +12968,6 @@
               "null"
             ],
             "format": "int32"
-          }
-        }
-      },
-      "BulkTranscribeEpisodesRequest": {
-        "type": "object",
-        "required": [
-          "episode_ids",
-          "user_id"
-        ],
-        "properties": {
-          "episode_ids": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "force": {
-            "type": "boolean",
-            "description": "Re-transcribe episodes that already have a transcript."
           }
         }
       },
@@ -14742,30 +13846,6 @@
         "properties": {
           "share_code": {
             "type": "string"
-          }
-        }
-      },
-      "DetectAdsRequest": {
-        "type": "object",
-        "required": [
-          "episode_id",
-          "user_id"
-        ],
-        "properties": {
-          "episode_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "force": {
-            "type": "boolean"
-          },
-          "download_first": {
-            "type": "boolean",
-            "description": "Download the episode to the server first (when it isn't) and detect ads on that copy, so\nad times match what the user plays."
           }
         }
       },
@@ -19321,26 +18401,6 @@
             "format": "int32"
           },
           "enabled": {
-            "type": "boolean"
-          }
-        }
-      },
-      "TranscribeEpisodeRequest": {
-        "type": "object",
-        "required": [
-          "episode_id",
-          "user_id"
-        ],
-        "properties": {
-          "episode_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "user_id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "force": {
             "type": "boolean"
           }
         }

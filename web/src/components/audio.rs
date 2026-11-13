@@ -393,11 +393,10 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                     let api_key = api_key.clone(); // Clone to make it owned
                     let server_name = server_name.clone(); // Clone to make it owned
 
-                    // Fetch auto-skip segments (silence trim #727, ads #790) for this episode,
+                    // Fetch auto-skip segments (silence trim #727) for this episode,
                     // dropping the previous episode's first so its ranges never skip this one.
                     dispatch.reduce_mut(|state| {
                         state.skip_segments = None;
-                        state.ad_audio = None;
                     });
                     if episode_id != 0 && !is_youtube_vid {
                         let seg_dispatch = dispatch.clone();
@@ -415,7 +414,6 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                                 Ok(info) => {
                                     seg_dispatch.reduce_mut(|state| {
                                         state.skip_segments = Some(info.segments);
-                                        state.ad_audio = info.ad_audio;
                                     });
                                 }
                                 Err(e) => {
@@ -616,38 +614,17 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                         0.0
                     };
 
-                    // Auto-skip: if the playhead is inside a detected silence range (#727) or an
-                    // active detected ad range (#790), jump to its end. Segments are pre-computed
-                    // server-side; a small tolerance avoids skipping when we're already at the end.
-                    // Ads only skip when the user's effective status is active/confirmed (the server
-                    // resolves per-user auto-activate vs. confirm-first + confirm/deny overrides).
+                    // Auto-skip: if the playhead is inside a detected silence range (#727), jump to
+                    // its end. Segments are pre-computed server-side; a small tolerance avoids
+                    // skipping when we're already at the end.
                     // Read the freshest state from the store, not the captured `state_clone`
                     // snapshot: this handler is created at episode load, but skip segments are
-                    // fetched asynchronously afterward (and ad reviews can change them), so the
-                    // snapshot would be stale and nothing would ever skip.
-                    // Ads also wait for the length to be known and must fit the copy playing:
-                    // dynamically inserted ads sit elsewhere in another copy of the episode.
+                    // fetched asynchronously afterward, so the snapshot would be stale and nothing
+                    // would ever skip.
                     let live_state = audio_dispatch.get();
-                    let playing_server_copy = live_state
-                        .media_element
-                        .as_ref()
-                        .map(|m| m.as_media_element().current_src())
-                        .or_else(|| live_state.audio_element.as_ref().map(|a| a.current_src()))
-                        .is_some_and(|src| src.contains("/api/data/stream/"));
-                    let ads_fit = duration.is_finite()
-                        && duration > 0.0
-                        && live_state
-                            .ad_audio
-                            .as_ref()
-                            .map_or(true, |a| a.fits(duration, playing_server_copy));
                     if let Some(segments) = &live_state.skip_segments {
                         if let Some(seg) = segments.iter().find(|s| {
-                            let applies = match s.kind.as_str() {
-                                "silence" => true,
-                                "ad" => ads_fit && matches!(s.status.as_deref(), Some("active") | Some("confirmed")),
-                                _ => false,
-                            };
-                            applies
+                            s.kind == "silence"
                                 && time_in_seconds >= s.start_time
                                 && time_in_seconds < s.end_time - 0.25
                         }) {

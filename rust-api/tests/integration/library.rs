@@ -183,7 +183,7 @@ async fn custom_collection_lifecycle() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn multi_select_adds_episodes_to_a_collection_and_queues_transcripts() {
+async fn multi_select_adds_episodes_to_a_collection() {
     let app = TestApp::new().await;
     let l = setup(&app).await;
     let c = create_collection(&app, &l.user, json!({ "name": "Old run" })).await;
@@ -201,18 +201,6 @@ async fn multi_select_adds_episodes_to_a_collection_and_queues_transcripts() {
     want.sort();
     assert_eq!(collection_episode_ids(&app, &l.user, c).await, want);
     assert!(saved_ids(&app, &l.user).await.is_empty());
-
-    let transcribe = |user: &TestUser, ids: Vec<i32>| {
-        app.post("/api/data/bulk_transcribe_episodes")
-            .key(user)
-            .json(&json!({ "user_id": user.id, "episode_ids": ids }))
-    };
-    assert_eq!(transcribe(&l.user, vec![]).send().await.status.as_u16(), 400);
-    // Someone else's episodes read as missing, and nothing is queued.
-    let other = app.user("bystander").await;
-    assert_eq!(transcribe(&other, l.ep.clone()).send().await.status.as_u16(), 404);
-    // Without the AI sidecar the batch is refused rather than queued to fail.
-    assert_eq!(transcribe(&l.user, l.ep.clone()).send().await.status.as_u16(), 503);
 }
 
 #[tokio::test(flavor = "multi_thread")]

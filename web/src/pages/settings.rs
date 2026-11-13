@@ -309,19 +309,6 @@ pub fn settings() -> Html {
                             </div>
                             <div class="settings-section">
                                 <div class="settings-section-head">
-                                    <i class="ph ph-text-aa"></i>
-                                    <div>
-                                        <div class="settings-section-title-row">
-                                            <div class="settings-section-title">{ &i18n.t("settings.ai") }</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="settings-section-body">
-                                    <setting_components::ai_settings::AiSettings />
-                                </div>
-                            </div>
-                            <div class="settings-section">
-                                <div class="settings-section-head">
                                     <i class="ph ph-shield-check"></i>
                                     <div>
                                         <div class="settings-section-title-row">

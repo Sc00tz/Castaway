@@ -17,10 +17,6 @@ pub fn youtube_downloads_dir() -> String {
     format!("{}/downloads/youtube", data_dir())
 }
 
-pub fn transcribe_tmp_dir() -> String {
-    format!("{}/downloads/.transcribe-tmp", data_dir())
-}
-
 pub fn backups_dir() -> String {
     format!("{}/backups", data_dir())
 }

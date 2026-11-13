@@ -18,7 +18,6 @@ pub(super) fn user_episode_rows_pg(episodes: &str) -> Vec<String> {
     vec![
         format!(r#"DELETE FROM "PlaylistContents" WHERE episodeid IN ({episodes}) AND playlistid IN (SELECT playlistid FROM "Playlists" WHERE userid = $1)"#),
         format!(r#"DELETE FROM "CollectionEpisodes" WHERE episodeid IN ({episodes}) AND collectionid IN (SELECT collectionid FROM "Collections" WHERE userid = $1)"#),
-        format!(r#"DELETE FROM "EpisodeAdSkipReview" WHERE userid = $1 AND segmentid IN (SELECT segmentid FROM "EpisodeSkipSegments" WHERE episodeid IN ({episodes}))"#),
         format!(r#"DELETE FROM "SharedEpisodes" WHERE sharedby = $1 AND episodeid IN ({episodes})"#),
         format!(r#"DELETE FROM "UserEpisodeHistory" WHERE userid = $1 AND episodeid IN ({episodes})"#),
         format!(r#"DELETE FROM "UserEpisodeState" WHERE userid = $1 AND episodeid IN ({episodes})"#),

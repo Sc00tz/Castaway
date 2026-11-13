@@ -15,11 +15,8 @@ use crate::pages::podcast_layout::ClickedFeedURL;
 use crate::requests::pod_req::{
     call_add_category, call_add_podcast, call_adjust_silence_trim, call_adjust_skip_times,
     call_get_silence_trim, SilenceTrimRequest,
-    call_adjust_auto_transcribe, call_get_ai_status, call_get_auto_transcribe, AutoTranscribeRequest,
-    call_get_auto_ad_detect, call_adjust_auto_ad_detect, AutoAdDetectRequest,
     call_get_auto_delete_on_complete, call_set_podcast_auto_delete_on_complete,
-    call_get_ad_skip_auto_activate, call_adjust_ad_skip_auto_activate,
-    call_bulk_download_episodes, call_bulk_transcribe_episodes,
+    call_bulk_download_episodes,
     call_bulk_mark_episodes_completed, call_bulk_queue_episodes, call_bulk_save_episodes,
     call_check_podcast, call_clear_playback_speed, call_download_all_podcast,
     call_enable_auto_download, call_enable_auto_play_next, call_enable_auto_queue,
@@ -898,12 +895,6 @@ pub fn episode_layout() -> Html {
     // Silence-trim (#727) per-podcast settings
     let trim_silence = use_state(|| false);
     let silence_threshold = use_state(|| 2i32);
-    // Transcription (#726): per-podcast auto-transcribe + whether the AI sidecar is up
-    let auto_transcribe = use_state(|| false);
-    let ai_available = use_state(|| false);
-    // Ad detection (#790): per-podcast auto-detect + skip immediately vs. confirm-first
-    let auto_ad_detect = use_state(|| false);
-    let ad_skip_auto_activate = use_state(|| true);
 
     // Load merge-related data when edit modal opens
     {
@@ -2488,10 +2479,6 @@ pub fn episode_layout() -> Html {
     {
         let trim_silence = trim_silence.clone();
         let silence_threshold = silence_threshold.clone();
-        let auto_transcribe = auto_transcribe.clone();
-        let ai_available = ai_available.clone();
-        let auto_ad_detect = auto_ad_detect.clone();
-        let ad_skip_auto_activate = ad_skip_auto_activate.clone();
         let api_key = api_key.clone();
         let server_name = server_name.clone();
         let user_id = user_id.clone();
@@ -2502,12 +2489,6 @@ pub fn episode_layout() -> Html {
                 if let (Some(api_key), Some(server_name), Some(user_id)) =
                     (api_key.clone(), server_name.clone(), user_id.clone())
                 {
-                    let at_api_key = api_key.clone();
-                    let at_server_name = server_name.clone();
-                    let auto_transcribe = auto_transcribe.clone();
-                    let ai_available = ai_available.clone();
-                    let auto_ad_detect = auto_ad_detect.clone();
-                    let ad_skip_auto_activate = ad_skip_auto_activate.clone();
                     wasm_bindgen_futures::spawn_local(async move {
                         if let Ok(settings) = call_get_silence_trim(
                             &server_name,
@@ -2519,27 +2500,6 @@ pub fn episode_layout() -> Html {
                         {
                             trim_silence.set(settings.enabled);
                             silence_threshold.set(settings.threshold);
-                        }
-                    });
-                    // Transcription (#726) + ad detection (#790): AI availability + per-podcast opt-ins.
-                    wasm_bindgen_futures::spawn_local(async move {
-                        if let Ok(up) = call_get_ai_status(&at_server_name, &at_api_key).await {
-                            ai_available.set(up);
-                        }
-                        if let Ok(enabled) =
-                            call_get_auto_transcribe(&at_server_name, &at_api_key, user_id, pid).await
-                        {
-                            auto_transcribe.set(enabled);
-                        }
-                        if let Ok(enabled) =
-                            call_get_auto_ad_detect(&at_server_name, &at_api_key, user_id, pid).await
-                        {
-                            auto_ad_detect.set(enabled);
-                        }
-                        if let Ok(enabled) =
-                            call_get_ad_skip_auto_activate(&at_server_name, &at_api_key, user_id, pid).await
-                        {
-                            ad_skip_auto_activate.set(enabled);
                         }
                     });
                 }
@@ -2618,88 +2578,6 @@ pub fn episode_layout() -> Html {
             }
         })
     };
-
-    // Auto-transcribe (#726): toggle immediately persists (no separate save button).
-    let ai_available_val = *ai_available;
-    let auto_transcribe_checked = *auto_transcribe;
-    let auto_transcribe_toggle = {
-        let auto_transcribe = auto_transcribe.clone();
-        let api_key = api_key.clone();
-        let user_id = user_id.clone();
-        let server_name = server_name.clone();
-        let podcast_id = podcast_id.clone();
-        Callback::from(move |_: MouseEvent| {
-            let enabled = !*auto_transcribe;
-            auto_transcribe.set(enabled);
-            let api_key = api_key.clone();
-            let user_id = user_id.clone().unwrap_or(0);
-            let server_name = server_name.clone();
-            let podcast_id = *podcast_id;
-            wasm_bindgen_futures::spawn_local(async move {
-                if let (Some(api_key), Some(server_name)) = (api_key, server_name) {
-                    let request = AutoTranscribeRequest { podcast_id, user_id, enabled };
-                    if let Err(e) =
-                        call_adjust_auto_transcribe(&server_name, &api_key, &request).await
-                    {
-                        web_sys::console::log_1(&format!("Error updating auto-transcribe: {}", e).into());
-                    }
-                }
-            });
-        })
-    };
-
-    // Auto ad-detect (#790): only enabled when auto-transcribe is on (ads need the transcript).
-    let auto_ad_detect_checked = *auto_ad_detect;
-    let ad_skip_auto_activate_checked = *ad_skip_auto_activate;
-    let auto_ad_detect_toggle = {
-        let auto_ad_detect = auto_ad_detect.clone();
-        let api_key = api_key.clone();
-        let user_id = user_id.clone();
-        let server_name = server_name.clone();
-        let podcast_id = podcast_id.clone();
-        Callback::from(move |_: MouseEvent| {
-            let enabled = !*auto_ad_detect;
-            auto_ad_detect.set(enabled);
-            let api_key = api_key.clone();
-            let user_id = user_id.clone().unwrap_or(0);
-            let server_name = server_name.clone();
-            let podcast_id = *podcast_id;
-            wasm_bindgen_futures::spawn_local(async move {
-                if let (Some(api_key), Some(server_name)) = (api_key, server_name) {
-                    let request = AutoAdDetectRequest { podcast_id, user_id, enabled };
-                    if let Err(e) = call_adjust_auto_ad_detect(&server_name, &api_key, &request).await {
-                        web_sys::console::log_1(&format!("Error updating auto ad-detect: {}", e).into());
-                    }
-                }
-            });
-        })
-    };
-    let ad_skip_auto_activate_toggle = {
-        let ad_skip_auto_activate = ad_skip_auto_activate.clone();
-        let api_key = api_key.clone();
-        let user_id = user_id.clone();
-        let server_name = server_name.clone();
-        let podcast_id = podcast_id.clone();
-        Callback::from(move |_: MouseEvent| {
-            let enabled = !*ad_skip_auto_activate;
-            ad_skip_auto_activate.set(enabled);
-            let api_key = api_key.clone();
-            let user_id = user_id.clone().unwrap_or(0);
-            let server_name = server_name.clone();
-            let podcast_id = *podcast_id;
-            wasm_bindgen_futures::spawn_local(async move {
-                if let (Some(api_key), Some(server_name)) = (api_key, server_name) {
-                    let request = AutoAdDetectRequest { podcast_id, user_id, enabled };
-                    if let Err(e) = call_adjust_ad_skip_auto_activate(&server_name, &api_key, &request).await {
-                        web_sys::console::log_1(&format!("Error updating ad-skip auto-activate: {}", e).into());
-                    }
-                }
-            });
-        })
-    };
-    // Ad times only fit the copy they were found on, and dynamically inserted ads differ between
-    // fetches, so auto ad-detect is only reliable when episodes are downloaded to the server.
-    let enable_auto_download_for_ads = toggle_download.clone();
 
     // Delete server downloads once an episode is finished: this podcast's override, or the
     // user's default when not customized.
@@ -3272,103 +3150,6 @@ pub fn episode_layout() -> Html {
                                     </button>
                                 </div>
                             </div>
-
-                            {
-                                // Auto-transcribe control — only meaningful when the AI sidecar is up.
-                                if ai_available_val {
-                                    html! {
-                                        <div class="mt-4">
-                                            <label for="auto-transcribe" class="block mb-2 text-sm font-medium">{ &i18n.t("episodes_layout.auto_transcribe") }</label>
-                                            <label class="inline-flex relative items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    id="auto-transcribe"
-                                                    checked={auto_transcribe_checked}
-                                                    class="sr-only peer"
-                                                    onclick={auto_transcribe_toggle}
-                                                />
-                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                                <span class="ms-3 text-sm">{ &i18n.t("episodes_layout.auto_transcribe_desc") }</span>
-                                            </label>
-                                        </div>
-                                    }
-                                } else {
-                                    html! {}
-                                }
-                            }
-
-                            {
-                                // Auto ad-detect (#790) — enabled only when auto-transcribe is on.
-                                if ai_available_val {
-                                    html! {
-                                        <div class="mt-4">
-                                            <label for="auto-ad-detect" class="block mb-2 text-sm font-medium">{ &i18n.t("episodes_layout.auto_ad_detect") }</label>
-                                            <label class={ if auto_transcribe_checked { "inline-flex relative items-center cursor-pointer" } else { "inline-flex relative items-center cursor-not-allowed opacity-50" } }>
-                                                <input
-                                                    type="checkbox"
-                                                    id="auto-ad-detect"
-                                                    checked={auto_ad_detect_checked}
-                                                    disabled={!auto_transcribe_checked}
-                                                    class="sr-only peer"
-                                                    onclick={auto_ad_detect_toggle}
-                                                />
-                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                                <span class="ms-3 text-sm">{ &i18n.t("episodes_layout.auto_ad_detect_desc") }</span>
-                                            </label>
-                                            {
-                                                if auto_ad_detect_checked && !*download_status {
-                                                    html! {
-                                                        <div class="ep-ad-notice">
-                                                            <i class="ph ph-warning"></i>
-                                                            <div class="ep-ad-notice-body">
-                                                                <span>{ &i18n.t("episodes_layout.auto_ad_detect_needs_download") }</span>
-                                                                <div class="ep-ad-notice-actions">
-                                                                    <button class="ep-ai-transcript-btn" onclick={enable_auto_download_for_ads}>
-                                                                        <i class="ph ph-cloud-arrow-down"></i>{ &i18n.t("episodes_layout.auto_ad_detect_enable_download") }
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                } else if auto_ad_detect_checked {
-                                                    html! {
-                                                        <div class="ep-ad-notice is-ok">
-                                                            <i class="ph ph-check-circle"></i>
-                                                            <div class="ep-ad-notice-body">
-                                                                <span>{ &i18n.t("episodes_layout.auto_ad_detect_download_ok") }</span>
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                } else {
-                                                    html! {}
-                                                }
-                                            }
-                                            {
-                                                // Skip-immediately vs. confirm-first — only when auto-detect is on.
-                                                if auto_transcribe_checked && auto_ad_detect_checked {
-                                                    html! {
-                                                        <label class="inline-flex relative items-center cursor-pointer mt-3">
-                                                            <input
-                                                                type="checkbox"
-                                                                id="ad-skip-auto-activate"
-                                                                checked={ad_skip_auto_activate_checked}
-                                                                class="sr-only peer"
-                                                                onclick={ad_skip_auto_activate_toggle}
-                                                            />
-                                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                                            <span class="ms-3 text-sm">{ &i18n.t("episodes_layout.ad_skip_auto_activate_desc") }</span>
-                                                        </label>
-                                                    }
-                                                } else {
-                                                    html! {}
-                                                }
-                                            }
-                                        </div>
-                                    }
-                                } else {
-                                    html! {}
-                                }
-                            }
 
                             {
                                 if let Some(info) = &podcast_info {
@@ -5514,46 +5295,6 @@ pub fn episode_layout() -> Html {
                                                             <i class="ph ph-folder-plus"></i>
                                                             {&i18n.t("collections.add_to_collection")}
                                                         </button>
-
-                                                        // Transcribe: queued server-side, one episode at a time
-                                                        if *ai_available && !is_youtube_feed {
-                                                            <button
-                                                                onclick={
-                                                                    let selected_ids = selected_ids.clone();
-                                                                    let api_key = api_key.clone();
-                                                                    let server_name = server_name.clone();
-                                                                    Callback::from(move |_| {
-                                                                        let selected_ids = selected_ids.clone();
-                                                                        let api_key = api_key.clone();
-                                                                        let server_name = server_name.clone();
-                                                                        spawn_local(async move {
-                                                                            match call_bulk_transcribe_episodes(
-                                                                                &server_name.unwrap_or_default(),
-                                                                                &api_key.flatten(),
-                                                                                selected_ids,
-                                                                                user_id_value,
-                                                                            ).await {
-                                                                                // Selection is kept so the same episodes can go into a collection too.
-                                                                                Ok(message) => {
-                                                                                    Dispatch::<NotificationState>::global().reduce_mut(|state| {
-                                                                                        state.info_message = Some(message);
-                                                                                    });
-                                                                                }
-                                                                                Err(e) => {
-                                                                                    Dispatch::<NotificationState>::global().reduce_mut(|state| {
-                                                                                        state.error_message = Some(format!("Error: {}", e));
-                                                                                    });
-                                                                                }
-                                                                            }
-                                                                        });
-                                                                    })
-                                                                }
-                                                                class="btn btn-secondary"
-                                                            >
-                                                                <i class="ph ph-text-aa"></i>
-                                                                {&i18n.t("episodes_layout.transcribe")}
-                                                            </button>
-                                                        }
 
                                                         // Queue button
                                                         <button

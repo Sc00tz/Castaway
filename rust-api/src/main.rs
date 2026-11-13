@@ -95,12 +95,8 @@ async fn main() -> AppResult<()> {
         import_progress_manager,
         notification_manager,
         restore_in_progress: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        ai_available: services::ai_client::AiAvailability::new(),
         merged_episodes: Default::default(),
     };
-
-    // Start the AI sidecar health monitor (no-op if PINEPODS_AI_URL is unset).
-    services::ai_client::spawn_health_monitor(app_state.ai_available.clone());
 
     // Bridge now-playing reports/commands across API replicas via Valkey pub/sub.
     // Degrades cleanly to in-process fan-out if the subscribe connection can't be

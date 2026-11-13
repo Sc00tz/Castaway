@@ -780,11 +780,7 @@ class PinepodsService {
   }
 
   // Get auto-skip segments (silence #727) for an episode, in seconds.
-  Future<List<SkipSegment>> getEpisodeSkipSegments(int episodeId, int userId) async =>
-      (await getEpisodeSkipInfo(episodeId, userId)).segments;
-
-  /// Skip ranges plus, when there are ads, which audio copy they were found on.
-  Future<SkipInfo> getEpisodeSkipInfo(int episodeId, int userId) async {
+  Future<List<SkipSegment>> getEpisodeSkipSegments(int episodeId, int userId) async {
     if (_server == null || _apiKey == null) {
       throw Exception('Not authenticated');
     }
@@ -796,251 +792,21 @@ class PinepodsService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final segments = (data['segments'] as List?) ?? [];
-        final audio = data['ad_audio'];
-        final analyzed = audio is Map ? audio['analyzed'] : null;
-        return SkipInfo(
-          segments: segments
-              .map((s) => SkipSegment(
-                    segmentId: (s['segment_id'] as num?)?.toInt() ?? 0,
-                    kind: s['kind'] ?? '',
-                    startTime: (s['start_time'] as num?)?.toDouble() ?? 0.0,
-                    endTime: (s['end_time'] as num?)?.toDouble() ?? 0.0,
-                    source: s['source'] as String?,
-                    status: s['status'] as String?,
-                  ))
-              .toList(),
-          adAudio: audio is Map
-              ? AdAudio(
-                  download: audio['download'] as String? ?? 'unknown',
-                  analyzedDuration: analyzed is Map
-                      ? (analyzed['duration'] as num?)?.toDouble()
-                      : null,
-                  analyzedSource:
-                      analyzed is Map ? analyzed['source'] as String? : null,
-                )
-              : null,
-        );
+        return segments
+            .map((s) => SkipSegment(
+                  segmentId: (s['segment_id'] as num?)?.toInt() ?? 0,
+                  kind: s['kind'] ?? '',
+                  startTime: (s['start_time'] as num?)?.toDouble() ?? 0.0,
+                  endTime: (s['end_time'] as num?)?.toDouble() ?? 0.0,
+                  source: s['source'] as String?,
+                ))
+            .toList();
       }
     } catch (e) {
       _devLog('Error getting skip segments: $e');
     }
-    return const SkipInfo(segments: []);
+    return const [];
   }
-
-  // --- AI features (#726 transcripts / #790 ad-block) --------------------
-  // All endpoints live under /api/data and use the Api-Key header. The server
-  // resolves per-user ad status; mobile just trusts it (never re-derives it).
-
-  // GET /api/data/ai_status — gate all AI UI on `available`.
-  Future<AiStatus> getAiStatus() async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse('$_server/api/data/ai_status');
-    try {
-      final response = await http.get(url, headers: {'Api-Key': _apiKey!});
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return AiStatus(
-          available: data['available'] == true,
-          transcriptionReady: data['transcription_ready'] == true,
-          adRemovalReady: data['ad_removal_ready'] == true,
-          downloadsEnabled: data['downloads_enabled'] == true,
-        );
-      }
-    } catch (e) {
-      _devLog('Error getting AI status: $e');
-    }
-    return const AiStatus();
-  }
-
-  // POST /api/data/detect_ads — trigger ad detection (async background job).
-  // Returns true if the request was accepted (503 => AI unavailable). With
-  // [downloadFirst], an episode not on the server is downloaded there first and
-  // ads are detected on that copy, so they line up with what gets played.
-  Future<bool> detectAds(int episodeId, int userId,
-      {bool force = false, bool downloadFirst = false}) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse('$_server/api/data/detect_ads');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'episode_id': episodeId,
-          'user_id': userId,
-          'force': force,
-          'download_first': downloadFirst,
-        }),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      _devLog('Error detecting ads: $e');
-      return false;
-    }
-  }
-
-  // POST /api/data/adjust_ad_segment_review — per-user confirm/deny of an ad.
-  // `status` is "confirmed" or "rejected".
-  Future<bool> adjustAdSegmentReview(
-      int segmentId, int userId, String status) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse('$_server/api/data/adjust_ad_segment_review');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'segment_id': segmentId,
-          'user_id': userId,
-          'status': status,
-        }),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      _devLog('Error adjusting ad segment review: $e');
-      return false;
-    }
-  }
-
-  // GET /api/data/episode_transcript — stored AI transcript (with cue segments).
-  Future<StoredTranscript?> getEpisodeTranscript(
-      int episodeId, int userId) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse(
-      '$_server/api/data/episode_transcript?episode_id=$episodeId&user_id=$userId',
-    );
-    try {
-      final response = await http.get(url, headers: {'Api-Key': _apiKey!});
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final t = data['transcript'];
-        if (t == null) return null;
-        return StoredTranscript(
-          source: t['source'] ?? '',
-          language: t['language'] as String?,
-          model: t['model'] as String?,
-          status: t['status'] ?? '',
-          fullText: t['full_text'] as String?,
-          segments: t['segments'] as String?,
-        );
-      }
-    } catch (e) {
-      _devLog('Error getting episode transcript: $e');
-    }
-    return null;
-  }
-
-  /// The generated transcript as a file body: [format] is 'srt', 'vtt' or 'txt'.
-  Future<String> exportEpisodeTranscript(int episodeId, int userId, String format) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse('$_server/api/data/episode_transcript_export').replace(queryParameters: {
-      'episode_id': '$episodeId',
-      'user_id': '$userId',
-      'format': format,
-    });
-    final response = await _get(url, headers: {'Api-Key': _apiKey!});
-    if (response.statusCode != 200) {
-      throw Exception('Transcript download failed (${response.statusCode})');
-    }
-    return utf8.decode(response.bodyBytes);
-  }
-
-  // POST /api/data/transcribe_episode — trigger transcription (async).
-  Future<bool> transcribeEpisode(int episodeId, int userId,
-      {bool force = false}) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse('$_server/api/data/transcribe_episode');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'episode_id': episodeId,
-          'user_id': userId,
-          'force': force,
-        }),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      _devLog('Error transcribing episode: $e');
-      return false;
-    }
-  }
-
-  // --- Per-podcast AI toggles -------------------------------------------
-  // Shared GET helper: /api/data/<path>?podcast_id=&user_id= => {enabled}.
-  Future<bool> _getPodcastEnabled(
-      String path, int userId, int podcastId, bool fallback) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse(
-      '$_server/api/data/$path?podcast_id=$podcastId&user_id=$userId',
-    );
-    try {
-      final response = await http.get(url, headers: {'Api-Key': _apiKey!});
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['enabled'] == true;
-      }
-    } catch (e) {
-      _devLog('Error getting $path: $e');
-    }
-    return fallback;
-  }
-
-  // Shared POST helper: /api/data/<path> with {podcast_id,user_id,enabled}.
-  Future<bool> _setPodcastEnabled(
-      String path, int userId, int podcastId, bool enabled) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Not authenticated');
-    }
-    final url = Uri.parse('$_server/api/data/$path');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Api-Key': _apiKey!, 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'podcast_id': podcastId,
-          'user_id': userId,
-          'enabled': enabled,
-        }),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      _devLog('Error setting $path: $e');
-      return false;
-    }
-  }
-
-  Future<bool> getAutoTranscribe(int userId, int podcastId) =>
-      _getPodcastEnabled('get_auto_transcribe', userId, podcastId, false);
-  Future<bool> adjustAutoTranscribe(int userId, int podcastId, bool enabled) =>
-      _setPodcastEnabled('adjust_auto_transcribe', userId, podcastId, enabled);
-
-  Future<bool> getAutoAdDetect(int userId, int podcastId) =>
-      _getPodcastEnabled('get_auto_ad_detect', userId, podcastId, false);
-  Future<bool> adjustAutoAdDetect(int userId, int podcastId, bool enabled) =>
-      _setPodcastEnabled('adjust_auto_ad_detect', userId, podcastId, enabled);
-
-  // Server default is TRUE (auto-activate ad-skip).
-  Future<bool> getAdSkipAutoActivate(int userId, int podcastId) =>
-      _getPodcastEnabled('get_ad_skip_auto_activate', userId, podcastId, true);
-  Future<bool> adjustAdSkipAutoActivate(
-          int userId, int podcastId, bool enabled) =>
-      _setPodcastEnabled(
-          'adjust_ad_skip_auto_activate', userId, podcastId, enabled);
 
   // --- Server downloads: auto-download + retention ---------------------
   // These are the server's settings (what the server downloads and keeps),
@@ -1985,18 +1751,6 @@ class PinepodsService {
         body: jsonEncode({'episode_ids': episodeIds, 'user_id': userId, 'is_youtube': isYoutube}));
     if (response.statusCode != 200) throw Exception(_errorText(response));
     return jsonDecode(response.body)['message'] as String? ?? 'Done';
-  }
-
-  /// Queues transcriptions; the server runs them one at a time and skips
-  /// episodes that already have an AI transcript. Returns its summary.
-  Future<String> bulkTranscribeEpisodes(List<int> episodeIds, int userId) async {
-    _requireAuth();
-    final url = Uri.parse('$_server/api/data/bulk_transcribe_episodes');
-    final response = await _post(url,
-        headers: _jsonHeaders,
-        body: jsonEncode({'episode_ids': episodeIds, 'user_id': userId, 'force': false}));
-    if (response.statusCode != 200) throw Exception(_errorText(response));
-    return jsonDecode(response.body)['detail'] as String? ?? 'Transcriptions queued';
   }
 
   // Get episode metadata
@@ -3466,16 +3220,13 @@ class SilenceTrimSettings {
   const SilenceTrimSettings({required this.enabled, required this.threshold});
 }
 
-// A single auto-skip range (silence #727; ads #790), times in seconds.
-// `status` is the requesting user's effective state for ad segments:
-// "active"/"confirmed" => skip, "pending"/"rejected" => don't skip; null for silence.
+// A single auto-skip range (trimmed silence, #727), times in seconds.
 class SkipSegment {
   final int segmentId;
   final String kind;
   final double startTime;
   final double endTime;
   final String? source;
-  final String? status;
 
   const SkipSegment({
     this.segmentId = 0,
@@ -3483,66 +3234,9 @@ class SkipSegment {
     required this.startTime,
     required this.endTime,
     this.source,
-    this.status,
-  });
-
-  // True only for ad segments the server has resolved as skippable for this user.
-  bool get isActiveAd =>
-      kind == 'ad' && (status == 'active' || status == 'confirmed');
-}
-
-// How the user's playback copy relates to the copy ads were detected on.
-// Dynamically inserted ads differ between fetches of an episode, so ad times
-// only fit the copy they came from. `download` is "match" (the user's server
-// download is that copy), "mismatch", "none" (no server download) or "unknown".
-class AdAudio {
-  final String download;
-  final double? analyzedDuration;
-  final String? analyzedSource;
-
-  const AdAudio({
-    required this.download,
-    this.analyzedDuration,
-    this.analyzedSource,
-  });
-
-  /// Whether ad times can be trusted on what is playing: the user's server
-  /// download when it is the analyzed copy, otherwise a copy whose length
-  /// (seconds) matches the analyzed one, since inserted ads usually change it.
-  bool fits(double durationSec, {required bool playingServerCopy}) {
-    if (download == 'match' && playingServerCopy) return true;
-    final expected = analyzedDuration;
-    if (expected == null || expected <= 0) return true;
-    if (!durationSec.isFinite || durationSec <= 0) return false;
-    final tolerance = (expected * 0.003) < 2.0 ? 2.0 : expected * 0.003;
-    return (durationSec - expected).abs() <= tolerance;
-  }
-}
-
-class SkipInfo {
-  final List<SkipSegment> segments;
-  final AdAudio? adAudio;
-
-  const SkipInfo({required this.segments, this.adAudio});
-}
-
-// AI capability status from GET /api/data/ai_status; gates all AI UI.
-class AiStatus {
-  final bool available;
-  final bool transcriptionReady;
-  final bool adRemovalReady;
-  final bool downloadsEnabled;
-
-  const AiStatus({
-    this.available = false,
-    this.transcriptionReady = false,
-    this.adRemovalReady = false,
-    this.downloadsEnabled = false,
   });
 }
 
-// Stored AI transcript from GET /api/data/episode_transcript.
-// `segments` is the raw JSON string of [{start,end,text}] (seconds), or null.
 /// One timed line of a transcript (times in seconds).
 class TranscriptCue {
   final double start;
@@ -3550,48 +3244,6 @@ class TranscriptCue {
   final String text;
 
   const TranscriptCue({required this.start, required this.end, required this.text});
-}
-
-class StoredTranscript {
-  final String source;
-  final String? language;
-  final String? model;
-  final String status;
-  final String? fullText;
-  final String? segments;
-
-  const StoredTranscript({
-    required this.source,
-    this.language,
-    this.model,
-    required this.status,
-    this.fullText,
-    this.segments,
-  });
-
-  /// The timed lines parsed from [segments]; empty when there are none.
-  List<TranscriptCue> get cues {
-    final json = segments;
-    if (json == null || json.isEmpty) return const [];
-    try {
-      final raw = jsonDecode(json);
-      if (raw is! List) return const [];
-      final cues = <TranscriptCue>[];
-      for (final item in raw) {
-        if (item is! Map) continue;
-        final text = (item['text'] as String?)?.trim() ?? '';
-        if (text.isEmpty) continue;
-        cues.add(TranscriptCue(
-          start: (item['start'] as num?)?.toDouble() ?? 0.0,
-          end: (item['end'] as num?)?.toDouble() ?? 0.0,
-          text: text,
-        ));
-      }
-      return cues;
-    } catch (_) {
-      return const [];
-    }
-  }
 }
 
 // Playlist Data Classes

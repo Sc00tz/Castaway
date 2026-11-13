@@ -1,8 +1,7 @@
-//! Ad times only fit the copy of an episode they were detected on, so the server records that
-//! copy, tells each user whether their download is it, and links new downloads to it; finished
-//! episodes' server downloads can be deleted automatically.
+//! Finished episodes' server downloads can be deleted automatically, and a new download links
+//! another user's copy of the episode instead of fetching it again.
 
-use pinepods_api::services::{ad_detection, audio_processing};
+use pinepods_api::services::audio_processing;
 use serde_json::{json, Value};
 
 use crate::harness::*;
@@ -128,56 +127,23 @@ async fn finished_episodes_lose_their_server_download() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn each_user_learns_whether_their_download_is_the_copy_ads_were_found_on() {
+async fn a_new_download_links_another_users_copy() {
     let app = TestApp::new().await;
-    let (alice, bob, carol) = (app.user("alice").await, app.user("bob").await, app.user("carol").await);
+    let (alice, carol) = (app.user("alice").await, app.user("carol").await);
     let url = app.feed("show.xml", &Feed::with_episodes("Show", 1));
     let a = app.subscribe(&alice, &url, 1).await;
-    app.subscribe(&bob, &url, 1).await;
     app.subscribe(&carol, &url, 1).await;
     let ep = app.episode_id(&alice, a, "Episode 1").await;
     let dir = scratch_dir();
-    let analyzed = write(&dir, "alice.mp3", b"show with the ad from monday");
-    add_download(&app, &alice, ep, &analyzed, "2026-01-01 10:00:00").await;
-    add_download(&app, &bob, ep, &write(&dir, "bob.mp3", b"show with a different ad"), "2026-01-01 10:00:00").await;
-    let fp = audio_processing::audio_fingerprint(&analyzed).await.unwrap();
-    exec(&app, &format!(
-        r#"INSERT INTO "EpisodeTranscripts" (EpisodeID, Source, Status, AudioFingerprint, AudioDuration, AudioSource)
-           VALUES ({ep}, 'generated', 'complete', '{fp}', 1800.5, 'download')"#,
-    ))
-    .await;
+    let alices = write(&dir, "alice.mp3", b"the episode audio");
+    add_download(&app, &alice, ep, &alices, "2026-01-01 10:00:00").await;
 
-    let skip_info = |user: &TestUser| {
-        app.get("/api/data/episode_skip_segments").key(user).query("episode_id", ep).query("user_id", user.id).send()
-    };
-    // No ads yet: nothing to say about copies.
-    assert_eq!(skip_info(&alice).await.assert_status(200).json()["ad_audio"], Value::Null);
-
-    exec(&app, &format!(
-        r#"INSERT INTO "EpisodeSkipSegments" (EpisodeID, Kind, StartTime, EndTime, Source) VALUES ({ep}, 'ad', 0, 60, 'auto-ad')"#,
-    ))
-    .await;
-    let alice_view = skip_info(&alice).await.assert_status(200).json();
-    assert_eq!(alice_view["ad_audio"]["download"], "match", "{alice_view:#?}");
-    assert_eq!(alice_view["ad_audio"]["analyzed"]["duration"], 1800.5);
-    assert_eq!(alice_view["ad_audio"]["analyzed"]["source"], "download");
-    assert_eq!(skip_info(&bob).await.json()["ad_audio"]["download"], "mismatch");
-    assert_eq!(skip_info(&carol).await.json()["ad_audio"]["download"], "none");
-
-    // Bob's fingerprint was worked out on the way and kept.
-    assert!(text(&app, &format!(r#"SELECT AudioFingerprint FROM "DownloadedEpisodes" WHERE UserID = {}"#, bob.id)).await.is_some());
-
-    // Carol's new download links the analyzed copy rather than bob's.
     let carol_path = dir.join("carol.mp3");
-    let (size, carol_fp) = audio_processing::reuse_download(app.db(), ep, carol.id, &carol_path).await.unwrap();
-    assert_eq!(size, std::fs::metadata(&analyzed).unwrap().len());
-    assert_eq!(carol_fp.as_deref(), Some(fp.as_str()));
-    assert_eq!(std::fs::read(&carol_path).unwrap(), std::fs::read(&analyzed).unwrap());
+    let size = audio_processing::reuse_download(app.db(), ep, carol.id, &carol_path).await.unwrap();
+    assert_eq!(size, std::fs::metadata(&alices).unwrap().len());
+    assert_eq!(std::fs::read(&carol_path).unwrap(), std::fs::read(&alices).unwrap());
 
-    // Clearing the ads drops them and the scanned flag so detection runs again.
-    exec(&app, &format!(r#"UPDATE "Episodes" SET AdsDetected = TRUE WHERE EpisodeID = {ep}"#)).await;
-    assert!(ad_detection::clear_ad_segments(app.db(), ep).await.unwrap());
-    assert_eq!(int(&app, &format!(r#"SELECT COUNT(*) FROM "EpisodeSkipSegments" WHERE EpisodeID = {ep}"#)).await, Some(0));
-    assert!(!ad_detection::has_ad_segments(app.db(), ep).await);
+    // Nothing to reuse for the user whose copy it is.
+    assert!(audio_processing::reuse_download(app.db(), ep, alice.id, &dir.join("again.mp3")).await.is_none());
     let _ = std::fs::remove_dir_all(dir);
 }

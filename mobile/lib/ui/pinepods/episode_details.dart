@@ -15,7 +15,6 @@ import 'package:pinepods_mobile/ui/widgets/podcast_html.dart';
 import 'package:pinepods_mobile/ui/widgets/episode_description.dart';
 import 'package:pinepods_mobile/ui/pinepods/podcast_details.dart';
 import 'package:pinepods_mobile/ui/pinepods/podcast_nav.dart';
-import 'package:pinepods_mobile/ui/pinepods/episode_ai_section.dart';
 import 'package:pinepods_mobile/ui/pinepods/people/people_widgets.dart';
 import 'package:pinepods_mobile/ui/utils/player_utils.dart';
 import 'package:pinepods_mobile/ui/utils/local_download_utils.dart';
@@ -52,7 +51,6 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
   List<CreditedPerson> _people = [];
   // True once people loaded from a server that supports adding them.
   bool _isDownloadedLocally = false;
-  int? _userId; // set once credentials are established in _loadEpisodeDetails
 
   // Play-button loading feedback: true while we've kicked off playback for this
   // episode but the audio system hasn't yet acknowledged it as now-playing.
@@ -261,7 +259,6 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
       _pinepodsService.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
       GlobalServices.setCredentials(settings.pinepodsServer!, settings.pinepodsApiKey!);
       final userId = settings.pinepodsUserId!;
-      _userId = userId;
 
       // People load on their own: they're a quick database read, while the
       // metadata can wait on the server.
@@ -420,20 +417,6 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
     } catch (e) {
       _showSnackBar(L.current.failed_to_jump_to_timestamp(e.toString()), Colors.red);
     }
-  }
-
-  // Re-supply the native player with this episode's skip segments after a
-  // review/detect change — but only if it is the one currently playing, so we
-  // never push a different episode's ad ranges onto the active player.
-  Future<void> _resupplySkipSegmentsIfPlaying() async {
-    final aps = _audioPlayerService ??
-        Provider.of<AudioPlayerService>(context, listen: false);
-    final current = aps.nowPlaying;
-    if (current == null || current.guid != _episode!.episodeUrl) return;
-    final podcastId = _episode!.podcastId;
-    if (podcastId == null || _userId == null) return;
-    await _audioService?.refreshSkipSegments(
-        _episode!.episodeId, _userId!, podcastId);
   }
 
   String _formatDuration(Duration duration) {
@@ -826,16 +809,6 @@ class _PinepodsEpisodeDetailsState extends State<PinepodsEpisodeDetails> {
                             EpisodeDescription(
                               content: _episode!.episodeDescription,
                               onTimestampTap: _handleTimestampTap,
-                            ),
-                          // AI features (#726 transcript / #790 ad-block). Self-hides unless
-                          // the server reports the AI sidecar as available.
-                          if (_userId != null)
-                            EpisodeAiSection(
-                              episode: _episode!,
-                              userId: _userId!,
-                              pinepodsService: _pinepodsService,
-                              onSeek: _handleTimestampTap,
-                              onSegmentsChanged: _resupplySkipSegmentsIfPlaying,
                             ),
                         ],
                       ),

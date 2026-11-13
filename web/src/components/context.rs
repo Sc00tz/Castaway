@@ -496,10 +496,8 @@ pub struct UIState {
     pub local_download_increment: Option<i32>,
     pub episode_chapters: Option<Vec<Chapter>>,
     pub current_chapter_index: Option<usize>,
-    // Auto-skip ranges (silence #727; later ads #790) for the currently-playing episode.
+    // Auto-skip ranges (trimmed silence, #727) for the currently-playing episode.
     pub skip_segments: Option<Vec<crate::requests::pod_req::SkipSegment>>,
-    // Which audio copy the ad ranges fit (dynamically inserted ads move between copies).
-    pub ad_audio: Option<crate::requests::pod_req::AdAudio>,
     pub podcast_people: Option<Vec<CreditedPerson>>,
     pub podcast_guests: Option<Vec<CreditedPerson>>,
     pub episode_people: Option<Vec<CreditedPerson>>,

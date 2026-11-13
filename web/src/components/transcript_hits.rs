@@ -81,8 +81,8 @@ pub fn play_from(episode: Episode, seconds: f64, e: MouseEvent) {
 }
 
 /// The episode page, opened at `seconds` in its transcript with `query` found.
-pub fn episode_link(episode_id: i32, seconds: Option<f64>, query: &str, source: &str) -> String {
-    let mut url = format!("/episode?episode_id={}&q={}&source={}", episode_id, urlencoding::encode(query), source);
+pub fn episode_link(episode_id: i32, seconds: Option<f64>, query: &str) -> String {
+    let mut url = format!("/episode?episode_id={}&q={}", episode_id, urlencoding::encode(query));
     if let Some(t) = seconds {
         url.push_str(&format!("&t={}", t.floor() as i64));
     }
@@ -257,7 +257,7 @@ fn render_hit(
 
     let open_episode = {
         let history = history.clone();
-        let link = episode_link(id, hit.moments.first().and_then(|m| m.start), query, &hit.source);
+        let link = episode_link(id, hit.moments.first().and_then(|m| m.start), query);
         Callback::from(move |_: MouseEvent| history.push(link.clone()))
     };
     let toggle = {
@@ -269,11 +269,6 @@ fn render_hit(
             }
             expanded.set(set);
         })
-    };
-    let source_label = if hit.source == "generated" {
-        i18n.t("search.transcripts_source_ai")
-    } else {
-        i18n.t("search.transcripts_source_feed")
     };
     let mentions = if hit.mentions == 1 {
         i18n.t("search.transcripts_one_mention")
@@ -294,7 +289,6 @@ fn render_hit(
                     <span>{ &ep.podcastname }</span>
                     if !date.is_empty() { <span>{ date }</span> }
                     <span>{ mentions }</span>
-                    <span class={classes!("ts-source", (hit.source == "generated").then_some("is-ai"))}>{ source_label }</span>
                 </div>
                 <ul class="ts-moments">
                     { for hit.moments.iter().take(shown).map(|m| {

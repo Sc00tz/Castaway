@@ -8,7 +8,6 @@ import android.net.Uri
 import java.io.File
 import android.os.Binder
 import android.os.Handler
-import android.os.SystemClock
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
@@ -60,29 +59,6 @@ class PinepodsMediaService : MediaLibraryService() {
     private val binder = LocalBinder()
     private val handler = Handler(Looper.getMainLooper())
     private var positionUpdateRunnable: Runnable? = null
-    // Ad-skip ranges (#790), in SECONDS. ExoPlayer's skipSilenceEnabled DSP can
-    // only remove silence, not ads (which are content), so ads are skipped by
-    // seeking past these ranges from the 1s position poll. Cleared per-episode.
-    private var adSkipSegments: List<Pair<Double, Double>> = emptyList()
-    // The range last skipped and when, and ranges given up on because the
-    // playhead landed back inside them (a stream that can't seek there).
-    private var lastAdSkipIndex = -1
-    private var lastAdSkipAt = 0L
-    private val abandonedAdSkips = mutableSetOf<Int>()
-
-    // A one-off check timed to the start of the next ad, so it is skipped as
-    // it begins rather than up to a poll interval later.
-    private val exactAdSkipRunnable = Runnable { applyAdSkipIfNeeded() }
-
-    // Logs the player state a few seconds after an ad-skip seek if playback
-    // hasn't resumed, to diagnose playback stalling at the end of a skipped ad.
-    private val adSkipStallCheck = Runnable {
-        val p = player ?: return@Runnable
-        if (!p.isPlaying) {
-            logPlayer("Ad-skip: not playing 5s after seek - ${describePlayer(p)}")
-        }
-    }
-
     inner class LocalBinder : Binder() {
         fun getService(): PinepodsMediaService = this@PinepodsMediaService
     }
@@ -489,8 +465,6 @@ class PinepodsMediaService : MediaLibraryService() {
         stopPositionUpdates()
         positionUpdateRunnable = object : Runnable {
             override fun run() {
-                applyAdSkipIfNeeded()
-                scheduleExactAdSkip()
                 sendPlaybackStateEvent()
                 handler.postDelayed(this, 1000)  // Update every 1s (battery: halves channel/UI work)
             }
@@ -499,7 +473,6 @@ class PinepodsMediaService : MediaLibraryService() {
     }
 
     private fun stopPositionUpdates() {
-        handler.removeCallbacks(exactAdSkipRunnable)
         positionUpdateRunnable?.let {
             handler.removeCallbacks(it)
             positionUpdateRunnable = null
@@ -549,10 +522,6 @@ class PinepodsMediaService : MediaLibraryService() {
                 Log.d(TAG, "Playing: ${builtMetadata.title} by ${builtMetadata.artist}")
                 Log.d(TAG, "Media item URI: $uri, startPosition: $startPosition")
 
-                // New episode: drop the previous episode's ad-skip ranges. The
-                // Dart layer re-supplies them via setAdSkipSegments after load.
-                resetAdSkips(emptyList())
-
                 // Start at the resume point directly: preparing first and seeking
                 // after would begin loading from 0 and then request again.
                 p.setMediaItem(mediaItem, startPosition.coerceAtLeast(0).toLong())
@@ -592,7 +561,6 @@ class PinepodsMediaService : MediaLibraryService() {
         Log.d(TAG, "stop")
         player?.stop()
         player?.clearMediaItems()
-        resetAdSkips(emptyList())
     }
 
     fun seek(positionMs: Int) {
@@ -658,16 +626,9 @@ class PinepodsMediaService : MediaLibraryService() {
     private fun createSeekOnlyPlayer(base: Player): Player {
         return object : ForwardingPlayer(base) {
             // Only controllers (system UI, Android Auto, bluetooth) stop through
-            // here; the app's own stop goes to the ExoPlayer directly. Some
-            // bluetooth/car devices send a STOP key in reaction to the brief
-            // buffer of an ad-skip seek, so ignore those, and otherwise pause
+            // here; the app's own stop goes to the ExoPlayer directly. Pause
             // rather than unload the episode.
             override fun stop() {
-                val sinceAdSkip = SystemClock.elapsedRealtime() - lastAdSkipAt
-                if (sinceAdSkip < 3000) {
-                    logPlayer("Ignoring controller stop ${sinceAdSkip}ms after ad skip - ${describePlayer(base)}")
-                    return
-                }
                 logPlayer("Stop requested by a media controller; pausing - ${describePlayer(base)}")
                 pause()
             }
@@ -706,75 +667,6 @@ class PinepodsMediaService : MediaLibraryService() {
     fun setTrimSilence(enabled: Boolean) {
         Log.d(TAG, "setTrimSilence: $enabled")
         player?.skipSilenceEnabled = enabled
-    }
-
-    // Ad-skip (#790): replace the active ad ranges (seconds). Empty list clears.
-    // The 1s position poll seeks past any range the playhead enters.
-    fun setAdSkipSegments(segments: List<Pair<Double, Double>>) {
-        Log.d(TAG, "setAdSkipSegments: ${segments.size} range(s)")
-        resetAdSkips(segments.sortedBy { it.first })
-    }
-
-    private fun resetAdSkips(segments: List<Pair<Double, Double>>) {
-        handler.removeCallbacks(exactAdSkipRunnable)
-        handler.removeCallbacks(adSkipStallCheck)
-        adSkipSegments = segments
-        lastAdSkipIndex = -1
-        abandonedAdSkips.clear()
-    }
-
-    // If an ad starts before the next poll, check again right as it starts.
-    private fun scheduleExactAdSkip() {
-        handler.removeCallbacks(exactAdSkipRunnable)
-        val p = player ?: return
-        if (adSkipSegments.isEmpty() || !p.isPlaying) return
-        val posMs = p.currentPosition
-        val speed = p.playbackParameters.speed.takeIf { it > 0f } ?: 1f
-        val nextStartMs = adSkipSegments
-            .filterIndexed { index, _ -> index !in abandonedAdSkips }
-            .map { (it.first * 1000).toLong() }
-            .firstOrNull { it > posMs } ?: return
-        val delayMs = ((nextStartMs - posMs) / speed).toLong()
-        if (delayMs < 1000) handler.postDelayed(exactAdSkipRunnable, delayMs + 20)
-    }
-
-    // Called every ~1s from the position poll. If the playhead is inside an
-    // active ad range, seek to its end. Times are seconds; ExoPlayer is ms.
-    // Uses a 0.25s tail tolerance (matching iOS) to avoid boundary seek-loops.
-    //
-    // Waits until the item is ready with a known length: an episode that opens
-    // on an ad would otherwise seek while still preparing, fighting the
-    // start-position seek.
-    private fun applyAdSkipIfNeeded() {
-        if (adSkipSegments.isEmpty()) return
-        val p = player ?: return
-        if (p.playbackState != Player.STATE_READY) return
-        val durationMs = p.duration
-        if (durationMs == C.TIME_UNSET || durationMs <= 0) return
-        val posMs = p.currentPosition
-        if (posMs < 0) return
-        for ((index, range) in adSkipSegments.withIndex()) {
-            if (index in abandonedAdSkips) continue
-            val startMs = (range.first * 1000).toLong()
-            val endMs = minOf((range.second * 1000).toLong(), durationMs)
-            if (posMs >= startMs && posMs < endMs - 250) {
-                // Back inside the range just skipped: the seek didn't take (or
-                // the user went back to hear it). Leave it alone rather than loop.
-                val now = SystemClock.elapsedRealtime()
-                if (index == lastAdSkipIndex && now - lastAdSkipAt < 5000) {
-                    logPlayer("Ad-skip: back inside range $index after skipping it; leaving it")
-                    abandonedAdSkips.add(index)
-                    return
-                }
-                lastAdSkipIndex = index
-                lastAdSkipAt = now
-                logPlayer("Ad-skip: range $index, seeking from ${posMs}ms to ${endMs}ms - ${describePlayer(p)}")
-                p.seekTo(endMs)
-                handler.removeCallbacks(adSkipStallCheck)
-                handler.postDelayed(adSkipStallCheck, 5000)
-                break
-            }
-        }
     }
 
     // Native player events go to the app log too, so exported logs show them.

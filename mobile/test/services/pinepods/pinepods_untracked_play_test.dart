@@ -41,7 +41,6 @@ void main() {
     when(() => audio.applyEpisodeSkipSegments(
           silenceEnabled: any(named: 'silenceEnabled'),
           silenceRanges: any(named: 'silenceRanges'),
-          adRanges: any(named: 'adRanges'),
         )).thenAnswer((_) async {});
   });
 

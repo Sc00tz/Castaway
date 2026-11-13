@@ -161,7 +161,6 @@ impl TestApp {
             )),
             notification_manager: Arc::new(pinepods_api::redis_manager::NotificationManager::new()),
             restore_in_progress: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            ai_available: pinepods_api::services::ai_client::AiAvailability::new(),
             merged_episodes: Default::default(),
         };
         let router = pinepods_api::create_app(state.clone());
@@ -268,17 +267,6 @@ impl TestApp {
             let _ = axum::serve(listener, router).await;
         });
         port
-    }
-
-    /// Run the server's AI health monitor and wait until it finds the sidecar.
-    pub async fn connect_ai(&self) {
-        pinepods_api::services::ai_client::spawn_health_monitor(self.state.ai_available.clone());
-        let flag = self.state.ai_available.clone();
-        super::flows::eventually("AI sidecar detected", || {
-            let flag = flag.clone();
-            async move { flag.is_available().then_some(()) }
-        })
-        .await;
     }
 
     /// Username/password login → API key (`/api/data/get_key`, HTTP Basic).

@@ -5,9 +5,8 @@ mod harness;
 mod support;
 
 mod accounts;
-mod ad_downloads;
+mod finished_downloads;
 mod admin_only;
-mod ai;
 mod auth_coverage;
 mod backups;
 mod cross_user;
@@ -48,6 +47,5 @@ mod sync_settings;
 mod timers;
 mod translations;
 mod transcript_search;
-mod transcript_export;
 mod user_episode_state;
 mod youtube;

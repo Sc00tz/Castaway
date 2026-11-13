@@ -1,5 +1,5 @@
-//! Searching inside transcripts: feed transcripts are fetched and stored, generated ones are
-//! found too, and each hit says when the words were said.
+//! Searching inside transcripts: feed transcripts are fetched and stored, and each hit says when
+//! the words were said.
 
 use crate::harness::sql;
 use crate::harness::*;
@@ -87,40 +87,6 @@ async fn only_your_own_podcasts_are_searched() {
     assert_eq!(res["searchable_episodes"], 0);
 
     app.get("/api/data/transcripts/search").query("q", "kubernetes").send().await.assert_status(401);
-}
-
-/// Store a generated transcript the way the transcription job leaves it.
-async fn insert_generated(app: &TestApp, episode_id: i32, text: &str, segments: &str) {
-    use pinepods_api::database::DatabasePool;
-    match app.db() {
-        DatabasePool::Postgres(pool) => sqlx::query(
-            r#"INSERT INTO "EpisodeTranscripts" (episodeid, source, model, transcripttext, segments, status) VALUES ($1, 'generated', 'base', $2, $3::jsonb, 'complete')"#,
-        )
-        .bind(episode_id).bind(text).bind(segments).execute(pool).await.map(|_| ()),
-    }
-    .unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn generated_transcripts_are_searched_and_preferred_over_the_feed_one() {
-    let app = TestApp::new().await;
-    let (user, two, _) = show_with_feed_transcripts(&app).await;
-    insert_generated(
-        &app,
-        two,
-        "intro words. kubernetes again here",
-        r#"[{"start": 0.0, "end": 3.0, "text": "intro words."}, {"start": 125.5, "end": 128.0, "text": "kubernetes again here"}]"#,
-    )
-    .await;
-
-    let res = search(&app, &user, "kubernetes").await;
-    assert_eq!(res["total"], 1, "one hit per episode: {res:#}");
-    assert_eq!(res["results"][0]["source"], "generated");
-    assert_eq!(res["results"][0]["moments"][0]["start"], 125.5);
-
-    // Words only in the feed transcript still find the episode, through that transcript.
-    let res = search(&app, &user, "welcome").await;
-    assert_eq!(res["results"][0]["source"], "feed", "{res:#}");
 }
 
 #[tokio::test(flavor = "multi_thread")]

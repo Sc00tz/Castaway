@@ -123,8 +123,6 @@ Library assertions are skipped against `mock`, which has no Castaway database be
 - **Backups** run the real `pg_dump`/`psql`. They read `DB_*` from the
   environment and share a folder, so those tests take turns through `BackupEnv`. Without the tools
   installed, the script runs the ones inside the test containers.
-- **AI** uses a stand-in sidecar with the real protocol (`harness/mock_ai.rs`). Tests choose the
-  outcome through the audio or model name it's given.
 - **Email** goes to a small SMTP server on a real socket (`harness/mock_smtp.rs`).
 - **WebSockets** need a real socket: `app.listen()` serves the router on one.
 - **Silence detection** needs `ffmpeg`.
@@ -140,6 +138,6 @@ scripts/integration-tests.sh --db postgres -- -- --ignored mobile_contract
 
 ## Not covered yet
 
-External services are stood in for rather than called: real ntfy/Gotify servers, real OIDC providers,
-real whisper and LLM models. On-device playback (CarPlay, Android Auto, Bluetooth, background audio)
+External services are stood in for rather than called: real ntfy/Gotify servers, real OIDC providers.
+On-device playback (CarPlay, Android Auto, Bluetooth, background audio)
 needs hardware.

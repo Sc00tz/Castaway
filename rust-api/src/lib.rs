@@ -61,9 +61,6 @@ pub struct AppState {
     /// and to block first-admin creation (which would otherwise race the restore and
     /// corrupt it). Shared across clones via Arc.
     pub restore_in_progress: Arc<std::sync::atomic::AtomicBool>,
-    /// Whether the optional pinepods-ai sidecar is reachable. Kept fresh by a
-    /// background health monitor; handlers gate AI features on this.
-    pub ai_available: crate::services::ai_client::AiAvailability,
     /// Whether episode ids of merged copies exist, for following them in requests.
     pub merged_episodes: crate::services::episode_aliases::MergedEpisodes,
 }
@@ -400,28 +397,12 @@ fn create_data_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::settings::enable_auto_queue))
         .routes(routes!(handlers::settings::enable_auto_play_next))
         .routes(routes!(handlers::settings::adjust_skip_times))
-        .routes(routes!(handlers::settings::ai_status))
-        .routes(routes!(handlers::settings::transcribe_episode))
-        .routes(routes!(handlers::settings::bulk_transcribe_episodes))
-        .routes(routes!(handlers::settings::get_episode_transcript))
-        .routes(routes!(handlers::settings::export_episode_transcript))
-        .routes(routes!(handlers::settings::adjust_auto_transcribe))
-        .routes(routes!(handlers::settings::get_auto_transcribe))
         .routes(routes!(handlers::settings::adjust_silence_trim))
         .routes(routes!(handlers::settings::get_silence_trim))
         .routes(routes!(handlers::settings::get_episode_skip_segments))
         .routes(routes!(handlers::settings::detect_silence))
-        .routes(routes!(handlers::settings::detect_ads))
-        .routes(routes!(handlers::settings::adjust_ad_segment_review))
-        .routes(routes!(handlers::settings::adjust_auto_ad_detect))
-        .routes(routes!(handlers::settings::get_auto_ad_detect))
-        .routes(routes!(handlers::settings::adjust_ad_skip_auto_activate))
-        .routes(routes!(handlers::settings::get_ad_skip_auto_activate))
-        .routes(routes!(handlers::settings::get_ai_settings, handlers::settings::update_ai_settings))
         .routes(routes!(handlers::settings::get_ytdlp_settings, handlers::settings::update_ytdlp_settings))
         .routes(routes!(handlers::settings::trigger_ytdlp_update))
-        .routes(routes!(handlers::settings::get_ai_models))
-        .routes(routes!(handlers::settings::ai_pull_model))
         .routes(routes!(handlers::settings::remove_category))
         .routes(routes!(handlers::settings::add_category))
         .routes(routes!(handlers::settings::set_podcast_playback_speed))

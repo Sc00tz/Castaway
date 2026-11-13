@@ -111,16 +111,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
   bool _isAutoRefreshEnabled = true;
   bool _isRefreshingNow = false;
 
-  // AI features (#726/#790) per-podcast settings. Only surfaced when the server
-  // reports the AI sidecar as available.
-  bool _aiAvailable = false;
-  bool _autoTranscribe = false;
-  bool _autoAdDetect = false;
-  bool _adSkipAutoActivate = true; // server default is true
-  // Server-side downloads for this podcast (separate from on-device
-  // auto-download): ad times only fit the copy they were found on, so the
-  // server copy is what makes ad skipping reliable.
-  bool _serverAutoDownload = false;
 
   // Tracks episode being loaded for ghost mini player
   PinepodsEpisode? _pendingEpisode;
@@ -142,7 +132,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
     _loadAutoDownloadPreference();
     _loadAutoPlayNextPreference();
     _loadAutoRefreshPreference();
-    _loadAiPreferences();
     _checkFollowStatus();
     _checkFavoriteStatus();
     _searchController.addListener(_onSearchChanged);
@@ -398,165 +387,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
     }
   }
 
-  // Load AI availability + the three per-podcast AI toggles (#726/#790).
-  Future<void> _loadAiPreferences() async {
-    final podcastId = _podcast.id;
-    if (podcastId <= 0) return;
-    try {
-      final settings =
-          Provider.of<SettingsBloc>(context, listen: false).currentSettings;
-      if (settings.pinepodsServer == null ||
-          settings.pinepodsApiKey == null ||
-          settings.pinepodsUserId == null) {
-        return;
-      }
-      _pinepodsService.setCredentials(
-          settings.pinepodsServer!, settings.pinepodsApiKey!);
-      final userId = settings.pinepodsUserId!;
-
-      final status = await _pinepodsService.getAiStatus();
-      if (!status.available) {
-        if (mounted) setState(() => _aiAvailable = false);
-        return;
-      }
-
-      final results = await Future.wait([
-        _pinepodsService.getAutoTranscribe(userId, podcastId),
-        _pinepodsService.getAutoAdDetect(userId, podcastId),
-        _pinepodsService.getAdSkipAutoActivate(userId, podcastId),
-        _pinepodsService.getServerAutoDownload(userId, podcastId),
-      ]);
-      if (mounted) {
-        setState(() {
-          _aiAvailable = true;
-          _autoTranscribe = results[0];
-          _autoAdDetect = results[1];
-          _adSkipAutoActivate = results[2];
-          _serverAutoDownload = results[3];
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading AI preferences: $e');
-    }
-  }
-
-  // Persist one AI toggle; returns whether it succeeded. Updates widget state
-  // so the bottom sheet and header reflect the new value after it closes.
-  Future<bool> _setAiToggle(String which, bool value) async {
-    final podcastId = _podcast.id;
-    if (podcastId <= 0) return false;
-    try {
-      final settings =
-          Provider.of<SettingsBloc>(context, listen: false).currentSettings;
-      if (settings.pinepodsUserId == null) return false;
-      final userId = settings.pinepodsUserId!;
-      _pinepodsService.setCredentials(
-          settings.pinepodsServer!, settings.pinepodsApiKey!);
-
-      bool ok;
-      switch (which) {
-        case 'transcribe':
-          ok = await _pinepodsService.adjustAutoTranscribe(userId, podcastId, value);
-          if (ok) {
-            _autoTranscribe = value;
-            // Auto-detect requires auto-transcribe; keep state consistent.
-            if (!value) _autoAdDetect = false;
-          }
-          break;
-        case 'ad_detect':
-          ok = await _pinepodsService.adjustAutoAdDetect(userId, podcastId, value);
-          if (ok) _autoAdDetect = value;
-          break;
-        case 'ad_skip_auto':
-          ok = await _pinepodsService.adjustAdSkipAutoActivate(userId, podcastId, value);
-          if (ok) _adSkipAutoActivate = value;
-          break;
-        case 'server_download':
-          ok = await _pinepodsService.setServerAutoDownload(userId, podcastId, value);
-          if (ok) _serverAutoDownload = value;
-          break;
-        default:
-          ok = false;
-      }
-      if (ok && mounted) setState(() {});
-      return ok;
-    } catch (e) {
-      debugPrint('Error setting AI toggle $which: $e');
-      return false;
-    }
-  }
-
-  void _showAiSettingsSheet() {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            Future<void> toggle(String which, bool value) async {
-              final ok = await _setAiToggle(which, value);
-              if (ok) setSheetState(() {});
-            }
-
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Text(
-                      L.of(context)!.ai_features_title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge!
-                          .copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: Text(L.of(context)!.auto_transcribe),
-                    subtitle: Text(
-                        L.of(context)!.auto_transcribe_description),
-                    value: _autoTranscribe,
-                    onChanged: (v) => toggle('transcribe', v),
-                  ),
-                  SwitchListTile(
-                    title: Text(L.of(context)!.auto_detect_ads),
-                    subtitle: Text(_autoTranscribe
-                        ? L.of(context)!.auto_detect_ads_description
-                        : L.of(context)!.enable_auto_transcribe_first),
-                    value: _autoAdDetect,
-                    onChanged:
-                        _autoTranscribe ? (v) => toggle('ad_detect', v) : null,
-                  ),
-                  if (_autoTranscribe && _autoAdDetect)
-                    SwitchListTile(
-                      title: Text(L.of(context)!.auto_skip_detected_ads),
-                      subtitle: Text(_adSkipAutoActivate
-                          ? L.of(context)!.auto_skip_ads_on
-                          : L.of(context)!.auto_skip_ads_off),
-                      value: _adSkipAutoActivate,
-                      onChanged: (v) => toggle('ad_skip_auto', v),
-                    ),
-                  if (_autoAdDetect)
-                    _AdDownloadNotice(
-                      serverAutoDownload: _serverAutoDownload,
-                      onEnable: () => toggle('server_download', true),
-                      onServerDownloads: () {
-                        Navigator.pop(sheetContext);
-                        _showServerDownloadsSheet();
-                      },
-                    ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   /// The server's download settings for this podcast: auto-download to the
   /// server, delete when finished, and delete after a number of days.
   Future<void> _showServerDownloadsSheet() async {
@@ -577,7 +407,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
     ]);
     if (!mounted) return;
     var autoDownload = results[0] as bool;
-    _serverAutoDownload = autoDownload;
     final deleteDefault = (results[1] as ({bool enabled, bool customized})).enabled;
     final finished = results[2] as ({bool enabled, bool customized});
     // 'default' | 'on' | 'off'
@@ -623,9 +452,7 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
                       if (await _pinepodsService.setServerAutoDownload(
                           userId, podcastId, v)) {
                         autoDownload = v;
-                        _serverAutoDownload = v;
                         setSheetState(() {});
-                        if (mounted) setState(() {});
                       }
                     },
                   ),
@@ -1982,11 +1809,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
                       showAddToCollectionSheet(context,
                           episodes: [for (final id in _selectedIds) (id, _isYoutube)]);
                     }),
-                    if (_aiAvailable && !_isYoutube)
-                      action(PhosphorIconsRegular.textAa, L.of(context)!.transcribe, () {
-                        // Kept selected so the same episodes can go into a collection too.
-                        _runBulk(_pinepodsService.bulkTranscribeEpisodes, keepSelection: true);
-                      }),
                     action(PhosphorIconsRegular.queue, L.of(context)!.queue,
                         () => _bulkAction('queue_episodes', apply: (e) => _updateEpisodeProperty(e, queued: true))),
                     action(PhosphorIconsRegular.bookmarkSimple, L.of(context)!.save,
@@ -2287,9 +2109,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
           case 'autoplay':
             _toggleAutoPlayNext();
             break;
-          case 'ai':
-            _showAiSettingsSheet();
-            break;
           case 'server_downloads':
             _showServerDownloadsSheet();
             break;
@@ -2364,15 +2183,6 @@ class _PinepodsPodcastDetailsState extends State<PinepodsPodcastDetails> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(PhosphorIconsRegular.article),
                 title: Text(L.of(context)!.refresh_details_from_feed),
-              ),
-            ),
-          if (_aiAvailable)
-            PopupMenuItem<String>(
-              value: 'ai',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(PhosphorIconsRegular.sparkle),
-                title: Text(L.of(context)!.ai_features),
               ),
             ),
           const PopupMenuDivider(),
@@ -2761,78 +2571,6 @@ class _PendingMiniPlayerState extends State<_PendingMiniPlayer>
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Shown under L.of(context)!.auto_detect_ads: whether ads will be found on the copy that
-/// gets played. Many podcasts insert different ads each time an episode is
-/// fetched, so only a server download keeps detection and playback on one copy.
-class _AdDownloadNotice extends StatelessWidget {
-  final bool serverAutoDownload;
-  final VoidCallback onEnable;
-  final VoidCallback onServerDownloads;
-
-  const _AdDownloadNotice({
-    required this.serverAutoDownload,
-    required this.onEnable,
-    required this.onServerDownloads,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = serverAutoDownload ? Colors.green : Colors.orange;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border(left: BorderSide(color: color, width: 3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                  serverAutoDownload
-                      ? PhosphorIconsRegular.checkCircle
-                      : PhosphorIconsRegular.warning,
-                  size: 18,
-                  color: color),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  serverAutoDownload
-                      ? L.of(context)!.ad_skip_server_copy_ok
-                      : L.of(context)!.ad_skip_server_copy_off,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (!serverAutoDownload)
-                OutlinedButton.icon(
-                  onPressed: onEnable,
-                  icon: const Icon(PhosphorIconsRegular.cloudArrowDown, size: 18),
-                  label: Text(L.of(context)!.turn_on_server_auto_download),
-                ),
-              TextButton(
-                onPressed: onServerDownloads,
-                child: Text(L.of(context)!.server_download_settings),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

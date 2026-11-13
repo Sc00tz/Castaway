@@ -21,10 +21,6 @@ use crate::requests::pod_req::{
     call_remove_downloaded_episode, call_remove_queued_episode, call_remove_saved_episode,
     call_save_episode, DownloadEpisodeRequest, EpisodeRequest, FetchPodcasting2DataRequest,
     MarkEpisodeCompletedRequest, QueuePodcastRequest, SavePodcastRequest, Transcript,
-    call_get_ai_status, call_get_episode_transcript, call_transcribe_episode, StoredTranscript,
-    call_export_episode_transcript,
-    call_get_episode_skip_segments, SkipSegment, AdAudio, call_get_ai_status_full, call_detect_ads, call_adjust_ad_segment_review,
-    AdSegmentReviewRequest,
 };
 use crate::requests::search_pods::{call_get_podcast_details_dynamic, call_parse_podcast_url};
 use i18nrs::yew::use_translation;
@@ -203,9 +199,6 @@ pub struct TranscriptInlineProps {
     pub transcripts: Vec<Transcript>,
     pub server_name: String,
     pub api_key: String,
-    /// Detected ad time ranges (seconds) to highlight within the transcript (#790).
-    #[prop_or_default]
-    pub ad_ranges: Vec<(f64, f64)>,
     /// The episode, to follow along while it plays.
     #[prop_or_default]
     pub episode_id: i32,
@@ -407,7 +400,6 @@ pub fn transcript_inline(props: &TranscriptInlineProps) -> Html {
             }
         })
     };
-    let ad_ranges = props.ad_ranges.clone();
     let cues = use_memo(transcript_content.clone(), |content| {
         content.as_ref().map(|c| parse_transcript_cues(c)).unwrap_or_default()
     });
@@ -560,20 +552,18 @@ pub fn transcript_inline(props: &TranscriptInlineProps) -> Html {
             } else if let Some(content) = &*transcript_content {
                 {{
                     if !cues.is_empty() {
-                        // Timecoded, clickable transcript with ad ranges highlighted (#790).
+                        // Timecoded, clickable transcript.
                         html! {
                             <>
                             { jump_banner }
                             { find_bar }
                             <div class="ep-transcript-cues">
                                 { for cues.iter().enumerate().map(|(i, cue)| {
-                                    let is_ad = ad_ranges.iter().any(|(s, e)| cue.start < *e && cue.end > *s);
                                     let start = cue.start;
                                     let seek = seek.clone();
                                     let onclick = Callback::from(move |e: MouseEvent| seek.emit((start, e)));
                                     let cls = classes!(
                                         "ep-transcript-cue",
-                                        is_ad.then_some("is-ad"),
                                         (current_cue == Some(i)).then_some("is-current"),
                                         (focus_cue == Some(i)).then_some("is-focus"),
                                         (found_cue == Some(i)).then_some("is-found"),
@@ -862,203 +852,53 @@ enum EpisodeTab {
     People,
 }
 
-/// Build the internal `Transcript` entry that renders a stored AI transcript through the same
-/// pipeline as feed transcripts (the backend resolves this URL to SRT).
-fn ai_transcript_entry(episode_id: i32) -> Transcript {
-    Transcript {
-        url: format!("pinepods-internal://transcript/{}", episode_id),
-        mime_type: "application/srt".to_string(),
-        language: Some("AI".to_string()),
-        rel: Some("ai".to_string()),
-    }
-}
-
-/// Fire a transcription request for `episode_id`, showing a notification and flipping the local
-/// state to "running" optimistically. Shared by the desktop tab and the mobile actions.
-fn spawn_transcribe(
-    server_name: String,
-    api_key: Option<String>,
-    user_id: i32,
-    episode_id: i32,
-    submitting: UseStateHandle<bool>,
-    transcript: UseStateHandle<Option<StoredTranscript>>,
-    started_msg: String,
-    error_msg: String,
-) {
-    submitting.set(true);
-    wasm_bindgen_futures::spawn_local(async move {
-        match call_transcribe_episode(&server_name, &api_key, episode_id, user_id, false).await {
-            Ok(_) => {
-                Dispatch::<NotificationState>::global()
-                    .reduce_mut(|s| s.info_message = Some(started_msg));
-                transcript.set(Some(StoredTranscript {
-                    source: "generated".to_string(),
-                    language: None,
-                    model: None,
-                    status: "running".to_string(),
-                    full_text: None,
-                    segments: None,
-                }));
-            }
-            Err(e) => {
-                Dispatch::<NotificationState>::global()
-                    .reduce_mut(|s| s.error_message = Some(format!("{}: {}", error_msg, e)));
-            }
-        }
-        submitting.set(false);
-    });
-}
-
 #[derive(Properties, PartialEq)]
 pub struct TranscriptTabProps {
     pub episode_id: i32,
-    /// Feed (built-in) transcripts for the episode, if any.
+    /// Feed (built-in) transcripts for the episode.
     pub feed_transcripts: Vec<Transcript>,
     pub server_name: String,
     pub api_key: String,
-    pub ai_available: bool,
-    #[prop_or_default]
-    pub downloaded: bool,
     /// Play the episode from a time (seconds).
     #[prop_or_default]
     pub on_seek: Option<Callback<(f64, MouseEvent)>>,
-    /// From a search hit: the time to open at, the words to find, and which transcript matched.
+    /// From a search hit: the time to open at and the words to find.
     #[prop_or_default]
     pub focus_time: Option<f64>,
     #[prop_or_default]
     pub initial_query: Option<String>,
-    #[prop_or_default]
-    pub prefer_source: Option<String>,
-    #[prop_or_default]
-    pub episode_title: String,
 }
 
-/// Unified transcript view for the episode's Transcript tab (#726): shows the built-in transcript
-/// if present, an AI transcript if one exists, a source selector when both are available, and a
-/// button to generate (or regenerate) an AI transcript when the sidecar is connected.
+/// The episode's Transcript tab: the feed's transcript, with a selector when the feed offers
+/// more than one (e.g. several languages).
 #[function_component(TranscriptTab)]
 pub fn transcript_tab(props: &TranscriptTabProps) -> Html {
     let (i18n, _) = use_translation();
-    let (app, _) = use_store::<AppState>();
-    let user_id = app.user_details.as_ref().map(|ud| ud.UserID);
+    let selected = use_state(|| 0usize);
 
-    let ai_transcript = use_state(|| Option::<StoredTranscript>::None);
-    // None until the listener picks a source.
-    let selected = use_state(|| Option::<usize>::None);
-    let submitting = use_state(|| false);
-    let episode_id = props.episode_id;
-
-    // Load any stored AI transcript for this episode.
-    {
-        let ai_transcript = ai_transcript.clone();
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        use_effect_with((episode_id, user_id), move |(episode_id, user_id)| {
-            let episode_id = *episode_id;
-            if let Some(user_id) = *user_id {
-                wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(t) = call_get_episode_transcript(&server_name, &Some(api_key), user_id, episode_id).await {
-                        ai_transcript.set(t);
-                    }
-                });
-            }
-            || ()
-        });
-    }
-
-    // Load detected ad segments for inline review + transcript highlighting (#790), and which
-    // audio copy they were found on.
-    let ad_segments = use_state(Vec::<SkipSegment>::new);
-    let ad_audio = use_state(|| Option::<AdAudio>::None);
-    let ad_refresh = use_state(|| 0u32);
-    {
-        let ad_segments = ad_segments.clone();
-        let ad_audio = ad_audio.clone();
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        let refresh = *ad_refresh;
-        use_effect_with((episode_id, user_id, refresh), move |(episode_id, user_id, _)| {
-            let episode_id = *episode_id;
-            if let Some(user_id) = *user_id {
-                wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(info) = call_get_episode_skip_segments(&server_name, &Some(api_key), user_id, episode_id).await {
-                        ad_segments.set(info.segments.into_iter().filter(|s| s.kind == "ad").collect());
-                        ad_audio.set(info.ad_audio);
-                    }
-                });
-            }
-            || ()
-        });
-    }
-
-    // Whether the admin allows server downloads (offered as the accurate way to detect ads).
-    let downloads_enabled = use_state(|| false);
-    {
-        let downloads_enabled = downloads_enabled.clone();
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        use_effect_with(props.ai_available, move |ai_available| {
-            if *ai_available {
-                wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(st) = call_get_ai_status_full(&server_name, &Some(api_key)).await {
-                        downloads_enabled.set(st.downloads_enabled);
-                    }
-                });
-            }
-            || ()
-        });
-    }
-    let (episode_status, _) = use_store::<EpisodeStatusState>();
-    // The store is only filled from the downloads page, so also trust the episode's own flag.
-    let on_server = props.downloaded || episode_status.downloaded_episodes.is_server_download(episode_id);
-    let ad_ranges: Vec<(f64, f64)> = ad_segments.iter().map(|s| (s.start_time, s.end_time)).collect();
-
-    let status = ai_transcript.as_ref().map(|t| t.status.clone());
-    let ai_complete = status.as_deref() == Some("complete");
-    let is_running = matches!(status.as_deref(), Some("running") | Some("pending"));
-
-    // Assemble selectable sources: built-in feed transcript(s) + the AI one (if complete).
-    let mut sources: Vec<(String, Transcript)> = Vec::new();
-    for t in &props.feed_transcripts {
-        let label = t
-            .language
-            .clone()
-            .filter(|l| !l.is_empty())
-            .unwrap_or_else(|| i18n.t("episode.transcript_builtin").to_string());
-        sources.push((label, t.clone()));
-    }
-    if ai_complete {
-        sources.push((i18n.t("episode.transcript_ai").to_string(), ai_transcript_entry(episode_id)));
-    }
-
-    let on_transcribe = {
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        let submitting = submitting.clone();
-        let ai_transcript = ai_transcript.clone();
-        let started = i18n.t("episode.transcription_started").to_string();
-        let err = i18n.t("episode.transcription_start_error").to_string();
-        Callback::from(move |_: MouseEvent| {
-            if let Some(user_id) = user_id {
-                spawn_transcribe(
-                    server_name.clone(), Some(api_key.clone()), user_id, episode_id,
-                    submitting.clone(), ai_transcript.clone(), started.clone(), err.clone(),
-                );
-            }
+    let sources: Vec<(String, Transcript)> = props
+        .feed_transcripts
+        .iter()
+        .map(|t| {
+            let label = t
+                .language
+                .clone()
+                .filter(|l| !l.is_empty())
+                .unwrap_or_else(|| i18n.t("episode.transcript_builtin").to_string());
+            (label, t.clone())
         })
-    };
+        .collect();
+    if sources.is_empty() {
+        return html! {};
+    }
+    let sel_idx = (*selected).min(sources.len() - 1);
 
-    // A search hit in the AI transcript opens that one.
-    let preferred = if props.prefer_source.as_deref() == Some("generated") && ai_complete { sources.len().saturating_sub(1) } else { 0 };
-    let sel_idx = (*selected).unwrap_or(preferred).min(sources.len().saturating_sub(1));
-
-    // Source selector — only when there's a real choice.
     let selector = if sources.len() > 1 {
         html! {
             <div class="ep-transcript-sources">
                 { for sources.iter().enumerate().map(|(i, (label, _))| {
                     let selected = selected.clone();
-                    let onclick = Callback::from(move |_: MouseEvent| selected.set(Some(i)));
+                    let onclick = Callback::from(move |_: MouseEvent| selected.set(i));
                     let cls = if i == sel_idx { "ep-transcript-source-btn active" } else { "ep-transcript-source-btn" };
                     html! { <button class={cls} {onclick}>{ label.clone() }</button> }
                 }) }
@@ -1068,420 +908,19 @@ pub fn transcript_tab(props: &TranscriptTabProps) -> Html {
         html! {}
     };
 
-    let content = if let Some((_, t)) = sources.get(sel_idx) {
-        html! {
+    html! {
+        <div class="ep-pane">
+            { selector }
             <TranscriptInline
-                transcripts={vec![t.clone()]}
+                transcripts={vec![sources[sel_idx].1.clone()]}
                 server_name={props.server_name.clone()}
                 api_key={props.api_key.clone()}
-                ad_ranges={ad_ranges.clone()}
-                episode_id={episode_id}
+                episode_id={props.episode_id}
                 on_seek={props.on_seek.clone()}
                 focus_time={props.focus_time}
                 initial_query={props.initial_query.clone()}
             />
-        }
-    } else {
-        html! {}
-    };
-
-    // Generate / regenerate action (only when the AI sidecar is connected).
-    let action = if !props.ai_available {
-        html! {}
-    } else if is_running {
-        html! { <p class="ep-ai-transcript-status ep-transcript-gen">{ i18n.t("episode.transcribing") }</p> }
-    } else {
-        let (icon, label) = if *submitting {
-            ("ph-circle-notch", i18n.t("episode.transcribe_starting"))
-        } else if ai_complete {
-            ("ph-arrow-clockwise", i18n.t("episode.regenerate_ai_transcript"))
-        } else {
-            ("ph-text-aa", i18n.t("episode.generate_ai_transcript"))
-        };
-        html! {
-            <button class="ep-ai-transcript-btn ep-transcript-gen" onclick={on_transcribe} disabled={*submitting}>
-                <i class={format!("ph {}", icon)}></i>{ label }
-            </button>
-        }
-    };
-
-    // Nothing to show at all (no transcript and can't generate) — render empty.
-    if sources.is_empty() && !props.ai_available {
-        return html! {};
-    }
-
-    // Ad detection (#790): manual trigger + per-user confirm/deny of detected ads. Ads that are
-    // inserted dynamically differ between copies of an episode, so detecting on a fresh stream
-    // can give times that don't fit what the user later plays; the server copy is the reliable one.
-    let detect_choice = use_state(|| false);
-    let start_detect = {
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        let detect_choice = detect_choice.clone();
-        let started = i18n.t("episode.ad_detection_started").to_string();
-        let download_started = i18n.t("episode.ad_detection_download_started").to_string();
-        let err = i18n.t("episode.ad_detection_error").to_string();
-        Callback::from(move |download_first: bool| {
-            detect_choice.set(false);
-            if let Some(user_id) = user_id {
-                let (server_name, api_key) = (server_name.clone(), api_key.clone());
-                let msg = if download_first { download_started.clone() } else { started.clone() };
-                let err = err.clone();
-                wasm_bindgen_futures::spawn_local(async move {
-                    match call_detect_ads(&server_name, &Some(api_key), episode_id, user_id, true, download_first).await {
-                        Ok(_) => Dispatch::<NotificationState>::global().reduce_mut(|s| s.info_message = Some(msg)),
-                        Err(e) => Dispatch::<NotificationState>::global().reduce_mut(|s| s.error_message = Some(format!("{}: {}", err, e))),
-                    }
-                });
-            }
-        })
-    };
-    let offer_download = !on_server && *downloads_enabled;
-    let on_detect_ads = {
-        let start_detect = start_detect.clone();
-        let detect_choice = detect_choice.clone();
-        Callback::from(move |_: MouseEvent| {
-            if offer_download {
-                detect_choice.set(true);
-            } else {
-                start_detect.emit(false);
-            }
-        })
-    };
-
-    let review_cb = {
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        let ad_refresh = ad_refresh.clone();
-        Callback::from(move |(segment_id, status): (i32, String)| {
-            if let Some(user_id) = user_id {
-                let (server_name, api_key) = (server_name.clone(), api_key.clone());
-                let ad_refresh = ad_refresh.clone();
-                wasm_bindgen_futures::spawn_local(async move {
-                    let req = AdSegmentReviewRequest { segment_id, user_id, status };
-                    let _ = call_adjust_ad_segment_review(&server_name, &Some(api_key), &req).await;
-                    ad_refresh.set(*ad_refresh + 1);
-                });
-            }
-        })
-    };
-
-    let detect_action = if props.ai_available {
-        html! {
-            <button class="ep-ai-transcript-btn ep-transcript-gen" onclick={on_detect_ads}>
-                <i class="ph ph-magnifying-glass"></i>{ i18n.t("episode.detect_ads") }
-            </button>
-        }
-    } else {
-        html! {}
-    };
-
-    let detect_choice_panel = if *detect_choice {
-        let download = { let s = start_detect.clone(); Callback::from(move |_: MouseEvent| s.emit(true)) };
-        let stream = { let s = start_detect.clone(); Callback::from(move |_: MouseEvent| s.emit(false)) };
-        let cancel = { let c = detect_choice.clone(); Callback::from(move |_: MouseEvent| c.set(false)) };
-        html! {
-            <div class="ep-ad-notice">
-                <i class="ph ph-warning"></i>
-                <div class="ep-ad-notice-body">
-                    <span>{ i18n.t("episode.ad_detect_not_downloaded") }</span>
-                    <div class="ep-ad-notice-actions">
-                        <button class="ep-ai-transcript-btn" onclick={download}>
-                            <i class="ph ph-cloud-arrow-down"></i>{ i18n.t("episode.ad_detect_download_first") }
-                        </button>
-                        <button class="ep-ai-transcript-btn" onclick={stream}>{ i18n.t("episode.ad_detect_stream_anyway") }</button>
-                        <button class="ep-ai-transcript-btn" onclick={cancel}>{ i18n.t("episode.cancel") }</button>
-                    </div>
-                </div>
-            </div>
-        }
-    } else {
-        html! {}
-    };
-
-    // How the ad times relate to what this user plays.
-    let ad_accuracy = match (ad_segments.is_empty(), ad_audio.as_ref().map(|a| a.download.as_str())) {
-        (false, Some("match")) => html! {
-            <div class="ep-ad-notice is-ok">
-                <i class="ph ph-check-circle"></i>
-                <div class="ep-ad-notice-body"><span>{ i18n.t("episode.ad_accuracy_match") }</span></div>
-            </div>
-        },
-        (false, Some("mismatch")) => html! {
-            <div class="ep-ad-notice">
-                <i class="ph ph-warning"></i>
-                <div class="ep-ad-notice-body"><span>{ i18n.t("episode.ad_accuracy_mismatch") }</span></div>
-            </div>
-        },
-        (false, Some("none")) => {
-            let download = { let s = start_detect.clone(); Callback::from(move |_: MouseEvent| s.emit(true)) };
-            html! {
-                <div class="ep-ad-notice">
-                    <i class="ph ph-warning"></i>
-                    <div class="ep-ad-notice-body">
-                        <span>{ i18n.t("episode.ad_accuracy_streaming") }</span>
-                        if *downloads_enabled {
-                            <div class="ep-ad-notice-actions">
-                                <button class="ep-ai-transcript-btn" onclick={download}>
-                                    <i class="ph ph-cloud-arrow-down"></i>{ i18n.t("episode.ad_detect_download_first") }
-                                </button>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-        }
-        _ => html! {},
-    };
-
-    let ad_review = if !ad_segments.is_empty() {
-        html! {
-            <div class="ep-ad-review">
-                <h4 class="ep-ad-review-title">{ i18n.t("episode.detected_ads") }</h4>
-                { for ad_segments.iter().map(|seg| {
-                    let seg_id = seg.segment_id;
-                    let status = seg.status.clone().unwrap_or_default();
-                    let range = format!("{} – {}", format_time(seg.start_time as i32), format_time(seg.end_time as i32));
-                    let skipping = matches!(status.as_str(), "active" | "confirmed");
-                    let confirm = { let r = review_cb.clone(); Callback::from(move |_: MouseEvent| r.emit((seg_id, "confirmed".to_string()))) };
-                    let deny = { let r = review_cb.clone(); Callback::from(move |_: MouseEvent| r.emit((seg_id, "rejected".to_string()))) };
-                    html! {
-                        <div class="ep-ad-review-row">
-                            <span class="ep-ad-review-range">{ range }</span>
-                            <span class={ if skipping { "ep-ad-status skipping" } else { "ep-ad-status kept" } }>
-                                { if skipping { i18n.t("episode.ad_skipping") } else { i18n.t("episode.ad_kept") } }
-                            </span>
-                            <button class="ep-ad-btn confirm" onclick={confirm} title={i18n.t("episode.ad_skip_this").to_string()}>
-                                <i class="ph ph-check"></i>
-                            </button>
-                            <button class="ep-ad-btn deny" onclick={deny} title={i18n.t("episode.ad_keep_this").to_string()}>
-                                <i class="ph ph-x"></i>
-                            </button>
-                        </div>
-                    }
-                }) }
-            </div>
-        }
-    } else {
-        html! {}
-    };
-
-    let download = if ai_complete {
-        html! {
-            <TranscriptDownload
-                episode_id={episode_id}
-                episode_title={props.episode_title.clone()}
-                server_name={props.server_name.clone()}
-                api_key={props.api_key.clone()}
-            />
-        }
-    } else {
-        html! {}
-    };
-
-    html! {
-        <div class="ep-pane">
-            { selector }
-            { content }
-            { download }
-            { action }
-            { detect_action }
-            { detect_choice_panel }
-            { ad_accuracy }
-            { ad_review }
         </div>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct TranscriptDownloadProps {
-    pub episode_id: i32,
-    pub episode_title: String,
-    pub server_name: String,
-    pub api_key: String,
-}
-
-/// Save the generated transcript as an SRT, WebVTT or text file.
-#[function_component(TranscriptDownload)]
-pub fn transcript_download(props: &TranscriptDownloadProps) -> Html {
-    let (i18n, _) = use_translation();
-    let (app, _) = use_store::<AppState>();
-    let user_id = app.user_details.as_ref().map(|ud| ud.UserID);
-    let failed = i18n.t("episode.transcript_download_failed").to_string();
-
-    let download = |format: &'static str| {
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        let episode_id = props.episode_id;
-        let title = props.episode_title.clone();
-        let failed = failed.clone();
-        Callback::from(move |_: MouseEvent| {
-            let Some(user_id) = user_id else { return };
-            let (server_name, api_key, title, failed) = (server_name.clone(), api_key.clone(), title.clone(), failed.clone());
-            spawn_local(async move {
-                match call_export_episode_transcript(&server_name, &api_key, user_id, episode_id, format).await {
-                    Ok(content) => save_text_file(&transcript_file_name(&title, episode_id, format), &content),
-                    Err(e) => Dispatch::<NotificationState>::global()
-                        .reduce_mut(|s| s.error_message = Some(format!("{}: {}", failed, e))),
-                }
-            });
-        })
-    };
-
-    html! {
-        <div class="ep-transcript-download">
-            <span class="ep-transcript-download-label">
-                <i class="ph ph-download-simple"></i>{ i18n.t("episode.download_transcript") }
-            </span>
-            <button class="ep-ai-transcript-btn" onclick={download("srt")} title="SubRip subtitles">{ "SRT" }</button>
-            <button class="ep-ai-transcript-btn" onclick={download("vtt")} title="WebVTT subtitles">{ "VTT" }</button>
-            <button class="ep-ai-transcript-btn" onclick={download("txt")} title="Plain text">{ "TXT" }</button>
-        </div>
-    }
-}
-
-/// "<episode title> - transcript.<ext>", with characters file systems reject replaced.
-fn transcript_file_name(title: &str, episode_id: i32, ext: &str) -> String {
-    let clean: String = title
-        .chars()
-        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '_' } else { c })
-        .collect();
-    let clean = clean.trim();
-    if clean.is_empty() {
-        format!("episode-{} - transcript.{}", episode_id, ext)
-    } else {
-        format!("{} - transcript.{}", clean, ext)
-    }
-}
-
-/// Hand `content` to the browser as a download named `file_name`.
-fn save_text_file(file_name: &str, content: &str) {
-    let parts = js_sys::Array::new();
-    parts.push(&JsValue::from_str(content));
-    let options = web_sys::BlobPropertyBag::new();
-    options.set_type("text/plain;charset=utf-8");
-    let Ok(blob) = web_sys::Blob::new_with_str_sequence_and_options(&parts, &options) else { return };
-    let Ok(url) = web_sys::Url::create_object_url_with_blob(&blob) else { return };
-    if let Some(document) = web_sys::window().and_then(|w| w.document()) {
-        if let Ok(a) = document.create_element("a") {
-            let a: web_sys::HtmlAnchorElement = a.unchecked_into();
-            a.set_href(&url);
-            a.set_download(file_name);
-            a.click();
-        }
-    }
-    // Firefox cancels the download if the URL goes away in the same tick.
-    gloo_timers::callback::Timeout::new(1_000, move || {
-        let _ = web_sys::Url::revoke_object_url(&url);
-    })
-    .forget();
-}
-
-#[derive(Properties, PartialEq)]
-pub struct MobileTranscriptActionsProps {
-    pub episode_id: i32,
-    pub server_name: String,
-    pub api_key: String,
-    pub ai_available: bool,
-    /// Opens the transcript modal with the given source(s).
-    pub on_view: Callback<Vec<Transcript>>,
-    #[prop_or_default]
-    pub episode_title: String,
-}
-
-/// AI transcript actions for the mobile transcript section: view the AI transcript in the same
-/// modal used for feed transcripts, and generate/regenerate one.
-#[function_component(MobileTranscriptActions)]
-pub fn mobile_transcript_actions(props: &MobileTranscriptActionsProps) -> Html {
-    let (i18n, _) = use_translation();
-    let (app, _) = use_store::<AppState>();
-    let user_id = app.user_details.as_ref().map(|ud| ud.UserID);
-
-    let ai_transcript = use_state(|| Option::<StoredTranscript>::None);
-    let submitting = use_state(|| false);
-    let episode_id = props.episode_id;
-
-    {
-        let ai_transcript = ai_transcript.clone();
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        use_effect_with((episode_id, user_id), move |(episode_id, user_id)| {
-            let episode_id = *episode_id;
-            if let Some(user_id) = *user_id {
-                wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(t) = call_get_episode_transcript(&server_name, &Some(api_key), user_id, episode_id).await {
-                        ai_transcript.set(t);
-                    }
-                });
-            }
-            || ()
-        });
-    }
-
-    let status = ai_transcript.as_ref().map(|t| t.status.clone());
-    let ai_complete = status.as_deref() == Some("complete");
-    let is_running = matches!(status.as_deref(), Some("running") | Some("pending"));
-
-    if !props.ai_available && !ai_complete {
-        return html! {};
-    }
-
-    let on_transcribe = {
-        let server_name = props.server_name.clone();
-        let api_key = props.api_key.clone();
-        let submitting = submitting.clone();
-        let ai_transcript = ai_transcript.clone();
-        let started = i18n.t("episode.transcription_started").to_string();
-        let err = i18n.t("episode.transcription_start_error").to_string();
-        Callback::from(move |_: MouseEvent| {
-            if let Some(user_id) = user_id {
-                spawn_transcribe(
-                    server_name.clone(), Some(api_key.clone()), user_id, episode_id,
-                    submitting.clone(), ai_transcript.clone(), started.clone(), err.clone(),
-                );
-            }
-        })
-    };
-
-    let view_ai = {
-        let on_view = props.on_view.clone();
-        Callback::from(move |_: MouseEvent| on_view.emit(vec![ai_transcript_entry(episode_id)]))
-    };
-
-    html! {
-        <>
-            { if ai_complete {
-                html! {
-                    <>
-                        <button class="ep-mobile-transcript-btn" onclick={view_ai}>
-                            <i class="ph ph-scroll"></i>{ i18n.t("episode.view_ai_transcript") }
-                        </button>
-                        <TranscriptDownload
-                            episode_id={episode_id}
-                            episode_title={props.episode_title.clone()}
-                            server_name={props.server_name.clone()}
-                            api_key={props.api_key.clone()}
-                        />
-                    </>
-                }
-            } else { html! {} } }
-            { if is_running {
-                html! { <p class="ep-ai-transcript-status">{ i18n.t("episode.transcribing") }</p> }
-            } else if props.ai_available {
-                let (icon, label) = if *submitting {
-                    ("ph-circle-notch", i18n.t("episode.transcribe_starting"))
-                } else if ai_complete {
-                    ("ph-arrow-clockwise", i18n.t("episode.regenerate_ai_transcript"))
-                } else {
-                    ("ph-text-aa", i18n.t("episode.generate_ai_transcript"))
-                };
-                html! {
-                    <button class="ep-mobile-transcript-btn" onclick={on_transcribe} disabled={*submitting}>
-                        <i class={format!("ph {}", icon)}></i>{ label }
-                    </button>
-                }
-            } else { html! {} } }
-        </>
     }
 }
 
@@ -1499,11 +938,11 @@ pub fn epsiode() -> Html {
     let ep_query_key = use_location()
         .map(|loc| loc.query_str().to_string())
         .unwrap_or_default();
-    // A search hit's link: `t` (seconds), `q` (the search) and `source` (which transcript).
-    let transcript_link: (Option<f64>, Option<String>, Option<String>) = {
+    // A search hit's link: `t` (seconds) and `q` (the search).
+    let transcript_link: (Option<f64>, Option<String>) = {
         let params = UrlSearchParams::new_with_str(&ep_query_key).ok();
         let get = |k: &str| params.as_ref().and_then(|p| p.get(k)).filter(|v| !v.is_empty());
-        (get("t").and_then(|t| t.parse().ok()), get("q"), get("source"))
+        (get("t").and_then(|t| t.parse().ok()), get("q"))
     };
 
     // let error = use_state(|| None);
@@ -1564,24 +1003,6 @@ pub fn epsiode() -> Html {
     let episode_people_loaded = audio_state.episode_page_people.is_some();
     let episode_people_rc = Rc::new(audio_state.episode_page_people.clone().unwrap_or_default());
     let ep_2_loading = use_state(|| true);
-
-    // Whether the optional AI sidecar is connected — gates the Transcript tab + generate action.
-    let ai_available = use_state(|| false);
-    {
-        let ai_available = ai_available.clone();
-        let server_name = server_name.clone();
-        let api_key = api_key.clone();
-        use_effect_with((), move |_| {
-            if let (Some(server_name), Some(api_key)) = (server_name, api_key) {
-                wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(up) = call_get_ai_status(&server_name, &api_key).await {
-                        ai_available.set(up);
-                    }
-                });
-            }
-            || ()
-        });
-    }
 
     let page_state = use_state(|| PageState::Loading);
 
@@ -2796,11 +2217,11 @@ pub fn epsiode() -> Html {
                                         }
                                     } else { html! {} }}
 
-                                    // ── Transcript (built-in + AI, #726) ──
+                                    // ── Transcript (from the feed) ──
                                     { {
                                         let feed = audio_state.episode_page_transcript.clone().unwrap_or_default();
                                         let has_feed = !feed.is_empty();
-                                        if has_feed || *ai_available {
+                                        if has_feed {
                                             // Opens the shared transcript modal with the chosen source(s).
                                             let on_view = Callback::from(move |sources: Vec<Transcript>| {
                                                 Dispatch::<EpisodeDetailState>::global().reduce_mut(move |s| {
@@ -2816,22 +2237,10 @@ pub fn epsiode() -> Html {
                                             html! {
                                                 <>
                                                 <div class="ep-mobile-transcript">
-                                                    { if has_feed {
-                                                        html! {
-                                                            <button onclick={on_view_feed} class="ep-mobile-transcript-btn font-bold">
-                                                                <i class="ph ph-scroll"></i>
-                                                                { &i18n_view_transcript }
-                                                            </button>
-                                                        }
-                                                    } else { html! {} } }
-                                                    <MobileTranscriptActions
-                                                        episode_id={episode.episodeid}
-                                                        server_name={server_name.clone().unwrap_or_default()}
-                                                        api_key={api_key.clone().unwrap_or_default().unwrap_or_default()}
-                                                        ai_available={*ai_available}
-                                                        on_view={on_view.clone()}
-                                                        episode_title={episode.episodetitle.clone()}
-                                                    />
+                                                    <button onclick={on_view_feed} class="ep-mobile-transcript-btn font-bold">
+                                                        <i class="ph ph-scroll"></i>
+                                                        { &i18n_view_transcript }
+                                                    </button>
                                                 </div>
                                                 if let Some(show_modal) = episode_detail_state.show_transcript_modal {
                                                     if show_modal {
@@ -2976,9 +2385,7 @@ pub fn epsiode() -> Html {
                                         let chapter_count = audio_state.episode_page_chapters.as_ref().map_or(0, |c| c.len());
                                         let has_chapters = chapter_count > 0;
                                         let has_feed_transcript = audio_state.episode_page_transcript.as_ref().map_or(false, |t| !t.is_empty());
-                                        // The Transcript tab is available if there's a built-in transcript OR the AI
-                                        // sidecar is connected (so the user can generate one).
-                                        let has_transcript = has_feed_transcript || *ai_available;
+                                        let has_transcript = has_feed_transcript;
                                         // Always offered for library episodes, so people can be added when none are listed.
                                         let has_people = *ep_in_db && !episode.is_youtube && episode_people_loaded;
                                         let people_count = episode_people_rc.len();
@@ -3124,16 +2531,12 @@ pub fn epsiode() -> Html {
                                                         feed_transcripts={audio_state.episode_page_transcript.clone().unwrap_or_default()}
                                                         server_name={server_name.clone().unwrap_or_default()}
                                                         api_key={api_key.clone().unwrap_or_default().unwrap_or_default()}
-                                                        ai_available={*ai_available}
-                                                        downloaded={*download_status}
                                                         on_seek={{
                                                             let episode = episode.clone();
                                                             Some(Callback::from(move |(t, e): (f64, MouseEvent)| play_from(episode.clone(), t, e)))
                                                         }}
                                                         focus_time={transcript_link.0}
                                                         initial_query={transcript_link.1.clone()}
-                                                        prefer_source={transcript_link.2.clone()}
-                                                        episode_title={episode.episodetitle.clone()}
                                                     />
                                                 },
                                                 EpisodeTab::People => html! {

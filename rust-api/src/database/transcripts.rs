@@ -41,9 +41,8 @@ pub struct TranscriptMatch {
     pub segments: Option<String>,
 }
 
-/// Matching rows ranked per episode: an episode with both a generated and a feed transcript
-/// uses the generated one, whose timings follow the audio the server plays.
-const PICK_ONE: &str = "ROW_NUMBER() OVER (PARTITION BY t.episodeid ORDER BY CASE WHEN t.source = 'generated' THEN 0 ELSE 1 END, t.transcriptid DESC)";
+/// Matching rows ranked per episode: the newest transcript wins.
+const PICK_ONE: &str = "ROW_NUMBER() OVER (PARTITION BY t.episodeid ORDER BY t.transcriptid DESC)";
 
 fn pub_date(d: Option<chrono::NaiveDateTime>) -> String {
     d.map(|d| d.format("%Y-%m-%dT%H:%M:%S").to_string()).unwrap_or_default()

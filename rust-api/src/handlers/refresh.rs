@@ -307,7 +307,7 @@ async fn queue_auto_new_episodes(
 
 /// Refresh one feed that may be shared by several subscriber podcasts (cross-user dedup). The feed
 /// is fetched (conditional GET + body hash) and parsed ONCE, then applied to every subscriber's
-/// podcast row; new episodes are auto-downloaded/queued/transcribed and added to matching
+/// podcast row; new episodes are auto-downloaded/queued and added to matching
 /// category collections (sync rematch runs inside `apply_parsed_episodes`). Cache validators and
 /// success/failure state are recorded for the whole group. The caller holds the feed's lock.
 /// Returns every newly inserted episode across the group; Err only when the feed itself failed.
@@ -390,11 +390,6 @@ async fn refresh_feed_group(
                             warn!("Category auto-add for podcast {} failed: {}", item.podcast_id, e);
                         }
                         all_new.extend(mine);
-                    }
-                    // Auto-transcribe new episodes for opted-in podcasts (ones that also
-                    // auto-download wait for the download).
-                    for id in ids {
-                        crate::services::transcription::maybe_transcribe_new_episode(state.db_pool.clone(), id);
                     }
                     true
                 }
@@ -1219,7 +1214,7 @@ async fn refresh_rss_feed(
     }
 
     // Same path as the scheduled refresh: conditional GET + body hash, the podcast's
-    // FeedCutoffDays, auto-download/queue/transcribe, failure and Retry-After tracking.
+    // FeedCutoffDays, auto-download/queue, failure and Retry-After tracking.
     let item = rss_refresh_item(podcast, user_id);
     let Some(_lock) = manual_lock(FeedLock::key(&item.feed_url, item.username.as_deref(), item.password.as_deref()), manual).await else {
         debug!("Skipping manual refresh of podcast {}: it's being refreshed right now", podcast.id);

@@ -532,15 +532,6 @@
   "podcast_details_refreshed": "Podcast details refreshed from the feed",
   "auto_play_next_enabled": "Auto-play next enabled",
   "auto_play_next_disabled": "Auto-play next disabled",
-  "ai_features_title": "AI Features",
-  "auto_transcribe": "Auto-transcribe",
-  "auto_transcribe_description": "Transcribe new episodes automatically as they arrive.",
-  "auto_detect_ads": "Auto-detect ads",
-  "auto_detect_ads_description": "Scan transcripts for ad segments to skip.",
-  "enable_auto_transcribe_first": "Enable auto-transcribe first.",
-  "auto_skip_detected_ads": "Auto-skip detected ads",
-  "auto_skip_ads_on": "Skip detected ads automatically.",
-  "auto_skip_ads_off": "Require confirmation before skipping.",
   "server_downloads": "Server downloads",
   "auto_download_to_server": "Auto-download to server",
   "auto_download_to_server_description": "Download new episodes to the server as they arrive.",
@@ -611,7 +602,6 @@
   "check_for_new_episodes": "Check for new episodes",
   "refresh_automatically": "Refresh automatically",
   "refresh_details_from_feed": "Refresh details from feed",
-  "ai_features": "AI features",
   "check_connection_try_again": "Check your connection and try again.",
   "retry": "Retry",
   "no_videos_yet": "No videos yet",
@@ -631,8 +621,6 @@
   "sort_title_az": "Title A–Z",
   "sort_title_za": "Title Z–A",
   "less": "Less",
-  "turn_on_server_auto_download": "Turn on server auto-download",
-  "server_download_settings": "Server download settings",
   "couldnt_change_auto_refresh": "Couldn't change automatic refresh: {error}",
   "@couldnt_change_auto_refresh": {
     "placeholders": {
@@ -774,8 +762,6 @@
       }
     }
   },
-  "ad_skip_server_copy_ok": "Episodes download to the server, so ads are found on the copy you'll play and skips line up exactly.",
-  "ad_skip_server_copy_off": "Server auto-download is off. Many podcasts insert different ads every time an episode is fetched, so ads found on one copy can land at the wrong times in the copy you stream. Castaway holds off skipping when the stream doesn't match, so some ads won't be skipped. Turn on server auto-download for exact skips; \"Delete when finished\" keeps it from filling the disk.",
   "filter_all": "All",
   "filter_in_progress": "In progress",
   "days_count": "{count, plural, =1{1 day} other{{count} days}}",
@@ -1244,41 +1230,6 @@
   "leave_blank_no_limit": "Leave blank for no limit",
   "group_by_podcast": "Group by Podcast",
   "group_by_podcast_description": "Group episodes by their podcast",
-  "not_downloaded_ads_explainer": "Many podcasts insert different ads each time an episode is fetched, so ads found on a one-off copy can land at the wrong times when you play it. For exact skips, download it to the server first; ads are then detected on the copy you'll play.",
-  "ads_match_server_download": "Ads were found on your server download, so skips line up exactly.",
-  "ads_mismatch_server_download": "Your server download is a different copy from the one these ads were found on, so their times may be off. Detect ads again to match your download.",
-  "ads_streaming_explainer": "You're streaming this episode. If the podcast inserts ads dynamically, they can sit at different times than detected; Castaway only skips them when the stream's length matches the analyzed copy. Download it to the server for exact skips.",
-  "could_not_export_transcript": "Could not export the transcript: {error}",
-  "@could_not_export_transcript": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "not_downloaded_to_server": "Not downloaded to the server",
-  "detect_anyway": "Detect anyway",
-  "download_first": "Download first",
-  "ai_unavailable": "AI is unavailable right now.",
-  "downloading_to_server_for_ads": "Downloading to the server — ads will be detected on that copy.",
-  "ad_detection_queued": "Ad detection queued — this can take a few minutes.",
-  "transcription_queued": "Transcription queued — this can take a few minutes.",
-  "ad_confirmed": "Ad confirmed",
-  "ad_kept": "Ad kept",
-  "could_not_update_ad": "Could not update ad",
-  "detect_ads": "Detect ads",
-  "export_transcript": "Export transcript",
-  "export_srt": "Subtitles (.srt)",
-  "export_vtt": "WebVTT (.vtt)",
-  "export_txt": "Plain text (.txt)",
-  "re_transcribe": "Re-transcribe",
-  "transcribe": "Transcribe",
-  "detected_ads": "Detected ads",
-  "transcribing": "Transcribing…",
-  "ad_skipping": "Skipping",
-  "ad_kept_label": "Kept",
-  "confirm_ad_skip": "Confirm ad (skip)",
-  "keep_ad_no_skip": "Keep (do not skip)",
   "authentication_failed": "Authentication failed: {error}",
   "@authentication_failed": {
     "placeholders": {

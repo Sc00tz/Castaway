@@ -678,10 +678,9 @@ class NativeAudioPlayerService extends AudioPlayerService {
   Future<void> applyEpisodeSkipSegments({
     required bool silenceEnabled,
     required List<Map<String, double>> silenceRanges,
-    required List<Map<String, double>> adRanges,
   }) async {
     log.info('applyEpisodeSkipSegments: silenceEnabled=$silenceEnabled, '
-        'silence=${silenceRanges.length}, ads=${adRanges.length}');
+        'silence=${silenceRanges.length}');
     // Session-only: unlike trimSilence(), this does NOT persist to the global
     // settingsService, so a per-podcast value never overwrites the user default.
     if (Platform.isAndroid) {
@@ -693,21 +692,10 @@ class NativeAudioPlayerService extends AudioPlayerService {
       } catch (e) {
         log.severe('Error applying episode trim silence (Android): $e');
       }
-      // Ads (#790) can't ride the DSP (they're content, not silence): send the
-      // ranges to the native position-poll seeker. Empty list clears them.
-      try {
-        await platform.invokeMethod('setAdSkipSegments', {
-          'segments':
-              adRanges.map((s) => {'start': s['start'], 'end': s['end']}).toList(),
-        });
-      } catch (e) {
-        log.severe('Error applying episode ad-skip segments (Android): $e');
-      }
     } else if (Platform.isIOS) {
-      // iOS (AVPlayer has no DSP skip-silence): the native seek observer is
-      // kind-agnostic, so send the union of silence + active-ad ranges and let
-      // it seek past any of them. Enabled whenever there's anything to skip.
-      final combined = [...silenceRanges, ...adRanges]
+      // iOS (AVPlayer has no DSP skip-silence): the native seek observer seeks
+      // past these ranges. Enabled whenever there's anything to skip.
+      final combined = silenceRanges
           .map((s) => {'start': s['start'], 'end': s['end']})
           .toList();
       try {

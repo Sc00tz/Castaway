@@ -2672,21 +2672,6 @@ pub async fn fetch_transcript(
         return Err(AppError::unauthorized("Your API key is either invalid or does not have correct permission"));
     }
 
-    // Internal AI transcript (#726): resolve from the DB and return as SRT so it renders through
-    // the same transcript UI as feed transcripts. URL form: pinepods-internal://transcript/<id>
-    if let Some(rest) = request.url.strip_prefix("pinepods-internal://transcript/") {
-        if let Ok(episode_id) = rest.parse::<i32>() {
-            let user_id = _state.db_pool.get_user_id_from_api_key(&api_key).await?;
-            require_episode_owner(&_state, user_id, episode_id, false).await?;
-            return match crate::services::transcription::get_episode_transcript_srt(&_state.db_pool, episode_id).await {
-                Ok(Some(srt)) => Ok(Json(serde_json::json!({ "success": true, "content": srt }))),
-                Ok(None) => Ok(Json(serde_json::json!({ "success": false, "error": "No transcript available" }))),
-                Err(e) => Ok(Json(serde_json::json!({ "success": false, "error": e }))),
-            };
-        }
-        return Ok(Json(serde_json::json!({ "success": false, "error": "Invalid internal transcript URL" })));
-    }
-
     // The URL is caller-supplied and the body is returned, so keep it off internal hosts.
     if let Err(reason) = crate::services::url_guard::ensure_safe_public_url_async(&request.url).await {
         warn!("Refusing to fetch transcript from unsafe URL {}: {}", request.url, reason);

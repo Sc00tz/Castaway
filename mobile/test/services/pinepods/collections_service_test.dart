@@ -99,25 +99,6 @@ void main() {
     expect(page.episodes.single.podcastId, 4);
   });
 
-  test('bulk transcribe returns the server summary and surfaces its errors', () async {
-    var status = 200;
-    final service = serviceWith((req) async {
-      expect(req.url.path, '/api/data/bulk_transcribe_episodes');
-      expect(jsonDecode(req.body), {'episode_ids': [1, 2], 'user_id': 7, 'force': false});
-      return status == 200
-          ? http.Response('{"detail":"Queued 2 episodes for transcription."}', 200)
-          : http.Response('{"message":"Service unavailable: AI service is not available."}', status);
-    });
-
-    expect(await service.bulkTranscribeEpisodes([1, 2], 7), 'Queued 2 episodes for transcription.');
-
-    status = 503;
-    expect(
-      () => service.bulkTranscribeEpisodes([1, 2], 7),
-      throwsA(predicate((e) => '$e'.contains('AI service is not available'))),
-    );
-  });
-
   test('bulk episode actions hit bulk_<action> with the feed type', () async {
     final service = serviceWith((req) async {
       expect(req.url.path, '/api/data/bulk_queue_episodes');
