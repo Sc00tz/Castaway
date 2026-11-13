@@ -99,7 +99,6 @@ RUN mkdir -p /pinepods
 RUN mkdir -p /var/log/pinepods/ && mkdir -p /etc/horust/services/
 COPY startup/ /pinepods/startup/
 # Legacy cron scripts removed - background tasks now handled by internal Rust scheduler
-COPY clients/ /pinepods/clients/
 RUN chmod +x /pinepods/startup/startup.sh
 ENV APP_ROOT=/pinepods
 # Database, downloads and backups all live here; mount it as a volume.
