@@ -85,7 +85,7 @@ FROM alpine
 # Metadata
 # Install runtime dependencies
 # su-exec: drop privileges to PUID:PGID at startup. shadow: usermod/groupmod to remap the runtime user's IDs.
-RUN apk add --no-cache tzdata nginx openssl bash mariadb-client postgresql-client curl ffmpeg wget jq mariadb-connector-c-dev su-exec shadow
+RUN apk add --no-cache tzdata nginx openssl bash mariadb-client postgresql18 postgresql18-client curl ffmpeg wget jq mariadb-connector-c-dev su-exec shadow
 
 # Create a fixed runtime user/group (default 911); startup.sh remaps these to PUID/PGID at runtime
 RUN addgroup -g 911 pinepods && \
@@ -134,6 +134,8 @@ COPY clients/ /pinepods/clients/
 COPY database_functions/ /pinepods/database_functions/
 RUN chmod +x /pinepods/startup/startup.sh
 ENV APP_ROOT=/pinepods
+# Database, downloads and backups all live here; mount it as a volume.
+ENV PINEPODS_DATA_DIR=/data
 # Define the build argument
 ARG PINEPODS_VERSION
 # Write the Castaway version to the current_version file

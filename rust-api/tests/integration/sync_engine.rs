@@ -273,7 +273,7 @@ async fn first_sync_merges_and_is_idempotent(kind: TargetKind) {
     assert!(!t.needs_full_sync && t.last_success_at.is_some() && t.last_error.is_none(), "{t:?}");
     assert!(t.subs_pull_cursor > 0 && t.actions_pull_cursor > 0);
     if kind == TargetKind::Gpodder {
-        assert_eq!(t.device_name.as_deref(), Some("pinepods"));
+        assert_eq!(t.device_name.as_deref(), Some("castaway"));
     }
 
     // Again, as a forced full sync: nothing new on either side.
@@ -521,7 +521,7 @@ async fn outbound_plays_are_antennapod_safe() {
     for (i, a) in pushed.iter().enumerate() {
         assert_eq!(check_episode_action(i, a), Vec::<String>::new());
         assert!(!a["timestamp"].as_str().unwrap().contains('+') && !a["timestamp"].as_str().unwrap().ends_with('Z'), "{a}");
-        assert_eq!(a["device"], "pinepods", "{a}");
+        assert_eq!(a["device"], "castaway", "{a}");
     }
     let p1 = play_of(&pushed, &ep_url(1));
     assert_eq!((p1.last().unwrap()["position"].as_i64(), p1.last().unwrap()["total"].as_i64()), (Some(120), Some(120)));
@@ -539,7 +539,7 @@ async fn pinepods_never_syncs_as_another_clients_device() {
 
     let before = s.mock.requests().len();
     s.run(RunMode::Incremental).await.unwrap();
-    assert_eq!(s.target().await.device_name.as_deref(), Some("pinepods"));
+    assert_eq!(s.target().await.device_name.as_deref(), Some("castaway"));
     let paths: Vec<String> = s.mock.requests().into_iter().skip(before).map(|r| r.path).collect();
     assert!(paths.iter().any(|p| p == "/api/2/subscriptions/remote/pinepods.json"), "{paths:?}");
     assert!(!paths.iter().any(|p| p.contains("/phone")), "{paths:?}");

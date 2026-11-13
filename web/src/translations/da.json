@@ -20,7 +20,7 @@
     "api_id": "API ID",
     "api_key_deleted_successfully": "API-nøgle blev slettet",
     "api_key_save_instructions": "Kopier API-nøglen nedenunder og gem den et sikkert sted. Du kan kun se den én gang, men kan altid lave en ny, hvis du mister den.",
-    "api_keys_description": "Du kan anmode om en Castaway API-nøgle her. Disse nøgler kan i forbindelse med andre Castaway apps (fx Firewood) til at forbinde dem til Pinepodsserveren. Derudover kan du bruge en API-nøgle til at forbinde til denne server fra en anden Castaway server, lignende at bruge en anden server som klient for denne.",
+    "api_keys_description": "Du kan anmode om en Castaway API-nøgle her. Disse nøgler kan i forbindelse med andre Castaway apps (fx Firewood) til at forbinde dem til Castaway-serveren. Derudover kan du bruge en API-nøgle til at forbinde til denne server fra en anden Castaway server, lignende at bruge en anden server som klient for denne.",
     "api_keys_title": "API-nøgler:",
     "cancel": "Annuller",
     "close_modal": "Luk modal",

@@ -62,7 +62,7 @@ pub struct LoggedAction {
 }
 
 fn device_name_candidates(user_id: i32) -> [String; 3] {
-    [PINEPODS_DEVICE_NAME.to_string(), "pinepods-server".to_string(), format!("pinepods-{user_id}")]
+    [PINEPODS_DEVICE_NAME.to_string(), "castaway-server".to_string(), format!("castaway-{user_id}")]
 }
 
 fn legacy_device_name(user_id: i32) -> String {

@@ -225,7 +225,7 @@ def main(argv) -> int:
         conn.rollback()
         raise
     print(f"Imported {sum(counts.values())} rows from {len(counts)} tables.")
-    print("Restart Pinepods, then sign in with your existing account.")
+    print("Restart Castaway, then sign in with your existing account.")
     return 0
 
 

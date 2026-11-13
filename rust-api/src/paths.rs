@@ -2,7 +2,7 @@
 //! and `PINEPODS_WEB_ROOT` move them, which lets tests run without touching those locations.
 
 fn data_dir() -> String {
-    std::env::var("PINEPODS_DATA_DIR").unwrap_or_else(|_| "/opt/pinepods".to_string())
+    std::env::var("PINEPODS_DATA_DIR").unwrap_or_else(|_| "/data".to_string())
 }
 
 fn web_root() -> String {

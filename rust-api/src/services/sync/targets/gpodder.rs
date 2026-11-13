@@ -13,7 +13,7 @@ use crate::services::sync::model::OutboundAction;
 pub const PUSH_BATCH: usize = 200;
 const DEVICE_CAPTION: &str = "Castaway";
 const DEVICE_TYPE: &str = "server";
-const DEFAULT_DEVICE: &str = "pinepods";
+const DEFAULT_DEVICE: &str = "castaway";
 
 pub struct GpodderTarget {
     http: Http,
@@ -82,7 +82,7 @@ pub fn device_to_use(current: Option<&str>, remote: &[RemoteDevice]) -> String {
 }
 
 /// The device Castaway should use: `current` unless another client owns it (a device of a type
-/// other than "server" with that id), then the first free `pinepods`, `pinepods-2`, ...
+/// other than "server" with that id), then the first free `castaway`, `castaway-2`, ...
 fn choose_device(current: Option<&str>, remote: &[(String, String)]) -> String {
     let taken = |name: &str| remote.iter().any(|(id, kind)| id == name && kind != DEVICE_TYPE);
     if let Some(name) = current.filter(|n| !taken(n)) {
@@ -180,10 +180,10 @@ mod tests {
 
     #[test]
     fn never_takes_another_clients_device() {
-        let remote = devices(&[("phone", "mobile"), ("pinepods", "server")]);
-        assert_eq!(choose_device(Some("phone"), &remote), "pinepods");
-        assert_eq!(choose_device(Some("pinepods"), &remote), "pinepods");
-        assert_eq!(choose_device(Some("pinepods-home"), &remote), "pinepods-home");
-        assert_eq!(choose_device(None, &devices(&[("pinepods", "mobile"), ("pinepods-2", "desktop")])), "pinepods-3");
+        let remote = devices(&[("phone", "mobile"), ("castaway", "server")]);
+        assert_eq!(choose_device(Some("phone"), &remote), "castaway");
+        assert_eq!(choose_device(Some("castaway"), &remote), "castaway");
+        assert_eq!(choose_device(Some("castaway-home"), &remote), "castaway-home");
+        assert_eq!(choose_device(None, &devices(&[("castaway", "mobile"), ("castaway-2", "desktop")])), "castaway-3");
     }
 }

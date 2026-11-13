@@ -1037,7 +1037,7 @@ pub fn oidc_settings() -> Html {
     let redirect_url = if let Some(auth_details) = &state.auth_details {
         format!("{}/api/auth/callback", auth_details.server_name)
     } else {
-        "https://your-pinepods-instance/api/auth/callback".to_string()
+        "https://your-castaway-server/api/auth/callback".to_string()
     };
 
     let onclick_copy = {
@@ -1143,7 +1143,7 @@ pub fn oidc_settings() -> Html {
                                         style="flex:1;"
                                         value={(*discovery_url).clone()}
                                         oninput={on_discovery_url_change}
-                                        placeholder="https://auth.example.com/application/o/pinepods/"
+                                        placeholder="https://auth.example.com/application/o/castaway/"
                                     />
                                     <button
                                         type="button"

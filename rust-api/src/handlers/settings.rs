@@ -1798,7 +1798,7 @@ async fn backup_server_streaming(
         return Response::builder()
             .status(200)
             .header("content-type", "text/plain; charset=utf-8")
-            .header("content-disposition", "attachment; filename=\"pinepods_backup.sql\"")
+            .header("content-disposition", "attachment; filename=\"castaway_backup.sql\"")
             .body(Body::from_stream(ReaderStream::new(file.map_err(|e| AppError::internal(format!("Backup failed: {}", e)))?)))
             .map_err(|e| AppError::internal(format!("Failed to build response: {}", e)));
     }
@@ -1907,7 +1907,7 @@ async fn backup_server_streaming(
     Response::builder()
         .status(200)
         .header("content-type", "text/plain; charset=utf-8")
-        .header("content-disposition", "attachment; filename=\"pinepods_backup.sql\"")
+        .header("content-disposition", "attachment; filename=\"castaway_backup.sql\"")
         .body(body)
         .map_err(|e| AppError::internal(format!("Failed to build response: {}", e)))
 }

@@ -176,7 +176,7 @@ def main(argv) -> int:
     counts = export(manager.get_connection(), db_type, argv[0])
     total = sum(counts.values())
     print(f"Wrote {total} rows from {len(counts)} tables to {argv[0]}")
-    print("Restore it on a SQLite Pinepods server running the same version: Settings > Restore Server.")
+    print("Restore it on a SQLite Castaway server running the same version: Settings > Restore Server.")
     return 0
 
 

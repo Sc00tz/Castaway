@@ -272,7 +272,7 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
     // Subscribing is an `add` from the pinepods device, created on first use.
     assert_eq!(subscription_log(&app, &user).await, vec![("add".into(), "pinepods".into(), url.clone())]);
     let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await;
-    assert_eq!(device.as_deref(), Some("pinepods"));
+    assert_eq!(device.as_deref(), Some("castaway"));
 
     // Progress saves every few seconds collapse into one play row, timestamps bumped.
     record(&app, &user, ep, 100.0).await;
@@ -286,7 +286,7 @@ async fn local_changes_are_logged_and_progress_coalesces_until_pushed() {
     let row = &log[0];
     assert_eq!((row.action.as_str(), row.origin.as_str()), ("play", "pinepods"));
     assert_eq!((row.position, row.total), (Some(200), Some(1801)));
-    assert_eq!((row.episode_id, row.guid.as_deref(), row.device.as_deref()), (Some(ep as i64), Some("guid-1"), Some("pinepods")));
+    assert_eq!((row.episode_id, row.guid.as_deref(), row.device.as_deref()), (Some(ep as i64), Some("guid-1"), Some("castaway")));
     assert!(row.server_ts > 1 && row.timestamp > 1, "coalescing bumps ServerTs/Timestamp: {row:?}");
 
     // Once a target has pushed that row, the next save starts a new one.
@@ -363,7 +363,7 @@ async fn the_pinepods_device_avoids_a_name_a_client_owns() {
     let user = app.user("crowded").await;
     exec(
         &app,
-        &format!(r#"INSERT INTO "GpodderDevices" (UserID, DeviceName, DeviceType, DeviceCaption) VALUES ({}, 'pinepods', 'mobile', 'A phone')"#, user.id),
+        &format!(r#"INSERT INTO "GpodderDevices" (UserID, DeviceName, DeviceType, DeviceCaption) VALUES ({}, 'castaway', 'mobile', 'A phone')"#, user.id),
     )
     .await;
     enable_sync(&app, &user).await;
@@ -371,7 +371,7 @@ async fn the_pinepods_device_avoids_a_name_a_client_owns() {
     app.subscribe(&user, &url, 1).await;
 
     let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'pinepods'"#, user.id)).await;
-    assert_eq!(device.as_deref(), Some("pinepods-server"));
+    assert_eq!(device.as_deref(), Some("castaway-server"));
     assert_eq!(subscription_log(&app, &user).await.len(), 1);
 }
 

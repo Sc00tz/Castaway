@@ -1328,7 +1328,7 @@
   "verify_mfa_code": "Verify MFA Code",
   "connect_to_pinepods": "Connect to Castaway",
   "or_continue_with": "Or continue with",
-  "no_server_learn_more": "Don't have a Castaway server? Visit pinepods.online to learn more.",
+  "no_server_learn_more": "Don't have a Castaway server? See github.com/Sc00tz/Castaway to set one up.",
   "failed_to_load_stats": "Failed to load stats: {error}",
   "@failed_to_load_stats": {
     "placeholders": {

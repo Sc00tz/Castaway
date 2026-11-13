@@ -130,7 +130,7 @@ Library assertions are skipped against `mock`, which has no Castaway database be
 ## Files, mail, AI and sockets
 
 - **Files.** `PINEPODS_DATA_DIR` and `PINEPODS_WEB_ROOT` move the server's storage, so tests use a
-  sandbox instead of `/opt/pinepods` (`harness/files.rs`). They're process-wide: tests tell their
+  sandbox instead of `/data` (`harness/files.rs`). They're process-wide: tests tell their
   files apart by unique podcast and folder names.
 - **Backups** run the real `pg_dump`/`psql`/`mysqldump`/`mysql`. They read `DB_*` from the
   environment and share a folder, so those tests take turns through `BackupEnv`. Without the tools
