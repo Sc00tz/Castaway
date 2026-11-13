@@ -1,7 +1,7 @@
 name: pinepods_mobile
 description: Castaway Podcast Server
 
-version: 0.10.0+20261112
+version: 0.10.1+20261113
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
