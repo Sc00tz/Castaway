@@ -18,6 +18,8 @@ jobs:
   compile:
     name: Compile
     strategy:
+      # Let every platform finish, so one failure doesn't hide another.
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
@@ -139,6 +141,21 @@ jobs:
           python .\change-version.py tauri.conf.json ${{ env.IMAGE_TAG }}
           Get-Content tauri.conf.json
         shell: pwsh
+
+      # Diagnostic: build the web code directly on macOS, so a failure shows its real error
+      # (trunk only says "error from build pipeline").
+      - name: Diagnose web build (macOS)
+        if: matrix.os == 'macOS-latest'
+        shell: bash
+        run: |
+          cd web
+          set +e
+          RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg getrandom_backend=\"wasm_js\"" \
+            /usr/bin/time -l cargo build --target=wasm32-unknown-unknown --release --features server_build > ../diag.log 2>&1
+          echo "cargo exit: $?"
+          grep -nE "^error|resident set|signal|SIGKILL|Killed|memory" ../diag.log | grep -v "^.*warning" | tail -40
+          tail -15 ../diag.log
+          sysctl hw.memsize
 
       - name: Build | Compile (UNIX)
         run: |
