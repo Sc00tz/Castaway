@@ -34,14 +34,20 @@ jobs:
       DEPENDS_SETUP: ${{ startsWith(matrix.os, 'ubuntu-') && 'true' || 'false' }}
 
     steps:
-      - name: Set Image Tag (Unix)
-        if: matrix.os != 'windows-latest'
-        run: echo "IMAGE_TAG=${{ github.event.release.tag_name || github.event.inputs.version || 'latest' }}" >> $GITHUB_ENV
+      - name: Setup | Checkout
+        uses: actions/checkout@v7
 
-      - name: Set Image Tag (Windows)
-        if: matrix.os == 'windows-latest'
-        run: echo "IMAGE_TAG=${{ github.event.release.tag_name || github.event.inputs.version || 'latest' }}" >> $Env:GITHUB_ENV
-        shell: pwsh
+      # The desktop app's version must be a plain number like 0.10.2: a release tag loses its
+      # leading "v", and a manual run without a version uses the one in tauri.conf.json.
+      - name: Set version
+        shell: bash
+        run: |
+          v="${{ github.event.release.tag_name || github.event.inputs.version }}"
+          v="${v#v}"
+          if [ -z "$v" ]; then
+            v=$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' web/src-tauri/tauri.conf.json)
+          fi
+          echo "IMAGE_TAG=$v" >> "$GITHUB_ENV"
 
       - name: Set environment variables
         run: |
@@ -70,9 +76,6 @@ jobs:
           echo "ARTIFACT_NAME2=Castaway_${{ env.IMAGE_TAG }}_x64_en-US.msi" >> $Env:GITHUB_ENV
         shell: pwsh
         if: ${{ matrix.os == 'windows-latest' }}
-
-      - name: Setup | Checkout
-        uses: actions/checkout@v7
 
       - uses: hecrj/setup-rust-action@v2
         with:
