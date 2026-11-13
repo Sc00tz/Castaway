@@ -7,6 +7,7 @@ use crate::components::loading::Loading;
 
 use crate::components::audio_player_bar::AudioPlayerBar;
 use crate::components::context::{AppState, EpisodeStatusState, FilterState, PodcastFeedState};
+use crate::components::hide_played::{is_played, use_hide_played, HidePlayedChip};
 use crate::components::episode_list_item::{DragCallbacks, EpisodeListItem};
 use crate::requests::episode::Episode;
 
@@ -80,6 +81,7 @@ pub fn queue() -> Html {
     let (podcast_state, _podcast_dispatch) = use_store::<PodcastFeedState>();
     let (ep_status, _ep_dispatch) = use_store::<EpisodeStatusState>();
     let (filter_state, _filter_dispatch) = use_store::<FilterState>();
+    let (hide_played, toggle_hide_played) = use_hide_played("queue");
 
     let error = use_state(|| None);
     let (post_state, _post_dispatch) = use_store::<AppState>();
@@ -219,18 +221,27 @@ pub fn queue() -> Html {
                                 })
                                 .unwrap_or_default();
 
+                            let any_queued = !queued_eps.episodes.is_empty();
                             let filtered_episodes: Vec<_> = queued_eps
                                 .episodes
                                 .into_iter()
-                                .filter(|ep| {
-                                    if !filter_state.favorites_only {
-                                        return true;
-                                    }
-                                    favorite_podcast_ids.contains(&ep.podcastid)
-                                })
+                                .filter(|ep| !filter_state.favorites_only || favorite_podcast_ids.contains(&ep.podcastid))
+                                .filter(|ep| !hide_played || !is_played(ep.episodeid, &ep_status.completed_episodes))
                                 .collect();
+                            let chips = html! {
+                                <div class="sp-chips pfb-chips list-chips">
+                                    <HidePlayedChip active={hide_played} onclick={toggle_hide_played.clone()} />
+                                </div>
+                            };
 
-                            if filtered_episodes.is_empty() {
+                            if any_queued && filtered_episodes.is_empty() && hide_played {
+                                html! {
+                                    <>
+                                        { chips }
+                                        <p class="list-chips-empty">{ i18n.t("hide_played.all_played") }</p>
+                                    </>
+                                }
+                            } else if filtered_episodes.is_empty() {
                                 // Render "No Queued Episodes Found" if episodes list is empty
                                 empty_message(
                                     &i18n.t("queue.no_queued_episodes_found"),
@@ -238,9 +249,12 @@ pub fn queue() -> Html {
                                 )
                             } else {
                                 html! {
-                                    <VirtualQueueList
-                                        episodes={filtered_episodes}
-                                    />
+                                    <>
+                                        { chips }
+                                        <VirtualQueueList
+                                            episodes={filtered_episodes}
+                                        />
+                                    </>
                                 }
                             }
                         } else {
@@ -427,18 +441,29 @@ pub fn virtual_queue_list(props: &VirtualQueueListProps) -> Html {
                         .into(),
                     );
 
-                    let mut episodes_vec = all_episodes.clone();
-                    if let Some(dragged_index) =
-                        episodes_vec.iter().position(|x| x.episodeid == dragged_id)
-                    {
-                        if dragged_index != target_idx {
-                            // Remove and reinsert at the correct position
+                    // The list on screen may be filtered (favorites, hide played); the move is
+                    // applied to the whole queue so hidden episodes keep their places.
+                    let mut episodes_vec: Vec<Episode> = Dispatch::<EpisodeStatusState>::global()
+                        .get()
+                        .queued_episodes
+                        .as_ref()
+                        .map(|q| q.episodes.clone())
+                        .unwrap_or_else(|| all_episodes.clone());
+                    let shown_from = all_episodes.iter().position(|x| x.episodeid == dragged_id);
+                    let target_id = all_episodes.get(target_idx).map(|x| x.episodeid);
+                    if let (Some(dragged_index), Some(shown_from), Some(target_id)) = (
+                        episodes_vec.iter().position(|x| x.episodeid == dragged_id),
+                        shown_from,
+                        target_id,
+                    ) {
+                        if shown_from != target_idx {
+                            // Land just after the target when moving down, just before it when up.
                             let dragged_item = episodes_vec.remove(dragged_index);
-                            let insert_idx = if dragged_index < target_idx {
-                                target_idx
-                            } else {
-                                target_idx
-                            };
+                            let target_pos = episodes_vec
+                                .iter()
+                                .position(|x| x.episodeid == target_id)
+                                .unwrap_or(episodes_vec.len());
+                            let insert_idx = if shown_from < target_idx { target_pos + 1 } else { target_pos };
                             episodes_vec.insert(insert_idx.min(episodes_vec.len()), dragged_item);
 
                             web_sys::console::log_1(&"Calling reorder queue API".into());

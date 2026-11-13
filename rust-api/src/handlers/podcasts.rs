@@ -140,7 +140,7 @@ pub struct ListQueryParams {
     pub offset: Option<i64>,
     pub sort_by: Option<String>,    // "date" | "duration" | "title"
     pub sort_order: Option<String>, // "asc" | "desc"
-    pub filter: Option<String>,     // "all" | "completed" | "in_progress"
+    pub filter: Option<String>,     // "all" | "completed" | "in_progress" | "unplayed"
     pub search: Option<String>,     // free-text term, matched against title and podcast name
 }
 
@@ -1504,7 +1504,7 @@ pub struct PodcastEpisodesQuery {
     pub sort_by: Option<String>,    // "date" | "duration" | "title"
     pub sort_order: Option<String>, // "asc" | "desc"
     pub search: Option<String>,     // free-text term, matched against title and description
-    pub filter: Option<String>,     // "all" | "completed" | "in_progress"
+    pub filter: Option<String>,     // "all" | "completed" | "in_progress" | "unplayed"
 }
 
 // Get episodes for a specific podcast - matches Python podcast_episodes endpoint

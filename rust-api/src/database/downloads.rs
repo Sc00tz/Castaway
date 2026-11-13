@@ -159,11 +159,13 @@ impl DatabasePool {
                 let ep_filter = match filter {
                     "completed"   => " AND COALESCE((SELECT ues.completed FROM \"UserEpisodeState\" ues WHERE ues.episodeid = e.episodeid AND ues.userid = de.userid), FALSE) = TRUE",
                     "in_progress" => " AND COALESCE((SELECT ues.completed FROM \"UserEpisodeState\" ues WHERE ues.episodeid = e.episodeid AND ues.userid = de.userid), FALSE) = FALSE AND ueh.listenduration IS NOT NULL AND ueh.listenduration > 0",
+                    "unplayed"    => " AND COALESCE((SELECT ues.completed FROM \"UserEpisodeState\" ues WHERE ues.episodeid = e.episodeid AND ues.userid = de.userid), FALSE) = FALSE",
                     _             => "",
                 };
                 let yt_filter = match filter {
                     "completed"   => " AND yv.completed = TRUE",
                     "in_progress" => " AND yv.completed = FALSE AND yv.listenposition IS NOT NULL AND yv.listenposition > 0",
+                    "unplayed"    => " AND yv.completed = FALSE",
                     _             => "",
                 };
                 let sql = format!(
@@ -246,6 +248,7 @@ impl DatabasePool {
                 let filter_clause = match filter {
                     "completed"   => " WHERE completed = TRUE",
                     "in_progress" => " WHERE completed = FALSE AND listenduration IS NOT NULL AND listenduration > 0",
+                    "unplayed"    => " WHERE completed = FALSE",
                     _             => "",
                 };
                 let sql = format!(

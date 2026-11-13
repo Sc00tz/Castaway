@@ -14,6 +14,8 @@ import 'package:pinepods_mobile/ui/pinepods/episode_details.dart';
 import 'package:provider/provider.dart';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:pinepods_mobile/ui/widgets/hide_played.dart';
+import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
 
 class PlaylistEpisodesPage extends StatefulWidget {
   final PlaylistData playlist;
@@ -27,7 +29,19 @@ class PlaylistEpisodesPage extends StatefulWidget {
   State<PlaylistEpisodesPage> createState() => _PlaylistEpisodesPageState();
 }
 
-class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> {
+class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> with HidePlayed<PlaylistEpisodesPage> {
+  @override
+  String get hidePlayedKey => 'playlist_hide_played';
+
+  /// Indices into the loaded episodes that are shown, so index-based handlers keep working.
+  List<int> get _visibleIndices {
+    final episodes = _playlistResponse?.episodes ?? const [];
+    return [
+      for (var i = 0; i < episodes.length; i++)
+        if (!(hidePlayed && episodes[i].completed)) i,
+    ];
+  }
+
   final PinepodsService _pinepodsService = PinepodsService();
   PlaylistEpisodesResponse? _playlistResponse;
   bool _isLoading = true;
@@ -43,6 +57,7 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> {
   @override
   void initState() {
     super.initState();
+    loadHidePlayed();
     _loadPlaylistEpisodes();
   }
 
@@ -601,8 +616,17 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> {
           ),
         ),
         
+        ListToolbar.sliver(context, ListToolbar<void>(filters: [hidePlayedFilter(context)])),
+
         // Episodes list
-        if (_playlistResponse!.episodes.isEmpty)
+        if (_playlistResponse!.episodes.isNotEmpty && _visibleIndices.isEmpty && _offset >= _playlistResponse!.total)
+          SliverToBoxAdapter(
+            child: SoftEmptyState(
+              icon: PhosphorIconsRegular.checkCircle,
+              title: L.of(context)!.no_episodes_match_filter,
+            ),
+          )
+        else if (_playlistResponse!.episodes.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
@@ -636,11 +660,12 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final episodes = _playlistResponse!.episodes;
+                final visible = _visibleIndices;
                 final hasMore = _offset < _playlistResponse!.total;
                 final showFooter = hasMore || _isLoadingMore;
 
                 // Footer item
-                if (showFooter && index == episodes.length) {
+                if (showFooter && index == visible.length) {
                   if (!_isLoadingMore) {
                     WidgetsBinding.instance.addPostFrameCallback(
                       (_) => _loadMorePlaylistEpisodes(),
@@ -652,7 +677,8 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> {
                   );
                 }
 
-                final episode = episodes[index];
+                final episodeIndex = visible[index];
+                final episode = episodes[episodeIndex];
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
                   child: PinepodsEpisodeCard(
@@ -667,12 +693,12 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> {
                         ),
                       );
                     },
-                    onLongPress: () => _showContextMenu(index),
+                    onLongPress: () => _showContextMenu(episodeIndex),
                     onPlayPressed: () => _playEpisode(episode),
                   ),
                 );
               },
-              childCount: _playlistResponse!.episodes.length +
+              childCount: _visibleIndices.length +
                   ((_offset < _playlistResponse!.total || _isLoadingMore) ? 1 : 0),
             ),
           ),

@@ -59,6 +59,11 @@ docker compose up -d
 Then open your `CASTAWAY_URL` and create your first admin account. To update later:
 `docker compose pull && docker compose up -d`.
 
+**Search:** Apple Podcasts search works right away. For Podcast Index search, finding a host's
+other shows, and the Discover page's trending lists, get a free API key at
+[api.podcastindex.org](https://api.podcastindex.org) and enter it under Settings → Podcast Index.
+Searches go from your server straight to Apple and Podcast Index; the key never leaves the server.
+
 Everything Castaway keeps is in `DATA_DIR`: `postgres/` (the database), `downloads/` and
 `backups/`. Back up that folder and you've backed up Castaway.
 

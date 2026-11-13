@@ -1816,5 +1816,9 @@
     "removed": "Podcast Index key removed",
     "search_unavailable": "Search isn't available right now.",
     "search_failed": "Search failed"
+  },
+  "hide_played": {
+    "label": "Hide played",
+    "all_played": "Every episode here is played. Turn off Hide played to see them."
   }
 }

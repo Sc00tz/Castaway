@@ -25,6 +25,7 @@ import 'package:sliver_tools/sliver_tools.dart';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:pinepods_mobile/ui/widgets/hide_played.dart';
 
 /// Sort direction options for downloads
 enum DownloadSortDirection {
@@ -63,7 +64,13 @@ class PinepodsDownloads extends StatefulWidget {
   State<PinepodsDownloads> createState() => _PinepodsDownloadsState();
 }
 
-class _PinepodsDownloadsState extends State<PinepodsDownloads> {
+class _PinepodsDownloadsState extends State<PinepodsDownloads> with HidePlayed<PinepodsDownloads> {
+  @override
+  String get hidePlayedKey => 'downloads_hide_played';
+
+  @override
+  void onHidePlayedChanged() => _filterLocalDownloads();
+
   static const int _pageSize = 50;
 
   final log = Logger('PinepodsDownloads');
@@ -98,6 +105,7 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
   @override
   void initState() {
     super.initState();
+    loadHidePlayed();
     _loadSortPreference();
     _loadDownloads();
     _searchController.addListener(_onSearchChanged);
@@ -212,6 +220,7 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
         }
       });
 
+      filtered = withoutPlayed(filtered, (e) => e.played);
       if (filtered.isNotEmpty) {
         _filteredLocalDownloadsByPodcast[podcastName] = filtered;
       }
@@ -627,12 +636,14 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
     final loadingMore = pageState?.loadingMore ?? false;
     final hasMore = offset < total;
 
-    // Filter loaded episodes by search query
-    final filtered = _searchQuery.isEmpty
-        ? episodes
-        : episodes.where((e) =>
-            e.episodeTitle.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            e.podcastName.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    // Filter loaded episodes by search query and the played toggle
+    final filtered = withoutPlayed(
+        _searchQuery.isEmpty
+            ? episodes
+            : episodes.where((e) =>
+                e.episodeTitle.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                e.podcastName.toLowerCase().contains(_searchQuery.toLowerCase())).toList(),
+        (e) => e.completed);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
@@ -912,7 +923,7 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
         final visibleServer = showServer ? _serverPodcastSummaries : <PodcastDownloadSummary>[];
         final hasVisibleLocal = showLocal && _filteredLocalDownloadsByPodcast.isNotEmpty;
         final hasVisibleServer = visibleServer.isNotEmpty;
-        final hasActiveFilters = _searchQuery.isNotEmpty || _typeFilter != DownloadTypeFilter.all;
+        final hasActiveFilters = _searchQuery.isNotEmpty || hidePlayed || _typeFilter != DownloadTypeFilter.all;
 
         if (!hasVisibleLocal && !hasVisibleServer) {
           if (hasActiveFilters) {
@@ -1032,6 +1043,7 @@ class _PinepodsDownloadsState extends State<PinepodsDownloads> {
               selected: _typeFilter == DownloadTypeFilter.localOnly,
               onTap: () => _setTypeFilter(DownloadTypeFilter.localOnly),
             ),
+            hidePlayedFilter(context),
           ],
           sortOptions: {
             DownloadSortDirection.newestFirst: L.of(context)!.sort_newest_first,

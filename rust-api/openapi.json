@@ -20240,7 +20240,7 @@
     },
     {
       "name": "people",
-      "description": "Hosts and guests on podcasts and episodes, person pages, follows, and contributing to PodPeopleDB"
+      "description": "Hosts and guests on podcasts and episodes, person pages, and follows"
     },
     {
       "name": "episodes",

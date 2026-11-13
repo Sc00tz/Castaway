@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:pinepods_mobile/ui/icons/phosphor_icons.dart';
 import 'package:pinepods_mobile/ui/widgets/soft_ui.dart';
 import 'package:pinepods_mobile/l10n/L.dart';
+import 'package:pinepods_mobile/ui/widgets/hide_played.dart';
 
 class PinepodsQueue extends StatefulWidget {
   const PinepodsQueue({Key? key}) : super(key: key);
@@ -24,7 +25,24 @@ class PinepodsQueue extends StatefulWidget {
   State<PinepodsQueue> createState() => _PinepodsQueueState();
 }
 
-class _PinepodsQueueState extends State<PinepodsQueue> {
+class _PinepodsQueueState extends State<PinepodsQueue> with HidePlayed<PinepodsQueue> {
+  @override
+  String get hidePlayedKey => 'queue_hide_played';
+
+  /// Indices into [_episodes] that are shown (all of them unless played ones are hidden), so
+  /// index-based handlers keep addressing [_episodes].
+  List<int> get _visibleIndices => [
+        for (var i = 0; i < _episodes.length; i++)
+          if (!(hidePlayed && _episodes[i].completed)) i,
+      ];
+
+  /// A drag within the shown episodes, applied to the whole queue: the moved episode goes just
+  /// before the one it was dropped on (or after the last shown one).
+  void _reorderVisible(int oldIndex, int newIndex) {
+    final (from, to) = visibleMoveToFull(_visibleIndices, oldIndex, newIndex);
+    _reorderEpisodes(from, to);
+  }
+
   bool _isLoading = false;
   String _errorMessage = '';
   List<PinepodsEpisode> _episodes = [];
@@ -35,6 +53,7 @@ class _PinepodsQueueState extends State<PinepodsQueue> {
   @override
   void initState() {
     super.initState();
+    loadHidePlayed();
     _loadQueuedEpisodes();
   }
 
@@ -606,6 +625,7 @@ class _PinepodsQueueState extends State<PinepodsQueue> {
   }
 
   Widget _buildEpisodesList() {
+    final visible = _visibleIndices;
     return SliverMainAxisGroup(
       slivers: [
         SliverToBoxAdapter(
@@ -621,38 +641,48 @@ class _PinepodsQueueState extends State<PinepodsQueue> {
             ],
           ),
         ),
-        // Lazily built; auto-scrolls when a dragged card nears an edge.
-        SliverReorderableList(
-          onReorder: _reorderEpisodes,
-          itemCount: _episodes.length,
-          proxyDecorator: (child, index, animation) => Material(
-            type: MaterialType.transparency,
-            child: child,
-          ),
-          itemBuilder: (context, index) {
-            final episode = _episodes[index];
-            return Padding(
-              key: ValueKey(episode.episodeId),
-              padding: const EdgeInsets.only(bottom: 4),
-              child: DraggableQueueEpisodeCard(
-                episode: episode,
-                index: index,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PinepodsEpisodeDetails(
-                        initialEpisode: episode,
+        ListToolbar.sliver(context, ListToolbar<void>(filters: [hidePlayedFilter(context)])),
+        if (visible.isEmpty)
+          SliverToBoxAdapter(
+            child: SoftEmptyState(
+              icon: PhosphorIconsRegular.checkCircle,
+              title: L.of(context)!.no_episodes_match_filter,
+            ),
+          )
+        else
+          // Lazily built; auto-scrolls when a dragged card nears an edge.
+          SliverReorderableList(
+            onReorder: _reorderVisible,
+            itemCount: visible.length,
+            proxyDecorator: (child, index, animation) => Material(
+              type: MaterialType.transparency,
+              child: child,
+            ),
+            itemBuilder: (context, index) {
+              final episodeIndex = visible[index];
+              final episode = _episodes[episodeIndex];
+              return Padding(
+                key: ValueKey(episode.episodeId),
+                padding: const EdgeInsets.only(bottom: 4),
+                child: DraggableQueueEpisodeCard(
+                  episode: episode,
+                  index: index,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PinepodsEpisodeDetails(
+                          initialEpisode: episode,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                onLongPress: () => _showContextMenu(index),
-                onPlayPressed: () => _playEpisode(episode),
-              ),
-            );
-          },
-        ),
+                    );
+                  },
+                  onLongPress: () => _showContextMenu(episodeIndex),
+                  onPlayPressed: () => _playEpisode(episode),
+                ),
+              );
+            },
+          ),
         const SliverToBoxAdapter(child: SizedBox(height: 12)),
       ],
     );

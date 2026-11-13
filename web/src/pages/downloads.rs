@@ -1,5 +1,6 @@
 use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
+use crate::components::hide_played::{use_hide_played, HidePlayedChip};
 use crate::components::context::{AppState, EpisodeNavigationState, NotificationState, UIState};
 use crate::components::context_menu_button::PageType;
 use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
@@ -26,11 +27,13 @@ const PAGE_SIZE: i64 = 50;
 /// Collapse the two mutually-exclusive completion chips into the backend's filter vocabulary
 /// ("all" | "completed" | "in_progress"). Kept identical to the values the paged/summary
 /// download endpoints understand.
-fn downloads_filter(show_completed: bool, show_in_progress: bool) -> &'static str {
+fn downloads_filter(show_completed: bool, show_in_progress: bool, hide_played: bool) -> &'static str {
     if show_completed {
         "completed"
     } else if show_in_progress {
         "in_progress"
+    } else if hide_played {
+        "unplayed"
     } else {
         "all"
     }
@@ -97,6 +100,7 @@ pub fn downloads() -> Html {
     let debounced_search_term = use_state(|| String::new());
     let show_completed = use_state(|| false);
     let show_in_progress = use_state(|| false);
+    let (hide_played_on, toggle_hide_played) = use_hide_played("downloads");
 
     let error = use_state(|| None);
     let (post_state, _post_dispatch) = use_store::<AppState>();
@@ -161,8 +165,9 @@ pub fn downloads() -> Html {
                 search_dep,
                 show_completed_dep,
                 show_in_progress_dep,
+                hide_played_on,
             ),
-            move |(api_key, user_id, server_name, search, show_completed, show_in_progress)| {
+            move |(api_key, user_id, server_name, search, show_completed, show_in_progress, hide_played)| {
                 let error_clone = error.clone();
                 if let (Some(api_key), Some(user_id), Some(server_name)) =
                     (api_key.clone(), user_id.clone(), server_name.clone())
@@ -170,7 +175,7 @@ pub fn downloads() -> Html {
                     let podcast_summaries = podcast_summaries.clone();
                     let per_podcast_state = per_podcast_state.clone();
                     let search = search.clone();
-                    let filter = downloads_filter(*show_completed, *show_in_progress).to_string();
+                    let filter = downloads_filter(*show_completed, *show_in_progress, *hide_played).to_string();
                     // Snapshot which podcasts are currently expanded so we can refetch their
                     // first page with the new search/filter.
                     let expanded_ids: Vec<i32> = (*expanded_state)
@@ -487,7 +492,7 @@ pub fn downloads() -> Html {
             let currently_expanded = *expanded_state.get(&podcast_id).unwrap_or(&false);
             let new_expanded = !currently_expanded;
             let search = (*debounced_search_term).clone();
-            let filter = downloads_filter(*show_completed, *show_in_progress).to_string();
+            let filter = downloads_filter(*show_completed, *show_in_progress, hide_played_on).to_string();
 
             // Update expansion state
             expanded_state.set({
@@ -553,7 +558,7 @@ pub fn downloads() -> Html {
                 (api_key.clone(), user_id.clone(), server_name.clone())
             {
                 let search = (*debounced_search_term).clone();
-                let filter = downloads_filter(*show_completed, *show_in_progress).to_string();
+                let filter = downloads_filter(*show_completed, *show_in_progress, hide_played_on).to_string();
                 let current_offset = per_podcast_state
                     .get(&podcast_id)
                     .map(|s| s.offset)
@@ -713,6 +718,7 @@ pub fn downloads() -> Html {
                                             <i class="ph ph-hourglass-medium"></i>
                                             <span>{&i18n_in_progress}</span>
                                         </button>
+                                        <HidePlayedChip active={hide_played_on} onclick={toggle_hide_played.clone()} />
                                     </div>
                                 </div>
                             </div>

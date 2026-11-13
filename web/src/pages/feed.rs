@@ -2,6 +2,7 @@ use crate::components::app_drawer::App_drawer;
 use crate::components::audio_player_bar::AudioPlayerBar;
 use crate::components::context::{AppState, EpisodeStatusState, FilterState, PodcastFeedState};
 use crate::components::episode_list_view::EpisodeListView;
+use crate::components::hide_played::{is_played, use_hide_played, HidePlayedChip};
 use crate::components::gen_components::{empty_message, Search_nav, UseScrollToTop};
 use crate::components::loading::Loading;
 use crate::requests::episode::Episode;
@@ -40,6 +41,9 @@ pub fn feed() -> Html {
     let podcast_feed_extra = use_selector(|state: &PodcastFeedState| {
         state.podcast_feed_return_extra.clone()
     });
+    // Played episodes, kept current as episodes are marked played or unplayed.
+    let completed_sel = use_selector(|state: &EpisodeStatusState| state.completed_episodes.clone());
+    let (hide_played, toggle_hide_played) = use_hide_played("feed");
     let api_key = (*api_key_sel).clone();
     let user_id = (*user_id_sel).clone();
     let server_name = (*server_name_sel).clone();
@@ -233,20 +237,23 @@ pub fn feed() -> Html {
     // Skip the clone when no client filter is active — just hand the parent's Rc<Vec<Episode>>
     // straight to the view. Filtering only allocates a new Vec when favorites_only is on AND
     // there's at least one favorite podcast to filter against.
-    let filtered_episodes_rc: Rc<Vec<Episode>> =
-        if filter_state.favorites_only && !favorite_podcast_ids.is_empty() {
-            Rc::new(
-                (*episodes)
-                    .iter()
-                    .filter(|ep| favorite_podcast_ids.contains(&ep.podcastid))
-                    .cloned()
-                    .collect(),
-            )
-        } else {
-            (*episodes).clone()
-        };
+    let favorites_filter = filter_state.favorites_only && !favorite_podcast_ids.is_empty();
+    let filtered_episodes_rc: Rc<Vec<Episode>> = if favorites_filter || hide_played {
+        Rc::new(
+            (*episodes)
+                .iter()
+                .filter(|ep| !favorites_filter || favorite_podcast_ids.contains(&ep.podcastid))
+                .filter(|ep| !hide_played || !is_played(ep.episodeid, &completed_sel))
+                .cloned()
+                .collect(),
+        )
+    } else {
+        (*episodes).clone()
+    };
     let backend_can_load_more = *offset < *total;
-    let episodes_empty = filtered_episodes_rc.is_empty();
+    // Only hidden by the played toggle (more pages may still hold unplayed episodes).
+    let all_hidden = hide_played && filtered_episodes_rc.is_empty() && !episodes.is_empty() && !backend_can_load_more;
+    let episodes_empty = episodes.is_empty();
 
     html! {
         <>
@@ -264,12 +271,19 @@ pub fn feed() -> Html {
                 } else {
                     html! {
                         <div class="flex-grow overflow-y-auto">
-                            <EpisodeListView
-                                episodes={filtered_episodes_rc}
-                                backend_can_load_more={backend_can_load_more}
-                                loading_more={*loading_more}
-                                on_load_more={on_load_more.clone()}
-                            />
+                            <div class="sp-chips pfb-chips list-chips">
+                                <HidePlayedChip active={hide_played} onclick={toggle_hide_played.clone()} />
+                            </div>
+                            if all_hidden {
+                                <p class="list-chips-empty">{ i18n.t("hide_played.all_played") }</p>
+                            } else {
+                                <EpisodeListView
+                                    episodes={filtered_episodes_rc}
+                                    backend_can_load_more={backend_can_load_more}
+                                    loading_more={*loading_more}
+                                    on_load_more={on_load_more.clone()}
+                                />
+                            }
                         </div>
                     }
                 }

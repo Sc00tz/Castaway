@@ -24,6 +24,7 @@ import 'package:pinepods_mobile/l10n/L.dart';
 import 'package:pinepods_mobile/ui/icons/collection_icons.dart';
 import 'package:pinepods_mobile/ui/pinepods/collection_sheets.dart';
 import 'package:pinepods_mobile/entities/pinepods_collection.dart';
+import 'package:pinepods_mobile/ui/widgets/hide_played.dart';
 
 /// Sort direction options for saved episodes
 enum SavedSortDirection {
@@ -49,7 +50,13 @@ class PinepodsSaved extends StatefulWidget {
   State<PinepodsSaved> createState() => _PinepodsSavedState();
 }
 
-class _PinepodsSavedState extends State<PinepodsSaved> {
+class _PinepodsSavedState extends State<PinepodsSaved> with HidePlayed<PinepodsSaved> {
+  @override
+  String get hidePlayedKey => 'saved_hide_played';
+
+  @override
+  void onHidePlayedChanged() => _filterEpisodes();
+
   bool _isLoading = false;
   String _errorMessage = '';
   List<PinepodsEpisode> _episodes = [];
@@ -83,6 +90,7 @@ class _PinepodsSavedState extends State<PinepodsSaved> {
   @override
   void initState() {
     super.initState();
+    loadHidePlayed();
     _loadSortPreference();
     _loadSavedEpisodes();
     _loadCollections();
@@ -168,6 +176,9 @@ class _PinepodsSavedState extends State<PinepodsSaved> {
           .where((e) =>
               e.podcastId != null && _favoritePodcastIds.contains(e.podcastId))
           .toList();
+    }
+    if (_activeFilter != EpisodeFilter.completed) {
+      filtered = withoutPlayed(filtered, (e) => e.completed);
     }
     _filteredEpisodes = filtered;
     _originalIndex = Map<PinepodsEpisode, int>.identity()
@@ -265,6 +276,7 @@ class _PinepodsSavedState extends State<PinepodsSaved> {
     setState(() {
       _activeFilter = EpisodeFilter.all;
       _favoritesOnly = false;
+      resetHidePlayed();
       _searchController.clear();
       _searchQuery = '';
       _episodes = [];
@@ -1026,6 +1038,7 @@ class _PinepodsSavedState extends State<PinepodsSaved> {
           selected: _favoritesOnly,
           onTap: _toggleFavoritesFilter,
         ),
+        hidePlayedFilter(context),
       ],
       sortOptions: {
         SavedSortDirection.newestFirst: L.of(context)!.sort_newest_first,
@@ -1044,7 +1057,7 @@ class _PinepodsSavedState extends State<PinepodsSaved> {
     final hasActiveSearch = _searchQuery.isNotEmpty;
     if (_filteredEpisodes.isEmpty &&
         !_isLoadingMore &&
-        (hasActiveSearch || _favoritesOnly || _activeFilter != EpisodeFilter.all)) {
+        (hasActiveSearch || _favoritesOnly || hidePlayed || _activeFilter != EpisodeFilter.all)) {
       return SliverToBoxAdapter(
         child: SoftEmptyState(
           icon: PhosphorIconsRegular.funnelSimpleX,

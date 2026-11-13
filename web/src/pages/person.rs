@@ -3,6 +3,7 @@ use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_view::EpisodeListView;
+use crate::components::hide_played::{use_hide_played, HidePlayedChip};
 use crate::components::gen_components::{FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::loading::Loading;
 use crate::components::people::{proxied_image, use_auth, FollowButton, PersonAvatar};
@@ -68,6 +69,8 @@ pub fn person(props: &PersonProps) -> Html {
     let can_load_more = use_state(|| false);
     let loading_more = use_state(|| false);
     let tab = use_state(|| None::<EpisodesTab>);
+    let (hide_played, toggle_hide_played) = use_hide_played("person");
+    let completed_sel = use_selector(|s: &crate::components::context::EpisodeStatusState| s.completed_episodes.clone());
 
     // Resolve the key and load the profile. A refresh of outside-library episodes may still be
     // running on the server; refetch a few times until it reports done.
@@ -170,6 +173,17 @@ pub fn person(props: &PersonProps) -> Html {
             .map(|p| p.external_episodes.iter().cloned().map(|e| e.into_episode()).collect())
             .unwrap_or_default()
     });
+
+    // The person page's episodes carry their own played flag; the session set adds episodes
+    // marked played since they loaded.
+    let without_played = |list: &Rc<Vec<Episode>>| -> Rc<Vec<Episode>> {
+        if !hide_played {
+            return list.clone();
+        }
+        Rc::new(list.iter().filter(|e| !(e.completed || completed_sel.contains(&e.episodeid))).cloned().collect())
+    };
+    let library_shown = without_played(&library_episodes);
+    let elsewhere_shown = without_played(&elsewhere_episodes);
 
     let server_name = auth.as_ref().map(|(s, _)| s.clone()).unwrap_or_default();
     let history = BrowserHistory::new();
@@ -296,6 +310,9 @@ pub fn person(props: &PersonProps) -> Html {
                         { tab_button(EpisodesTab::Library, i18n.t("people.in_your_library").to_string(), library_count) }
                         { tab_button(EpisodesTab::Elsewhere, i18n.t("people.elsewhere").to_string(), elsewhere_count) }
                     </div>
+                    <div class="sp-chips pfb-chips list-chips">
+                        <HidePlayedChip active={hide_played} onclick={toggle_hide_played.clone()} />
+                    </div>
                     { if p.refreshing && active_tab == EpisodesTab::Elsewhere {
                         html! { <p class="pp-note"><span class="sp-spinner"></span>{ i18n.t("people.looking_for_more") }</p> }
                     } else { html! {} } }
@@ -303,10 +320,13 @@ pub fn person(props: &PersonProps) -> Html {
                         EpisodesTab::Library if library_count == 0 => html! {
                             <p class="pp-empty-text pp-pad">{ i18n.t("people.no_library_episodes") }</p>
                         },
+                        EpisodesTab::Library if library_shown.is_empty() && !*can_load_more => html! {
+                            <p class="list-chips-empty">{ i18n.t("hide_played.all_played") }</p>
+                        },
                         EpisodesTab::Library => html! {
                             <EpisodeListView
                                 key={format!("person-{}-library", person.id)}
-                                episodes={(*library_episodes).clone()}
+                                episodes={library_shown.clone()}
                                 backend_can_load_more={*can_load_more}
                                 loading_more={*loading_more}
                                 on_load_more={on_load_more.clone()}
@@ -317,10 +337,13 @@ pub fn person(props: &PersonProps) -> Html {
                                 if p.refreshing { i18n.t("people.looking_for_more") } else { i18n.t("people.no_elsewhere_episodes") }
                             }</p>
                         },
+                        EpisodesTab::Elsewhere if elsewhere_shown.is_empty() => html! {
+                            <p class="list-chips-empty">{ i18n.t("hide_played.all_played") }</p>
+                        },
                         EpisodesTab::Elsewhere => html! {
                             <EpisodeListView
                                 key={format!("person-{}-elsewhere", person.id)}
-                                episodes={elsewhere_episodes.clone()}
+                                episodes={elsewhere_shown.clone()}
                             />
                         },
                     } }

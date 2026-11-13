@@ -418,3 +418,49 @@ async fn the_episode_file_endpoint_sends_the_episode() {
     let disposition = resp.headers.get("content-disposition").and_then(|v| v.to_str().ok()).unwrap_or_default();
     assert!(disposition.contains("attachment"), "{disposition}");
 }
+
+/// Downloads can be listed without the played ones (the "Hide played" toggle).
+#[tokio::test(flavor = "multi_thread")]
+async fn the_unplayed_filter_leaves_out_played_downloads() {
+    let s = show().await;
+    downloaded(&s.app, &s.user, s.episode).await;
+    let summary = |filter: &'static str| {
+        let s = &s;
+        async move {
+            s.app
+                .get(&format!("/api/data/podcast_download_summary/{}", s.user.id))
+                .key(&s.user)
+                .query("filter", filter)
+                .send()
+                .await
+                .ok_json()
+        }
+    };
+    let paged = |filter: &'static str| {
+        let s = &s;
+        async move {
+            s.app
+                .get(&format!("/api/data/podcast_downloads_paged/{}/{}", s.user.id, s.pod))
+                .key(&s.user)
+                .query("filter", filter)
+                .send()
+                .await
+                .ok_json()
+        }
+    };
+    let count = |v: &serde_json::Value| v.to_string().matches(&format!("\"episodeid\":{}", s.episode)).count();
+
+    assert!(summary("unplayed").await.to_string().contains(&format!("\"podcastid\":{}", s.pod)), "unplayed download is listed");
+    assert_eq!(count(&paged("unplayed").await), 1);
+
+    s.app
+        .post("/api/data/mark_episode_completed")
+        .key(&s.user)
+        .json(&json!({ "episode_id": s.episode, "user_id": s.user.id, "is_youtube": false }))
+        .send()
+        .await
+        .assert_ok();
+    assert!(!summary("unplayed").await.to_string().contains(&format!("\"podcastid\":{}", s.pod)), "{}", summary("unplayed").await);
+    assert_eq!(count(&paged("unplayed").await), 0);
+    assert_eq!(count(&paged("all").await), 1, "still listed without the filter");
+}
