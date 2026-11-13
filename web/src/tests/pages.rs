@@ -149,21 +149,10 @@ fn close(root: web_sys::Element, app: yew::AppHandle<Harness>) {
     root.remove();
 }
 
-/// Mount `page` signed in with an API that knows `routes`, and return what it shows.
-async fn shown_when_signed_in(page: Page, routes: Value) -> String {
-    answer_api_with(routes);
-    sign_in();
-    let (root, app) = render(page).await;
-    let shown = text(&root);
-    close(root, app);
-    sign_out();
-    shown
-}
-
-/// Like [`shown_when_signed_in`], but waits (up to 5 seconds) for `wait_for` to appear
-/// instead of reading the page after a fixed delay. For pages that load data before showing it:
-/// on a slow CI runner the fixed delay can catch them still on their loading message.
-async fn shown_when_signed_in_once_it_shows(page: Page, routes: Value, wait_for: &str) -> String {
+/// Mount `page` signed in with an API that knows `routes`, and return what it shows once
+/// `wait_for` appears (or after 5 seconds). Pages load data before they show it, and on a busy
+/// CI runner a fixed delay can catch them still on a loading message.
+async fn shown_when_signed_in(page: Page, routes: Value, wait_for: &str) -> String {
     answer_api_with(routes);
     sign_in();
     let (root, app) = render(page).await;
@@ -188,69 +177,69 @@ fn assert_shows(shown: &str, expected: &str) {
 
 #[wasm_bindgen_test]
 async fn the_home_page_welcomes_a_new_listener() {
-    assert_shows(&shown_when_signed_in(Page::Home, json!({})).await, "Welcome to Castaway");
+    assert_shows(&shown_when_signed_in(Page::Home, json!({}), "Welcome to Castaway").await, "Welcome to Castaway");
 }
 
 #[wasm_bindgen_test]
 async fn the_feed_page_explains_how_to_add_podcasts() {
-    assert_shows(&shown_when_signed_in(Page::Feed, json!({})).await, "No Recent Episodes Found");
+    assert_shows(&shown_when_signed_in(Page::Feed, json!({}), "No Recent Episodes Found").await, "No Recent Episodes Found");
 }
 
 #[wasm_bindgen_test]
 async fn the_saved_page_offers_its_sort_options() {
-    assert_shows(&shown_when_signed_in(Page::Saved, json!({})).await, "Newest First");
+    assert_shows(&shown_when_signed_in(Page::Saved, json!({}), "Newest First").await, "Newest First");
 }
 
 #[wasm_bindgen_test]
 async fn the_history_page_has_an_empty_state() {
-    assert_shows(&shown_when_signed_in(Page::History, json!({})).await, "No Episode History Found");
+    assert_shows(&shown_when_signed_in(Page::History, json!({}), "No Episode History Found").await, "No Episode History Found");
 }
 
 #[wasm_bindgen_test]
 async fn the_downloads_page_has_an_empty_state() {
-    assert_shows(&shown_when_signed_in(Page::Downloads, json!({})).await, "No Episode Downloads Found");
+    assert_shows(&shown_when_signed_in(Page::Downloads, json!({}), "No Episode Downloads Found").await, "No Episode Downloads Found");
 }
 
 #[wasm_bindgen_test]
 async fn the_queue_page_has_an_empty_state() {
-    assert_shows(&shown_when_signed_in(Page::Queue, json!({})).await, "No Queued Episodes Found");
+    assert_shows(&shown_when_signed_in(Page::Queue, json!({}), "No Queued Episodes Found").await, "No Queued Episodes Found");
 }
 
 #[wasm_bindgen_test]
 async fn the_podcasts_page_has_an_empty_state() {
-    assert_shows(&shown_when_signed_in(Page::Podcasts, json!({})).await, "No Podcasts Fo");
+    assert_shows(&shown_when_signed_in(Page::Podcasts, json!({}), "No Podcasts Fo").await, "No Podcasts Fo");
 }
 
 #[wasm_bindgen_test]
 async fn the_search_page_renders() {
-    assert_shows(&shown_when_signed_in(Page::Search, json!({})).await, "Search");
+    assert_shows(&shown_when_signed_in(Page::Search, json!({}), "Search").await, "Search");
 }
 
 #[wasm_bindgen_test]
 async fn the_playlists_page_offers_creating_one() {
-    assert_shows(&shown_when_signed_in(Page::Playlists, json!({})).await, "Create Playlist");
+    assert_shows(&shown_when_signed_in(Page::Playlists, json!({}), "Create Playlist").await, "Create Playlist");
 }
 
 #[wasm_bindgen_test]
 async fn the_discover_page_has_its_sections() {
-    let shown = shown_when_signed_in(Page::Discover, json!({})).await;
+    let shown = shown_when_signed_in(Page::Discover, json!({}), "For You").await;
     assert_shows(&shown, "For You");
     assert_shows(&shown, "Trending Now");
 }
 
 #[wasm_bindgen_test]
 async fn the_settings_page_tells_you_when_the_server_cannot_be_reached() {
-    assert_shows(&shown_when_signed_in(Page::Settings, json!({})).await, "Is the server reachable?");
+    assert_shows(&shown_when_signed_in(Page::Settings, json!({}), "Is the server reachable?").await, "Is the server reachable?");
 }
 
 #[wasm_bindgen_test]
 async fn the_stats_page_has_its_heading() {
-    assert_shows(&shown_when_signed_in(Page::Stats, json!({})).await, "User Statistics");
+    assert_shows(&shown_when_signed_in(Page::Stats, json!({}), "User Statistics").await, "User Statistics");
 }
 
 #[wasm_bindgen_test]
 async fn the_not_found_page_links_home() {
-    let shown = shown_when_signed_in(Page::NotFound, json!({})).await;
+    let shown = shown_when_signed_in(Page::NotFound, json!({}), "404").await;
     assert_shows(&shown, "404");
     assert_shows(&shown, "Head back home");
 }
@@ -270,6 +259,7 @@ async fn queued_episodes_are_listed() {
             "episodepubdate": "2026-01-02T03:04:05",
             "episodeduration": 1800,
         }] } }),
+        "An Episode In The Queue",
     )
     .await;
     assert_shows(&shown, "An Episode In The Queue");
@@ -277,7 +267,7 @@ async fn queued_episodes_are_listed() {
 
 #[wasm_bindgen_test]
 async fn the_stats_page_shows_the_servers_numbers() {
-    let shown = shown_when_signed_in_once_it_shows(
+    let shown = shown_when_signed_in(
         Page::Stats,
         json!({ "/api/data/get_stats": {
             "UserCreated": "2026-01-02T03:04:05",
@@ -310,7 +300,7 @@ async fn the_login_page_asks_for_credentials() {
     answer_api_with(json!({}));
     sign_out();
     let (root, app) = render(Page::Login).await;
-    assert_shows(&text(&root), "A Forest of Podcasts");
+    assert_shows(&text(&root), "Self-hosted podcasts for your whole household");
     assert!(root.query_selector("input[type=password]").unwrap().is_some(), "a password field");
     assert!(root.query_selector("input[type=text]").unwrap().is_some(), "a username field");
     close(root, app);
@@ -335,11 +325,20 @@ async fn a_rejected_login_stays_on_the_page_and_says_so() {
         .find(|b| b.inner_text().trim() == "Login")
         .expect("a Login button");
     login.click();
-    TimeoutFuture::new(300).await;
-
-    let calls = js_sys::eval("window.__apiCalls.join(' ')").unwrap().as_string().unwrap();
-    assert!(calls.contains("/api/pinepods_check"), "the server was checked: {calls}");
+    // Wait (up to 5 seconds) for the login request, rather than a fixed delay that a busy CI
+    // runner can outlast.
     let origin = web_sys::window().unwrap().location().origin().unwrap();
+    let calls_so_far = || js_sys::eval("window.__apiCalls.join(' ')").unwrap().as_string().unwrap();
+    for _ in 0..50 {
+        if calls_so_far().contains(&format!("{origin}/api/data/get_key")) {
+            break;
+        }
+        TimeoutFuture::new(100).await;
+    }
+    TimeoutFuture::new(100).await; // let the rejection be handled
+
+    let calls = calls_so_far();
+    assert!(calls.contains("/api/pinepods_check"), "the server was checked: {calls}");
     assert!(
         calls.contains(&format!("{origin}/api/data/get_key")),
         "whatever follows the address in the page's URL stays out of the server address: {calls}"
