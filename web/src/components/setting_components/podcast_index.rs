@@ -34,9 +34,11 @@ pub fn podcast_index_section() -> Html {
     let key = use_state(String::new);
     let secret = use_state(String::new);
     let saving = use_state(|| false);
+    // Shown in this section only: a failed status read shouldn't replace the page's other messages.
+    let load_error = use_state(|| None::<String>);
 
     {
-        let (status, key, auth) = (status.clone(), key.clone(), auth.clone());
+        let (status, key, auth, load_error) = (status.clone(), key.clone(), auth.clone(), load_error.clone());
         use_effect_with(auth.clone(), move |_| {
             if let Some((server, api_key)) = auth {
                 spawn_local(async move {
@@ -45,7 +47,7 @@ pub fn podcast_index_section() -> Html {
                             key.set(s.api_key.clone().unwrap_or_default());
                             status.set(Some(s));
                         }
-                        Err(e) => notify(Some(e.to_string()), None),
+                        Err(e) => load_error.set(Some(e.to_string())),
                     }
                 });
             }
@@ -83,6 +85,9 @@ pub fn podcast_index_section() -> Html {
     };
     let on_remove = Callback::from(move |_: MouseEvent| save(true));
 
+    if let Some(error) = (*load_error).clone() {
+        return html! { <div class="settings-row"><div class="settings-row-desc">{ error }</div></div> };
+    }
     let Some(st) = (*status).clone() else {
         return html! { <div class="settings-row"><div class="settings-row-desc"><i class="ph ph-spinner animate-spin"></i></div></div> };
     };
