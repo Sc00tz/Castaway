@@ -1,6 +1,6 @@
 //! Now-playing sessions + cross-device remote control.
 //!
-//! Every client (web tab, mobile app, Firewood, …) holds one full-duplex socket at
+//! Every client (web tab, mobile app, …) holds one full-duplex socket at
 //! `/ws/api/nowplaying/{user_id}?api_key=…&device_id=…&device_name=…&device_type=…`.
 //! The server is a relay ("aware, not owns"): devices report what they are playing,
 //! the server mirrors that into Valkey with a short TTL and fans the device list out,
@@ -16,7 +16,7 @@
 //!   closed with code [`CLOSE_REPLACED`] (4000) and should not blindly reconnect
 //!   with the same id.
 //! - `device_name` / `device_type`: free-form display strings (`"Web"`, `"iOS"`,
-//!   `"Android"`, `"Firewood"`, …). The server never interprets them.
+//!   `"Android"`, …). The server never interprets them.
 //! - `capabilities` (optional): comma-separated action names the device applies,
 //!   e.g. `play,pause,seek,skip_forward,skip_back,set_speed,play_episode`. Echoed in
 //!   its snapshot as a `capabilities` list so other UIs can hide controls it lacks.

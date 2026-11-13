@@ -2,7 +2,7 @@ use crate::components::context::{AppState, FilterState, NotificationState, PageL
 use crate::components::queue_panel::QueuePanel;
 use crate::components::navigation::use_back_button;
 use crate::pages::routes::Route;
-use crate::requests::pod_req::{call_get_pinepods_version, connect_to_episode_websocket};
+use crate::requests::pod_req::{call_get_castaway_version, connect_to_episode_websocket};
 use i18nrs::yew::use_translation;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::window;
@@ -94,10 +94,10 @@ pub fn app_drawer() -> Html {
                 let stats_dispatch = stats_dispatch.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     if let Ok(version) =
-                        call_get_pinepods_version(server_name.clone(), &api_key).await
+                        call_get_castaway_version(server_name.clone(), &api_key).await
                     {
                         stats_dispatch.reduce_mut(move |state| {
-                            state.pinepods_version = Some(version);
+                            state.castaway_version = Some(version);
                         });
                     }
                 });
@@ -341,7 +341,7 @@ pub fn app_drawer() -> Html {
                         </Link<Route>>
                     </div>
                     {
-                        if let Some(version) = &stats_state.pinepods_version {
+                        if let Some(version) = &stats_state.castaway_version {
                             html! {
                                 <div class="sb-version">{ format!("v{}", version) }</div>
                             }

@@ -49,7 +49,7 @@ ENV OPENSSL_LIB_DIR=/usr/lib
 ENV OPENSSL_INCLUDE_DIR=/usr/include
 
 # Build the Rust API
-RUN cargo build --release && strip target/release/pinepods-api
+RUN cargo build --release && strip target/release/castaway
 
 # Final stage for setting up runtime environment
 FROM alpine
@@ -59,8 +59,8 @@ FROM alpine
 RUN apk add --no-cache tzdata nginx openssl bash postgresql18 postgresql18-client curl ffmpeg wget jq su-exec shadow
 
 # Create a fixed runtime user/group (default 911); startup.sh remaps these to PUID/PGID at runtime
-RUN addgroup -g 911 pinepods && \
-    adduser -D -H -u 911 -G pinepods -h /pinepods pinepods
+RUN addgroup -g 911 castaway && \
+    adduser -D -H -u 911 -G castaway -h /castaway castaway
 
 
 # Download and install latest yt-dlp — pick the arch-specific musl binary (no Python needed)
@@ -88,29 +88,28 @@ COPY --from=builder /app/dist /var/www/html/
 # Copy translation files for the Rust API to access
 COPY ./web/src/translations /var/www/html/static/translations
 # Copy Rust API binary from the rust-api-builder stage
-COPY --from=rust-api-builder /rust-api/target/release/pinepods-api /usr/local/bin/
+COPY --from=rust-api-builder /rust-api/target/release/castaway /usr/local/bin/
 # Move to the root directory to execute the startup script
 WORKDIR /
 # Copy startup scripts
 COPY startup/startup.sh /startup.sh
 RUN chmod +x /startup.sh
 # Copy Castaway runtime files
-RUN mkdir -p /pinepods
-RUN mkdir -p /var/log/pinepods/ && mkdir -p /etc/horust/services/
-COPY startup/ /pinepods/startup/
-# Legacy cron scripts removed - background tasks now handled by internal Rust scheduler
-RUN chmod +x /pinepods/startup/startup.sh
-ENV APP_ROOT=/pinepods
+RUN mkdir -p /castaway
+RUN mkdir -p /var/log/castaway/ && mkdir -p /etc/horust/services/
+COPY startup/ /castaway/startup/
+RUN chmod +x /castaway/startup/startup.sh
+ENV APP_ROOT=/castaway
 # Database, downloads and backups all live here; mount it as a volume.
-ENV PINEPODS_DATA_DIR=/data
+ENV CASTAWAY_DATA_DIR=/data
 # Define the build argument
-ARG PINEPODS_VERSION
+ARG CASTAWAY_VERSION
 # Write the Castaway version to the current_version file
-RUN echo "${PINEPODS_VERSION}" > /pinepods/current_version
+RUN echo "${CASTAWAY_VERSION}" > /castaway/current_version
 # OCI image metadata (shown by registries and `docker inspect`)
 LABEL org.opencontainers.image.title="Castaway" \
       org.opencontainers.image.description="Self-hosted podcast management server and player" \
-      org.opencontainers.image.version="${PINEPODS_VERSION}" \
+      org.opencontainers.image.version="${CASTAWAY_VERSION}" \
       org.opencontainers.image.licenses="GPL-3.0-or-later"
 # Configure Nginx
 COPY startup/nginx.conf /etc/nginx/nginx.conf

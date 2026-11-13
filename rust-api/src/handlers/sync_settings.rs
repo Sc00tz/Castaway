@@ -24,7 +24,7 @@ use crate::{
 
 /// Overrides the server URL shown for gpodder apps (behind a reverse proxy, the URL users
 /// reach Castaway at). Without it the URL is worked out from the request.
-pub const PUBLIC_URL_ENV: &str = "PINEPODS_PUBLIC_URL";
+pub const PUBLIC_URL_ENV: &str = "PUBLIC_URL";
 
 const APP_PASSWORD_LABEL: &str = "App password";
 const MAX_LABEL: usize = 255;
@@ -39,10 +39,10 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers.get(name).and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(str::trim).filter(|v| !v.is_empty())
 }
 
-/// The URL gpodder apps should use: `PINEPODS_PUBLIC_URL`, else the forwarded/Host headers of
+/// The URL gpodder apps should use: `CASTAWAY_PUBLIC_URL`, else the forwarded/Host headers of
 /// this request. The flag says whether it was configured.
 pub fn public_server_url(headers: &HeaderMap) -> (String, bool) {
-    if let Some(url) = std::env::var(PUBLIC_URL_ENV).ok().map(|u| u.trim().trim_end_matches('/').to_string()).filter(|u| !u.is_empty()) {
+    if let Some(url) = crate::env::var(PUBLIC_URL_ENV).map(|u| u.trim().trim_end_matches('/').to_string()).filter(|u| !u.is_empty()) {
         return (url, true);
     }
     let host = header(headers, "x-forwarded-host").or_else(|| header(headers, "host")).unwrap_or("localhost");
@@ -63,7 +63,7 @@ pub struct SyncServerInfo {
     pub username: String,
     /// The server URL to enter in apps.
     pub server_url: String,
-    /// `server_url` comes from `PINEPODS_PUBLIC_URL`; otherwise it was guessed from the request
+    /// `server_url` comes from `CASTAWAY_PUBLIC_URL`; otherwise it was guessed from the request
     /// and a client may prefer the URL it reached Castaway at.
     pub server_url_configured: bool,
     /// A notice for the settings page, e.g. `reenter_external`: the external sync server has to

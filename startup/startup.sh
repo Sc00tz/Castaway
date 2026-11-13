@@ -13,8 +13,9 @@ trap shutdown SIGTERM SIGINT
 
 # Everything Castaway keeps (database, downloads, backups) lives under one folder, which
 # should be a mounted volume. The server reads the same variable.
-export PINEPODS_DATA_DIR=${PINEPODS_DATA_DIR:-/data}
-DATA_DIR=$PINEPODS_DATA_DIR
+# (PINEPODS_DATA_DIR is its old name, still read.)
+export CASTAWAY_DATA_DIR=${CASTAWAY_DATA_DIR:-${PINEPODS_DATA_DIR:-/data}}
+DATA_DIR=$CASTAWAY_DATA_DIR
 
 # Castaway runs on PostgreSQL only. With no DB_HOST it runs the PostgreSQL server built into
 # this image, keeping its files in $DATA_DIR/postgres. Set DB_HOST (with DB_PORT, DB_USER,
@@ -42,7 +43,7 @@ export DB_NAME=$DB_NAME
 export DB_PORT=$DB_PORT
 export DB_TYPE=$DB_TYPE
 export REVERSE_PROXY=$REVERSE_PROXY
-export PINEPODS_PORT=$PINEPODS_PORT
+export CASTAWAY_PORT=${CASTAWAY_PORT:-$PINEPODS_PORT}
 export PROXY_PROTOCOL=$PROXY_PROTOCOL
 export DEBUG_MODE=${DEBUG_MODE:-'False'}
 # Without any Valkey settings, the built-in database setup keeps that state in memory (one
@@ -109,9 +110,9 @@ cat << "EOF"
 EOF
 
 # Print version beneath the banner
-PINEPODS_VERSION_DISPLAY="$(cat /pinepods/current_version 2>/dev/null || echo 'dev')"
+VERSION_DISPLAY="$(cat /castaway/current_version 2>/dev/null || echo 'dev')"
 echo ""
-echo "  Castaway ${PINEPODS_VERSION_DISPLAY}"
+echo "  Castaway ${VERSION_DISPLAY}"
 echo ""
 
 # Configure timezone based on TZ environment variable
@@ -149,12 +150,12 @@ export TZ
 
 # Create required directories
 echo "Creating required directories..."
-mkdir -p /pinepods/cache
+mkdir -p /castaway/cache
 mkdir -p $DATA_DIR/backups
 mkdir -p $DATA_DIR/downloads
 mkdir -p $DATA_DIR/certs
 mkdir -p $DATA_DIR/local-media  # User-mounted media library; app writes artwork here
-mkdir -p /var/log/pinepods  # Make sure log directory exists
+mkdir -p /var/log/castaway  # Make sure log directory exists
 
 # Seed the persistent, self-updating yt-dlp binary (#793). yt-dlp updates itself at runtime
 # (yt-dlp --update-to), so it must live on a persistent, user-writable path rather than the
@@ -171,28 +172,28 @@ if [ -n "${PUID}" ] && [ -n "${PGID}" ]; then
     chown -R "${PUID}:${PGID}" "$YTDLP_BIN_DIR" 2>/dev/null || true
 fi
 
-# Built-in PostgreSQL. It runs as the 'pinepods' user (PostgreSQL refuses to run as root),
+# Built-in PostgreSQL. It runs as the 'castaway' user (PostgreSQL refuses to run as root),
 # which is remapped to PUID/PGID so the database files belong to the host user like the rest.
 PG_BIN=/usr/libexec/postgresql18
 PG_MAJOR=18
 PG_ROOT=$DATA_DIR/postgres
 PG_SOCKETS=/run/postgresql
 # Horust runs as PUID when both IDs are set and PUID isn't root (see the end of this script);
-# otherwise it runs as root and has to switch to 'pinepods' to start PostgreSQL.
+# otherwise it runs as root and has to switch to 'castaway' to start PostgreSQL.
 if [[ -n "$PUID" && -n "$PGID" && ! "$PUID" =~ ^0+$ ]]; then
-    groupmod -o -g "$PGID" pinepods 2>/dev/null || true
-    usermod -o -u "$PUID" -g "$PGID" pinepods 2>/dev/null || true
+    groupmod -o -g "$PGID" castaway 2>/dev/null || true
+    usermod -o -u "$PUID" -g "$PGID" castaway 2>/dev/null || true
     pg_service_cmd="$PG_BIN/postgres"
 else
-    pg_service_cmd="su-exec pinepods $PG_BIN/postgres"
+    pg_service_cmd="su-exec castaway $PG_BIN/postgres"
 fi
-pg() { su-exec pinepods "$@"; }
+pg() { su-exec castaway "$@"; }
 
 if [[ "$BUNDLED_DB" == true ]]; then
     export PGDATA=$PG_ROOT/data
     pw_file=$PG_ROOT/password
     mkdir -p "$PG_ROOT" "$PG_SOCKETS"
-    chown pinepods:pinepods "$PG_ROOT" "$PG_SOCKETS"
+    chown castaway:castaway "$PG_ROOT" "$PG_SOCKETS"
     chmod 700 "$PG_ROOT"
 
     if [[ ! -s "$PGDATA/PG_VERSION" ]]; then
@@ -202,7 +203,7 @@ if [[ "$BUNDLED_DB" == true ]]; then
         if [[ ! -s "$pw_file" ]]; then
             (umask 077; if [[ -n "$DB_PASSWORD" ]]; then printf '%s' "$DB_PASSWORD"; else openssl rand -hex 24; fi > "$pw_file")
         fi
-        chown pinepods:pinepods "$pw_file"
+        chown castaway:castaway "$pw_file"
         pg "$PG_BIN/initdb" -D "$PGDATA" -U "$DB_USER" --pwfile="$pw_file" \
             --auth=scram-sha-256 --encoding=UTF8 --locale=C.UTF-8 >/dev/null
     fi
@@ -223,7 +224,7 @@ if [[ "$BUNDLED_DB" == true ]]; then
     # as that user: some mounts (Docker Desktop's) report a different owner to root.
     if ! pg test -O "$PGDATA"; then
         echo "Updating database file ownership for the new PUID..."
-        chown -R pinepods:pinepods "$PGDATA" "$pw_file"
+        chown -R castaway:castaway "$PGDATA" "$pw_file"
     fi
     # The Castaway server creates its database and schema itself when it starts.
 fi
@@ -234,13 +235,13 @@ if [[ $DEBUG_MODE == "true" ]]; then
     export HORUST_STDERR_MODE="STDERR"
     echo "Starting Horust in debug mode (logs to stdout)..."
 else
-    export HORUST_STDOUT_MODE="/var/log/pinepods/service.log"
-    export HORUST_STDERR_MODE="/var/log/pinepods/service.log"
+    export HORUST_STDOUT_MODE="/var/log/castaway/service.log"
+    export HORUST_STDERR_MODE="/var/log/castaway/service.log"
     echo "Starting Horust in production mode (logs to files)..."
 fi
 
 # Copy service configurations to Horust directory
-cp /pinepods/startup/services/*.toml /etc/horust/services/
+cp /castaway/startup/services/*.toml /etc/horust/services/
 if [[ "$BUNDLED_DB" == true ]]; then
     # SIGINT is PostgreSQL's "fast" shutdown: it disconnects clients and stops cleanly.
     cat > /etc/horust/services/postgres.toml <<EOF
@@ -260,7 +261,7 @@ keep-env = true
 signal = "INT"
 wait = "30s"
 EOF
-    sed -i '1i start-after = ["postgres.toml"]' /etc/horust/services/pinepods-api.toml
+    sed -i '1i start-after = ["postgres.toml"]' /etc/horust/services/castaway.toml
 fi
 
 # Ensure runtime directories exist and are writable when running non-root.
@@ -301,16 +302,16 @@ if [[ -n "$PUID" && -n "$PGID" ]]; then
     echo "Configuring non-root execution as ${PUID}:${PGID}..."
 
     # Remap the runtime user/group to the requested IDs (-o allows duplicate IDs).
-    # This gives the dropped-privilege process a valid passwd entry and HOME (/pinepods).
-    groupmod -o -g "$PGID" pinepods 2>/dev/null || true
-    usermod -o -u "$PUID" -g "$PGID" pinepods 2>/dev/null || true
+    # This gives the dropped-privilege process a valid passwd entry and HOME (/castaway).
+    groupmod -o -g "$PGID" castaway 2>/dev/null || true
+    usermod -o -u "$PUID" -g "$PGID" castaway 2>/dev/null || true
 
     # Cheap, non-recursive ownership of the dirs the app writes to.
     # Note: local-media is intentionally chowned non-recursively — it's often a large
     # pre-existing library; the app only needs to write artwork into a subdir.
     # nginx's dirs are deliberately absent here — they are set above to the user
     # nginx actually runs its workers as, which is not PUID when the master is root.
-    chown "${PUID}:${PGID}" /pinepods/cache /var/log/pinepods $DATA_DIR/certs \
+    chown "${PUID}:${PGID}" /castaway/cache /var/log/castaway $DATA_DIR/certs \
                             $DATA_DIR/downloads $DATA_DIR/backups \
                             $DATA_DIR/local-media \
                             /var/run/horust 2>/dev/null || true

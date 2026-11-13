@@ -104,6 +104,27 @@
         }
       }
     },
+    "/api/castaway_check": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Lets apps confirm the address they were given is a Castaway server.\nGET /api/castaway_check",
+        "operationId": "castaway_check",
+        "responses": {
+          "200": {
+            "description": "Confirms this is a Castaway instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CastawayCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/add_category": {
       "post": {
         "tags": [
@@ -3555,6 +3576,33 @@
         }
       }
     },
+    "/api/data/get_castaway_version": {
+      "get": {
+        "tags": [
+          "podcasts"
+        ],
+        "summary": "Get the Castaway version",
+        "operationId": "get_castaway_version",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key"
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/api/data/get_default_volume": {
       "post": {
         "tags": [
@@ -3951,33 +3999,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/QueuedEpisode"
                 }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key"
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ]
-      }
-    },
-    "/api/data/get_pinepods_version": {
-      "get": {
-        "tags": [
-          "podcasts"
-        ],
-        "summary": "Get pinepods version",
-        "operationId": "get_pinepods_version",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           },
@@ -11746,27 +11767,6 @@
         }
       }
     },
-    "/api/pinepods_check": {
-      "get": {
-        "tags": [
-          "health"
-        ],
-        "summary": "Castaway instance check endpoint - matches Python API exactly\nGET /api/pinepods_check",
-        "operationId": "pinepods_check",
-        "responses": {
-          "200": {
-            "description": "Confirms this is a Castaway instance",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PinepodsCheckResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/proxy/image": {
       "get": {
         "tags": [
@@ -12968,6 +12968,23 @@
               "null"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "CastawayCheckResponse": {
+        "type": "object",
+        "required": [
+          "status_code",
+          "castaway_instance"
+        ],
+        "properties": {
+          "status_code": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "castaway_instance": {
+            "type": "boolean"
           }
         }
       },
@@ -15747,23 +15764,6 @@
           }
         }
       },
-      "PinepodsCheckResponse": {
-        "type": "object",
-        "required": [
-          "status_code",
-          "pinepods_instance"
-        ],
-        "properties": {
-          "status_code": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "pinepods_instance": {
-            "type": "boolean"
-          }
-        }
-      },
       "PlayEpisodeDetailsRequest": {
         "type": "object",
         "required": [
@@ -17948,7 +17948,7 @@
           },
           "server_url_configured": {
             "type": "boolean",
-            "description": "`server_url` comes from `PINEPODS_PUBLIC_URL`; otherwise it was guessed from the request\nand a client may prefer the URL it reached Castaway at."
+            "description": "`server_url` comes from `CASTAWAY_PUBLIC_URL`; otherwise it was guessed from the request\nand a client may prefer the URL it reached Castaway at."
           },
           "notice": {
             "type": [

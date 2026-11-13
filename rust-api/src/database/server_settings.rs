@@ -3,9 +3,9 @@
 use super::*;
 
 impl DatabasePool {
-    // Get Castaway version - matches Python get_pinepods_version function
-    pub async fn get_pinepods_version(&self) -> AppResult<String> {
-        match std::fs::read_to_string("/pinepods/current_version") {
+    // The Castaway version written into the image at build time.
+    pub async fn get_castaway_version(&self) -> AppResult<String> {
+        match std::fs::read_to_string("/castaway/current_version") {
             Ok(version) => {
                 let version = version.trim();
                 if version.is_empty() {

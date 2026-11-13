@@ -32,8 +32,6 @@ IconData _deviceIcon(String deviceType) {
     case 'android':
     case 'mobile':
       return PhosphorIconsRegular.deviceMobile;
-    case 'firewood':
-      return PhosphorIconsRegular.terminalWindow;
     default:
       return PhosphorIconsRegular.devices;
   }

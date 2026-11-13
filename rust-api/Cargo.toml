@@ -4,6 +4,11 @@ version = "0.10.1"
 edition = "2021"
 rust-version = "1.99"
 
+# The server program is called castaway (the crate keeps its old name).
+[[bin]]
+name = "castaway"
+path = "src/main.rs"
+
 [dependencies]
 # Web Framework
 axum = { version = "0.8.9", features = ["macros", "multipart", "ws"] }

@@ -308,7 +308,7 @@ async fn the_login_page_asks_for_credentials() {
 
 #[wasm_bindgen_test]
 async fn a_rejected_login_stays_on_the_page_and_says_so() {
-    answer_api_with(json!({ "/api/pinepods_check": { "status_code": 200, "pinepods_instance": true } }));
+    answer_api_with(json!({ "/api/castaway_check": { "status_code": 200, "castaway_instance": true } }));
     sign_out();
     let (root, app) = render(Page::Login).await;
     let username: web_sys::HtmlInputElement =
@@ -338,7 +338,7 @@ async fn a_rejected_login_stays_on_the_page_and_says_so() {
     TimeoutFuture::new(100).await; // let the rejection be handled
 
     let calls = calls_so_far();
-    assert!(calls.contains("/api/pinepods_check"), "the server was checked: {calls}");
+    assert!(calls.contains("/api/castaway_check"), "the server was checked: {calls}");
     assert!(
         calls.contains(&format!("{origin}/api/data/get_key")),
         "whatever follows the address in the page's URL stays out of the server address: {calls}"

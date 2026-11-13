@@ -2,22 +2,30 @@ use axum::{extract::State, response::Json};
 use chrono::Utc;
 use crate::{
     error::AppResult,
-    models::{HealthResponse, PinepodsCheckResponse},
+    models::{CastawayCheckResponse, HealthResponse, LegacyCheckResponse},
     AppState,
 };
 
-/// Castaway instance check endpoint - matches Python API exactly
-/// GET /api/pinepods_check
+/// Lets apps confirm the address they were given is a Castaway server.
+/// GET /api/castaway_check
 #[utoipa::path(
     get,
-    path = "/api/pinepods_check",
+    path = "/api/castaway_check",
     tag = "health",
     responses(
-        (status = 200, description = "Confirms this is a Castaway instance", body = PinepodsCheckResponse),
+        (status = 200, description = "Confirms this is a Castaway instance", body = CastawayCheckResponse),
     ),
 )]
-pub async fn pinepods_check() -> Json<PinepodsCheckResponse> {
-    Json(PinepodsCheckResponse {
+pub async fn castaway_check() -> Json<CastawayCheckResponse> {
+    Json(CastawayCheckResponse {
+        status_code: 200,
+        castaway_instance: true,
+    })
+}
+
+/// The same check under its old address, for apps from before 0.10.2. Not in the API docs.
+pub async fn legacy_check() -> Json<LegacyCheckResponse> {
+    Json(LegacyCheckResponse {
         status_code: 200,
         pinepods_instance: true,
     })

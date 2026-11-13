@@ -42,20 +42,20 @@ pub struct LoginResponse {
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
-pub struct PinepodsCheckResponse {
+pub struct CastawayCheckResponse {
     status_code: u16,
-    pinepods_instance: bool,
+    castaway_instance: bool,
 }
 
-pub async fn verify_pinepods_instance(
+pub async fn verify_castaway_instance(
     server_name: &str,
-) -> Result<PinepodsCheckResponse, anyhow::Error> {
-    let url = format!("{}/api/pinepods_check", server_name);
+) -> Result<CastawayCheckResponse, anyhow::Error> {
+    let url = format!("{}/api/castaway_check", server_name);
     let response = Request::get(&url).send().await?;
 
     if response.ok() {
-        let check_data: PinepodsCheckResponse = response.json().await?;
-        if check_data.pinepods_instance {
+        let check_data: CastawayCheckResponse = response.json().await?;
+        if check_data.castaway_instance {
             Ok(check_data)
         } else {
             Err(anyhow::Error::msg("Castaway instance not found"))
@@ -194,9 +194,9 @@ pub async fn login_new_server_secure(
     let url = format!("{}/api/data/get_key", server_name);
 
     // Step 1: Verify Server
-    match verify_pinepods_instance(&server_name).await {
+    match verify_castaway_instance(&server_name).await {
         Ok(check_data) => {
-            if !check_data.pinepods_instance {
+            if !check_data.castaway_instance {
                 return Err(anyhow::Error::msg(
                     "Castaway instance not found at specified server",
                 ));
@@ -330,9 +330,9 @@ pub async fn login_new_server(
     let url = format!("{}/api/data/get_key", server_name);
 
     // Step 1: Verify Server
-    match verify_pinepods_instance(&server_name).await {
+    match verify_castaway_instance(&server_name).await {
         Ok(check_data) => {
-            if !check_data.pinepods_instance {
+            if !check_data.castaway_instance {
                 return Err(anyhow::Error::msg(
                     "Castaway instance not found at specified server",
                 ));
@@ -401,7 +401,7 @@ pub async fn login_new_server(
             Ok((user_details, login_request, server_details))
         }
         Err(e) => {
-            // Directly propagate the error from verify_pinepods_instance
+            // Directly propagate the error from verify_castaway_instance
             return Err(e);
         }
     }

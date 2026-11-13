@@ -526,7 +526,7 @@ pub async fn get_config(
     
     // Get configuration from environment variables (same as Python)
     let proxy_host = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
-    let proxy_port = std::env::var("PINEPODS_PORT").unwrap_or_else(|_| "8040".to_string());
+    let proxy_port = crate::env::var("PORT").unwrap_or_else(|| "8040".to_string());
     let proxy_protocol = std::env::var("PROXY_PROTOCOL").unwrap_or_else(|_| "http".to_string());
     let reverse_proxy = std::env::var("REVERSE_PROXY").unwrap_or_else(|_| "False".to_string());
     
@@ -1137,9 +1137,9 @@ fn oidc_allowed_hosts(headers: &HeaderMap) -> Vec<String> {
         .into_iter()
         .flatten()
         .map(|h| format!("http://{h}"));
-    let from_env = ["SERVER_URL", crate::handlers::sync_settings::PUBLIC_URL_ENV]
+    let from_env = [std::env::var("SERVER_URL").ok(), crate::env::var(crate::handlers::sync_settings::PUBLIC_URL_ENV)]
         .into_iter()
-        .filter_map(|name| std::env::var(name).ok());
+        .flatten();
     from_headers
         .chain(from_env)
         .filter_map(|u| url::Url::parse(u.trim()).ok()?.host_str().map(str::to_ascii_lowercase))

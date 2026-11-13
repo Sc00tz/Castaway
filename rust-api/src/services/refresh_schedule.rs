@@ -22,7 +22,7 @@ const CADENCE_SAMPLE: usize = 10;
 /// How long after a feed's announced publishing time it's refreshed.
 const AFTER_EXPECTED: Duration = Duration::minutes(10);
 const JITTER: f64 = 0.1;
-/// Default `PINEPODS_REFRESH_MAX_INTERVAL`.
+/// Default `CASTAWAY_REFRESH_MAX_INTERVAL`.
 const DEFAULT_MAX_INTERVAL: Duration = Duration::hours(24);
 
 /// What a feed and its host say about how often it changes.
@@ -340,7 +340,7 @@ fn parse_time(value: &str) -> Option<DateTime<Utc>> {
     None
 }
 
-/// `PINEPODS_REFRESH_MAX_INTERVAL`: minutes, or a number with s/m/h/d.
+/// `CASTAWAY_REFRESH_MAX_INTERVAL`: minutes, or a number with s/m/h/d.
 pub fn parse_max_interval(value: &str) -> Option<Duration> {
     let v = value.trim().to_ascii_lowercase();
     let (number, unit) = match v.find(|c: char| !c.is_ascii_digit()) {
@@ -358,33 +358,16 @@ pub fn parse_max_interval(value: &str) -> Option<Duration> {
     Some(d.max(Duration::minutes(1)))
 }
 
-/// The gap between consecutive runs of a cron schedule (the old `PINEPODS_REFRESH_CRON`).
-fn cron_interval(cron: &str) -> Option<Duration> {
-    use croner::parser::{CronParser, Seconds};
-    let parsed = CronParser::builder().seconds(Seconds::Optional).sloppy_ranges(true).build().parse(cron).ok()?;
-    let first = parsed.find_next_occurrence(&Utc::now(), false).ok()?;
-    let second = parsed.find_next_occurrence(&first, false).ok()?;
-    Some((second - first).max(Duration::minutes(1)))
-}
-
 /// The longest any feed waits between refreshes.
 pub fn max_interval() -> Duration {
     static MAX: OnceLock<Duration> = OnceLock::new();
     *MAX.get_or_init(|| {
-        let var = |name| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
-        if let Some(value) = var("PINEPODS_REFRESH_MAX_INTERVAL") {
+        if let Some(value) = crate::env::var("REFRESH_MAX_INTERVAL") {
             if let Some(d) = parse_max_interval(&value) {
                 info!("Feeds are refreshed at least every {} minutes", d.num_minutes());
                 return d;
             }
-            warn!("Ignoring PINEPODS_REFRESH_MAX_INTERVAL={value:?}: expected minutes or a number with s/m/h/d");
-        } else if let Some(cron) = var("PINEPODS_REFRESH_CRON") {
-            warn!("PINEPODS_REFRESH_CRON is deprecated: feeds now refresh on their own schedule. Set PINEPODS_REFRESH_MAX_INTERVAL instead");
-            if let Some(d) = cron_interval(&cron) {
-                info!("Feeds are refreshed at least every {} minutes (from PINEPODS_REFRESH_CRON)", d.num_minutes());
-                return d;
-            }
-            warn!("Ignoring PINEPODS_REFRESH_CRON={cron:?}: not a valid cron expression");
+            warn!("Ignoring CASTAWAY_REFRESH_MAX_INTERVAL={value:?}: expected minutes or a number with s/m/h/d");
         }
         DEFAULT_MAX_INTERVAL
     })
@@ -578,8 +561,5 @@ mod tests {
         assert_eq!(parse_max_interval("0"), None);
         assert_eq!(parse_max_interval("soon"), None);
         assert_eq!(parse_max_interval("5w"), None);
-        assert_eq!(cron_interval("0 */30 * * * *"), Some(Duration::minutes(30)));
-        assert_eq!(cron_interval("*/15 * * * *"), Some(Duration::minutes(15)));
-        assert_eq!(cron_interval("not a cron"), None);
     }
 }

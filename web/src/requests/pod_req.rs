@@ -3799,11 +3799,11 @@ struct VersionResponse {
     data: String,
 }
 
-pub async fn call_get_pinepods_version(
+pub async fn call_get_castaway_version(
     server_name: String,
     api_key: &Option<String>,
 ) -> Result<String, Error> {
-    let url = format!("{}/api/data/get_pinepods_version", server_name);
+    let url = format!("{}/api/data/get_castaway_version", server_name);
     let api_key_ref = api_key
         .as_deref()
         .ok_or_else(|| anyhow::Error::msg("API key is missing"))?;

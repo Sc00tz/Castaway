@@ -1,12 +1,12 @@
-//! Where the server keeps files. The defaults are the container's layout; `PINEPODS_DATA_DIR`
-//! and `PINEPODS_WEB_ROOT` move them, which lets tests run without touching those locations.
+//! Where the server keeps files. The defaults are the container's layout; `CASTAWAY_DATA_DIR`
+//! and `CASTAWAY_WEB_ROOT` move them, which lets tests run without touching those locations.
 
 fn data_dir() -> String {
-    std::env::var("PINEPODS_DATA_DIR").unwrap_or_else(|_| "/data".to_string())
+    crate::env::var("DATA_DIR").unwrap_or_else(|| "/data".to_string())
 }
 
 fn web_root() -> String {
-    std::env::var("PINEPODS_WEB_ROOT").unwrap_or_else(|_| "/var/www/html".to_string())
+    crate::env::var("WEB_ROOT").unwrap_or_else(|| "/var/www/html".to_string())
 }
 
 pub fn downloads_dir() -> String {

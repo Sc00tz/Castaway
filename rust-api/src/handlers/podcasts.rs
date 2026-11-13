@@ -2543,19 +2543,20 @@ pub async fn get_extended_stats(
     }
 }
 
-// Get Castaway version - matches Python get_pinepods_version endpoint exactly
+// The server's Castaway version. Also served at /get_pinepods_version (not in the API docs)
+// for apps from before 0.10.2.
 #[utoipa::path(
     get,
-    path = "/get_pinepods_version",
+    path = "/get_castaway_version",
     tag = "podcasts",
-    summary = "Get pinepods version",
+    summary = "Get the Castaway version",
     security(("api_key" = [])),
     responses(
         (status = 200, description = "Success", body = serde_json::Value),
         (status = 401, description = "Invalid or missing API key"),
     ),
 )]
-pub async fn get_pinepods_version(
+pub async fn get_castaway_version(
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -2567,7 +2568,7 @@ pub async fn get_pinepods_version(
         return Err(AppError::unauthorized("Your API key is either invalid or does not have correct permission"));
     }
 
-    let version = state.db_pool.get_pinepods_version().await?;
+    let version = state.db_pool.get_castaway_version().await?;
     
     Ok(Json(serde_json::json!({ "data": version })))
 }

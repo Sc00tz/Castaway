@@ -29,13 +29,13 @@ impl Default for PushDelays {
 }
 
 impl PushDelays {
-    /// The defaults, overridden by `PINEPODS_SYNC_PUSH_DELAY` / `PINEPODS_SYNC_PUSH_MAX_DELAY`
+    /// The defaults, overridden by `CASTAWAY_SYNC_PUSH_DELAY` / `CASTAWAY_SYNC_PUSH_MAX_DELAY`
     /// (seconds).
     pub fn from_env() -> Self {
-        let secs = |name: &str| std::env::var(name).ok().and_then(|v| v.trim().parse::<u64>().ok()).map(Duration::from_secs);
+        let secs = |name: &str| crate::env::var(name).and_then(|v| v.trim().parse::<u64>().ok()).map(Duration::from_secs);
         let d = PushDelays::default();
-        let quiet = secs("PINEPODS_SYNC_PUSH_DELAY").unwrap_or(d.quiet);
-        let max_wait = secs("PINEPODS_SYNC_PUSH_MAX_DELAY").unwrap_or(d.max_wait).max(quiet);
+        let quiet = secs("SYNC_PUSH_DELAY").unwrap_or(d.quiet);
+        let max_wait = secs("SYNC_PUSH_MAX_DELAY").unwrap_or(d.max_wait).max(quiet);
         PushDelays { quiet, max_wait }
     }
 

@@ -43,7 +43,6 @@ pub fn device_icon(device_type: &str) -> &'static str {
     match device_type.to_ascii_lowercase().as_str() {
         "web" => "ph ph-browser",
         "ios" | "android" | "mobile" => "ph ph-device-mobile",
-        "firewood" => "ph ph-terminal-window",
         _ => "ph ph-monitor",
     }
 }

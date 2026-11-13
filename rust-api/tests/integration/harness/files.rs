@@ -1,5 +1,5 @@
-//! The server's file storage during tests, and audio to put in it. `PINEPODS_DATA_DIR` and
-//! `PINEPODS_WEB_ROOT` are process-wide, so all tests share one sandbox: downloads are told
+//! The server's file storage during tests, and audio to put in it. `CASTAWAY_DATA_DIR` and
+//! `CASTAWAY_WEB_ROOT` are process-wide, so all tests share one sandbox: downloads are told
 //! apart by podcast name and ids, and local-media tests use a folder named after their tag.
 
 use std::path::{Path, PathBuf};
@@ -28,12 +28,12 @@ pub fn install_sandbox() {
     let data = data.canonicalize().unwrap();
     let web = web.canonicalize().unwrap();
     // SAFETY (edition 2021 API): runs once, before the server code under test starts.
-    std::env::set_var("PINEPODS_DATA_DIR", &data);
-    std::env::set_var("PINEPODS_WEB_ROOT", &web);
+    std::env::set_var("CASTAWAY_DATA_DIR", &data);
+    std::env::set_var("CASTAWAY_WEB_ROOT", &web);
 }
 
 pub fn data_dir() -> PathBuf {
-    PathBuf::from(std::env::var("PINEPODS_DATA_DIR").expect("sandbox installed"))
+    PathBuf::from(std::env::var("CASTAWAY_DATA_DIR").expect("sandbox installed"))
 }
 
 /// A folder under the local-media root.

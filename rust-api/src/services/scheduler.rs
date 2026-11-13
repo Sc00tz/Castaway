@@ -92,8 +92,8 @@ impl BackgroundScheduler {
         info!("🕒 Starting background task scheduler...");
 
         // Every minute, refresh the feeds that are due. Each feed's next refresh follows how often
-        // it publishes, at most PINEPODS_REFRESH_MAX_INTERVAL apart (read now, so a deprecated or
-        // invalid setting is reported at startup).
+        // it publishes, at most CASTAWAY_REFRESH_MAX_INTERVAL apart (read now, so an invalid
+        // setting is reported at startup).
         crate::services::refresh_schedule::max_interval();
         let refresh_state = app_state.clone();
         let refresh_job = Job::new_async("0 * * * * *", move |_uuid, _l| {
@@ -104,11 +104,9 @@ impl BackgroundScheduler {
         })?;
 
         // External sync (gpodder servers, Nextcloud), separate from the refresh. Configurable via
-        // PINEPODS_SYNC_CRON (same format); defaults to every 5 minutes. Local changes are also
+        // CASTAWAY_SYNC_CRON (same format); defaults to every 5 minutes. Local changes are also
         // pushed shortly after they happen.
-        let sync_cron = std::env::var("PINEPODS_SYNC_CRON")
-            .ok()
-            .filter(|s| !s.trim().is_empty())
+        let sync_cron = crate::env::var("SYNC_CRON")
             .unwrap_or_else(|| "0 */5 * * * *".to_string());
         info!("📅 External sync schedule: {}", sync_cron);
         let sync_state = app_state.clone();

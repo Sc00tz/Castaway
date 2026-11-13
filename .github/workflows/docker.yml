@@ -81,7 +81,7 @@ jobs:
         run: |
           docker buildx build \
             --platform "linux/${{ matrix.arch }}" \
-            --build-arg "PINEPODS_VERSION=${{ needs.version.outputs.version }}" \
+            --build-arg "CASTAWAY_VERSION=${{ needs.version.outputs.version }}" \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --label "org.opencontainers.image.revision=${{ github.sha }}" \
             --cache-from "type=gha,scope=${{ matrix.arch }}" \

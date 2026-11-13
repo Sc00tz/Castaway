@@ -27,6 +27,13 @@ class PinepodsLoginService {
 
   /// Verify if the server is a valid Castaway instance.
   ///
+  /// The check's address on servers before 0.10.2.
+  static const legacyCheckPath = '/api/pinepods_check';
+
+  /// Whether a check response comes from a Castaway server (any version).
+  static bool isCastawayCheck(dynamic data) =>
+      data is Map && (data['castaway_instance'] == true || data['pinepods_instance'] == true);
+
   /// Kept for backwards compatibility; prefer [checkServer] which reports *why*
   /// a check failed.
   static Future<bool> verifyPinepodsInstance(String serverUrl) async {
@@ -43,18 +50,22 @@ class PinepodsLoginService {
   static Future<ServerCheckResult> checkServer(String serverUrl,
       {http.Client? client}) async {
     final normalizedUrl = serverUrl.trim().replaceAll(RegExp(r'/$'), '');
-    final url = Uri.parse('$normalizedUrl/api/pinepods_check');
     final httpClient = client ?? http.Client();
+    Future<http.Response> check(String path) => httpClient
+        .get(Uri.parse('$normalizedUrl$path'), headers: {'User-Agent': userAgent})
+        .timeout(_requestTimeout);
 
     try {
-      final response = await httpClient
-          .get(url, headers: {'User-Agent': userAgent})
-          .timeout(_requestTimeout);
+      var response = await check('/api/castaway_check');
+      // Servers before 0.10.2 answer at the old address.
+      if (response.statusCode == 404) {
+        response = await check(legacyCheckPath);
+      }
 
       if (response.statusCode == 200) {
         try {
           final data = jsonDecode(response.body);
-          if (data['pinepods_instance'] == true) {
+          if (isCastawayCheck(data)) {
             return ServerCheckResult.ok;
           }
         } on FormatException {

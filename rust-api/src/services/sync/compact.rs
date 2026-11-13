@@ -10,11 +10,11 @@ use crate::database::DatabasePool;
 use crate::error::AppResult;
 
 /// Days a superseded log row is kept. 0 turns compaction off.
-pub const RETENTION_ENV: &str = "PINEPODS_SYNC_LOG_RETENTION_DAYS";
+pub const RETENTION_ENV: &str = "SYNC_LOG_RETENTION_DAYS";
 const DEFAULT_RETENTION_DAYS: i64 = 90;
 
 pub fn retention_days() -> i64 {
-    std::env::var(RETENTION_ENV).ok().and_then(|v| v.trim().parse::<i64>().ok()).filter(|d| *d >= 0).unwrap_or(DEFAULT_RETENTION_DAYS)
+    crate::env::var(RETENTION_ENV).and_then(|v| v.trim().parse::<i64>().ok()).filter(|d| *d >= 0).unwrap_or(DEFAULT_RETENTION_DAYS)
 }
 
 /// One log row as compaction sees it: what item it's about, and when it arrived.
@@ -49,7 +49,7 @@ pub struct CompactSummary {
 pub async fn run(db: &DatabasePool) -> AppResult<CompactSummary> {
     let days = retention_days();
     if days == 0 {
-        debug!("Sync log compaction is off ({RETENTION_ENV}=0)");
+        debug!("Sync log compaction is off ({}=0)", crate::env::name(RETENTION_ENV));
         return Ok(CompactSummary::default());
     }
     let cutoff = chrono::Utc::now().timestamp() - days * 86_400;

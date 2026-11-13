@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:pinepods_mobile/services/pinepods/login_service.dart';
 import 'package:pinepods_mobile/entities/episode.dart';
 import 'package:pinepods_mobile/entities/pinepods_episode.dart';
 import 'package:pinepods_mobile/entities/pinepods_collection.dart';
@@ -74,14 +75,16 @@ class PinepodsService {
   Future<bool> verifyPinepodsInstance(String serverUrl) async {
     // Normalize the URL by removing trailing slashes
     final normalizedUrl = serverUrl.trim().replaceAll(RegExp(r'/$'), '');
-    final url = Uri.parse('$normalizedUrl/api/pinepods_check');
 
     try {
-      final response = await _get(url);
+      var response = await _get(Uri.parse('$normalizedUrl/api/castaway_check'));
+      // Servers before 0.10.2 answer at the old address.
+      if (response.statusCode == 404) {
+        response = await _get(Uri.parse('$normalizedUrl${PinepodsLoginService.legacyCheckPath}'));
+      }
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['pinepods_instance'] == true;
+        return PinepodsLoginService.isCastawayCheck(jsonDecode(response.body));
       }
       return false;
     } catch (e) {
@@ -2429,7 +2432,7 @@ class PinepodsService {
       throw Exception('Not authenticated');
     }
 
-    final url = Uri.parse('$_server/api/data/get_pinepods_version');
+    final url = Uri.parse('$_server/api/data/get_castaway_version');
 
     try {
       final response = await _get(

@@ -382,7 +382,7 @@ impl DownloadedEpisodeRecords {
 pub struct UserStatsStore {
     pub stats: Option<UserStats>,
     pub extended_stats: Option<ExtendedUserStats>,
-    pub pinepods_version: Option<String>,
+    pub castaway_version: Option<String>,
 }
 
 #[derive(Default, Deserialize, Clone, PartialEq, Store, Debug)]

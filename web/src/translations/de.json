@@ -20,7 +20,7 @@
     "api_id": "API-ID",
     "api_key_deleted_successfully": "API Schlüssel erfolgreich gelöscht",
     "api_key_save_instructions": "Speichere den API Schlüssel an einem sicheren Ort. Er ist nur einmal sichtbar. Du kannst jederzeit einen neuen Schlüssel erstellen.",
-    "api_keys_description": "Hier kannst du einen Castaway-API-Schlüssel anfordern. Diese Schlüssel können dann zusammen mit anderen Castaway-Apps (z. B. Firewood) verwendet werden, um diese mit dem Castaway-Server zu verbinden. Zusätzlich kannst du einen API-Schlüssel auch nutzen, um dich von einem anderen Castaway-Server aus bei diesem Server anzumelden – quasi als würdest du einen anderen Server als Client für diesen hier verwenden.",
+    "api_keys_description": "Hier kannst du einen Castaway-API-Schlüssel anfordern. Diese Schlüssel können dann zusammen mit anderen Castaway-Apps verwendet werden, um diese mit dem Castaway-Server zu verbinden. Zusätzlich kannst du einen API-Schlüssel auch nutzen, um dich von einem anderen Castaway-Server aus bei diesem Server anzumelden – quasi als würdest du einen anderen Server als Client für diesen hier verwenden.",
     "api_keys_title": "API Schlüssel:",
     "cancel": "Abbrechen",
     "close_modal": "Dialog schließen",

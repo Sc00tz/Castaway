@@ -20,7 +20,7 @@
     "api_id": "ID de l'API",
     "api_key_deleted_successfully": "Clé API supprimée avec succès",
     "api_key_save_instructions": "Copiez la clé API ci-dessous. Assurez-vous de la placer en lieu sûr. Vous ne pourrez voir cette clé qu'une seule fois. Il est toujours possible de créer une nouvelle clé si vous la perdez.",
-    "api_keys_description": "Vous pouvez demander une clé API Castaway ici. Ces clés peuvent être utilisées conjointement avec d'autres applications Castaway (comme Firewood) pour les connecter au serveur Castaway. De plus, vous pouvez utiliser cette clé API pour vous authentifier à ce serveur depuis n'importe quel autre serveur Castaway, dans l'idée d'utiliser un autre serveur comme un client de celui-ci.",
+    "api_keys_description": "Vous pouvez demander une clé API Castaway ici. Ces clés peuvent être utilisées conjointement avec d'autres applications Castaway pour les connecter au serveur Castaway. De plus, vous pouvez utiliser cette clé API pour vous authentifier à ce serveur depuis n'importe quel autre serveur Castaway, dans l'idée d'utiliser un autre serveur comme un client de celui-ci.",
     "api_keys_title": "Clés API :",
     "cancel": "Annuler",
     "close_modal": "Fermer la fenêtre",

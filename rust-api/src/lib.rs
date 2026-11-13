@@ -20,6 +20,7 @@ use tower_http::{
 
 pub mod config;
 pub mod database;
+pub mod env;
 pub mod error;
 pub mod gpodder;
 pub mod handlers;
@@ -73,7 +74,8 @@ pub fn openapi_router() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(openapi::ApiDoc::openapi())
         // Health check endpoints (annotated — appear in the spec).
         // One routes!() call per distinct path; routes!() groups methods that share a path.
-        .routes(routes!(handlers::health::pinepods_check))
+        .routes(routes!(handlers::health::castaway_check))
+        .route("/api/pinepods_check", get(handlers::health::legacy_check))
         .routes(routes!(handlers::health::health_check))
         // Partially-migrated groups (annotated handlers appear in the spec; the rest serve as plain routes)
         .nest("/api/data", create_data_routes())
@@ -269,7 +271,8 @@ fn create_data_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::podcasts::get_podcast_id_from_ep_id))
         .routes(routes!(handlers::podcasts::get_stats))
         .routes(routes!(handlers::podcasts::get_extended_stats))
-        .routes(routes!(handlers::podcasts::get_pinepods_version))
+        .routes(routes!(handlers::podcasts::get_castaway_version))
+        .route("/get_pinepods_version", get(handlers::podcasts::get_castaway_version))
         .routes(routes!(handlers::podcasts::search_data))
         .routes(routes!(handlers::podcasts::proxy_search))
         .routes(routes!(handlers::podcasts::proxy_trending))

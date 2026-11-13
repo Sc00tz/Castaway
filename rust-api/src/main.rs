@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
-    // Offline OpenAPI dump: `pinepods-api --dump-openapi [path]` writes the spec and exits.
+    // Offline OpenAPI dump: `castaway --dump-openapi [path]` writes the spec and exits.
     // Builds the document without touching the database/Redis so it can run in CI.
     let args: Vec<String> = std::env::args().collect();
     if let Some(pos) = args.iter().position(|a| a == "--dump-openapi") {
@@ -136,7 +136,7 @@ async fn main() -> AppResult<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
     info!("🌐 Castaway Rust API listening on http://{}", addr);
     info!("📊 Health check available at: http://{}/api/health", addr);
-    debug!("🔍 API check available at: http://{}/api/pinepods_check", addr);
+    debug!("🔍 API check available at: http://{}/api/castaway_check", addr);
     info!("Server listening on {}", addr);
 
     // Start the server

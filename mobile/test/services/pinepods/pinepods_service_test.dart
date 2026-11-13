@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:pinepods_mobile/services/pinepods/login_service.dart';
 import 'package:pinepods_mobile/services/pinepods/pinepods_service.dart';
 
 void main() {
@@ -17,14 +18,28 @@ void main() {
       Uri? capturedUrl;
       final client = MockClient((request) async {
         capturedUrl = request.url;
-        return http.Response('{"pinepods_instance": true}', 200);
+        return http.Response('{"castaway_instance": true}', 200);
       });
       final service = PinepodsService(client: client);
 
       final result = await service.verifyPinepodsInstance('https://pods.example.com');
 
       expect(result, isTrue);
-      expect(capturedUrl.toString(), 'https://pods.example.com/api/pinepods_check');
+      expect(capturedUrl.toString(), 'https://pods.example.com/api/castaway_check');
+    });
+
+    test('a server from before 0.10.2 is found at the old check address', () async {
+      final paths = <String>[];
+      final client = MockClient((request) async {
+        paths.add(request.url.path);
+        return request.url.path == '/api/castaway_check'
+            ? http.Response('Not Found', 404)
+            : http.Response('{"status_code": 200, "pinepods_instance": true}', 200);
+      });
+      final service = PinepodsService(client: client);
+
+      expect(await service.verifyPinepodsInstance('https://pods.example.com'), isTrue);
+      expect(paths, ['/api/castaway_check', PinepodsLoginService.legacyCheckPath]);
     });
 
     test('a request that never responds times out instead of hanging forever', () async {
@@ -46,7 +61,7 @@ void main() {
       var callCount = 0;
       final client = MockClient((request) async {
         callCount++;
-        return http.Response('{"pinepods_instance": true}', 200);
+        return http.Response('{"castaway_instance": true}', 200);
       });
       final service = PinepodsService(client: client);
 

@@ -20,7 +20,7 @@
     "api_id": "API ID",
     "api_key_deleted_successfully": "API-nyckeln har tagits bort",
     "api_key_save_instructions": "Kopiera API-nyckeln nedan. Var noga med att spara den på en säker plats. Du kan bara se den en gång, men du kan alltid skapa en ny nyckel om du förlorar den.",
-    "api_keys_description": "Du kan begära en API-nyckel för Castaway här. Dessa nycklar kan användas ihop med andra Castaway-appar (som t.ex Firewood) för att ansluta dem till Castaway-servern. Dessutom kan du använda en API-nyckel för att autentisera gentemot den här servern från en annan Castaway-server. Ungefär som att använda en annan server som en klient för den här servern.",
+    "api_keys_description": "Du kan begära en API-nyckel för Castaway här. Dessa nycklar kan användas ihop med andra Castaway-appar för att ansluta dem till Castaway-servern. Dessutom kan du använda en API-nyckel för att autentisera gentemot den här servern från en annan Castaway-server. Ungefär som att använda en annan server som en klient för den här servern.",
     "api_keys_title": "API-nycklar:",
     "cancel": "Avbryt",
     "close_modal": "Stäng rutan",

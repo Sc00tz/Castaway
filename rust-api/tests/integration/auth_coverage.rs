@@ -28,7 +28,7 @@ enum Public {
 }
 
 const PUBLIC: &[(&str, Public)] = &[
-    ("GET /api/pinepods_check", Public::Open("instance discovery for clients")),
+    ("GET /api/castaway_check", Public::Open("instance discovery for clients")),
     ("GET /api/health", Public::Open("container health check")),
     ("GET /api/data/self_service_status", Public::Open("login page: is sign-up enabled")),
     ("GET /api/data/public_oidc_providers", Public::Open("login page: OIDC buttons")),

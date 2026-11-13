@@ -46,7 +46,7 @@ void main() {
   });
 
   test('a genuine Castaway response checks out', () async {
-    final client = MockClient((_) async => http.Response('{"pinepods_instance": true}', 200));
+    final client = MockClient((_) async => http.Response('{"castaway_instance": true}', 200));
 
     final r = await PinepodsLoginService.checkServer(
       'https://pods.example.com',

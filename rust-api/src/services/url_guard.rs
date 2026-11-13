@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn blocks_loopback_and_metadata_and_private() {
         for u in [
-            "http://127.0.0.1:8040/api/pinepods_check",
+            "http://127.0.0.1:8040/api/castaway_check",
             "http://169.254.169.254/latest/meta-data/",
             "http://[::ffff:169.254.169.254]/",
             "http://[64:ff9b::a9fe:a9fe]/",

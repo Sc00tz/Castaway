@@ -2,7 +2,7 @@ use crate::components::gen_components::Search_nav;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState, UserStatsStore};
 use crate::components::gen_funcs::{format_date, format_time, format_time_mins};
-use crate::requests::pod_req::call_get_pinepods_version;
+use crate::requests::pod_req::call_get_castaway_version;
 use crate::requests::stat_reqs::{self, TopPodcastStat, CategoryStat};
 use crate::components::app_drawer::App_drawer;
 use i18nrs::yew::use_translation;
@@ -100,7 +100,7 @@ pub fn user_stats() -> Html {
     let (stat_state, stat_dispatch) = use_store::<UserStatsStore>();
     let user_stats = stat_state.stats.as_ref();
     let extended_stats = stat_state.extended_stats.as_ref();
-    let pinepods_version = stat_state.pinepods_version.as_ref();
+    let castaway_version = stat_state.castaway_version.as_ref();
 
     let (post_state, _post_dispatch) = use_store::<AppState>();
     let (audio_state, _audio_dispatch) = use_store::<UIState>();
@@ -158,14 +158,14 @@ pub fn user_stats() -> Html {
                     });
 
                     wasm_bindgen_futures::spawn_local(async move {
-                        if let Ok(fetched_stats) = call_get_pinepods_version(
+                        if let Ok(fetched_stats) = call_get_castaway_version(
                             server_name_effect.unwrap().clone(),
                             &api_key.clone(),
                         )
                         .await
                         {
                             stat_dispatch.reduce_mut(move |state| {
-                                state.pinepods_version = Some(fetched_stats);
+                                state.castaway_version = Some(fetched_stats);
                             });
                         }
                     });
@@ -176,7 +176,7 @@ pub fn user_stats() -> Html {
     }
 
     let display_version_value = "test_mode".to_string();
-    let display_version = pinepods_version
+    let display_version = castaway_version
         .as_deref()
         .unwrap_or(&display_version_value);
 
