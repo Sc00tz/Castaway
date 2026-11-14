@@ -64,6 +64,35 @@ void main() {
       expect(result.getUnifiedPodcasts().single.title, 'Big Id Show');
     });
 
+    test('adding a podcast tells the screens, and again once its episodes are in', () async {
+      var importChecks = 0;
+      final client = MockClient((request) async {
+        if (request.url.path == '/api/data/add_podcast') {
+          return http.Response('{"success": true, "podcast_id": 7, "first_episode_id": 0}', 200);
+        }
+        if (request.url.path == '/api/tasks/user/2') {
+          importChecks++;
+          final status = importChecks < 2 ? 'PROGRESS' : 'SUCCESS';
+          return http.Response('[{"id": "t", "task_type": "add_podcast_episodes", "status": "$status", "progress": 50}]', 200);
+        }
+        return http.Response('', 404);
+      });
+      final service = CastawayService(client: client)..setCredentials('https://pods.example.com', 'key');
+      final changes = <int>[];
+      void listener() => changes.add(CastawayService.libraryChanged.value);
+      CastawayService.libraryChanged.addListener(listener);
+      addTearDown(() => CastawayService.libraryChanged.removeListener(listener));
+
+      final podcast = UnifiedCastawayPodcast.fromITunesPodcast(CastawayITunesPodcast.fromJson(
+          {'trackId': 1, 'trackName': 'New Show', 'feedUrl': 'https://feeds.example.invalid/n.xml'}));
+      expect(await service.addPodcast(podcast, 2), isTrue);
+      expect(changes, hasLength(1), reason: 'the new podcast shows right away');
+
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      expect(importChecks, 2);
+      expect(changes, hasLength(2), reason: 'and its episodes once the import is done');
+    });
+
     test('a request that never responds times out instead of hanging forever', () async {
       // Simulates a stalled connection: the handler's future never completes.
       final client = MockClient((request) => Completer<http.Response>().future);

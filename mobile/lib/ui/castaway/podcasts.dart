@@ -57,9 +57,14 @@ class _CastawayPodcastsState extends State<CastawayPodcasts> {
   Map<int, List<String>> _podcastCategories = {}; // podcastId -> categories
   static const String _sortPreferenceKey = 'podcasts_sort_direction';
 
+  void _onLibraryChanged() {
+    if (mounted) _loadPodcasts();
+  }
+
   @override
   void initState() {
     super.initState();
+    CastawayService.libraryChanged.addListener(_onLibraryChanged);
     _loadSortPreference();
     _loadPodcasts();
     _searchController.addListener(_onSearchChanged);
@@ -141,6 +146,7 @@ class _CastawayPodcastsState extends State<CastawayPodcasts> {
 
   @override
   void dispose() {
+    CastawayService.libraryChanged.removeListener(_onLibraryChanged);
     _searchController.dispose();
     super.dispose();
   }

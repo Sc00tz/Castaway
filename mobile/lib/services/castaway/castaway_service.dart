@@ -1,5 +1,6 @@
 // Create this file at lib/services/castaway/castaway_service.dart
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -1992,7 +1993,7 @@ class CastawayService {
         return CastawaySearchResult.fromJson(data);
       } else if (response.statusCode == 503 && provider == SearchProvider.podcastIndex) {
         // Podcast Index has no key on this server (or is down): search Apple instead.
-        return searchPodcasts(query, SearchProvider.itunes);
+        return await searchPodcasts(query, SearchProvider.itunes);
       } else {
         throw Exception('Failed to search podcasts: ${response.statusCode}');
       }
@@ -2035,6 +2036,35 @@ class CastawayService {
   }
 
   // Add a podcast to the server
+  /// Goes up whenever the user's library changes: a podcast added or removed, and again once a
+  /// new podcast's episodes have been imported. Home, Feed and Podcasts reload when it does, so
+  /// they're current when you go back to them.
+  static final ValueNotifier<int> libraryChanged = ValueNotifier(0);
+
+  static void notifyLibraryChanged() => libraryChanged.value++;
+
+  /// The server imports a new podcast's episodes in the background: tell the screens again once
+  /// that's done (or after a minute, whichever comes first).
+  Future<void> _notifyWhenImported(int userId) async {
+    for (var i = 0; i < 60; i++) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!await _importRunning(userId)) break;
+    }
+    notifyLibraryChanged();
+  }
+
+  Future<bool> _importRunning(int userId) async {
+    try {
+      final response = await _get(Uri.parse('$_server/api/tasks/user/$userId'), headers: {'Api-Key': _apiKey!});
+      if (response.statusCode != 200) return false;
+      final tasks = (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+      return tasks.any((t) =>
+          t['task_type'] == 'add_podcast_episodes' && t['status'] != 'SUCCESS' && t['status'] != 'FAILED');
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> addPodcast(UnifiedCastawayPodcast podcast, int userId) async {
     if (_server == null || _apiKey == null) {
       throw Exception('Not authenticated');
@@ -2066,7 +2096,12 @@ class CastawayService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['success'] == true;
+        final added = data['success'] == true;
+        if (added) {
+          notifyLibraryChanged();
+          unawaited(_notifyWhenImported(userId));
+        }
+        return added;
       }
       return false;
     } catch (e) {
@@ -2101,7 +2136,9 @@ class CastawayService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['success'] == true;
+        final removed = data['success'] == true;
+        if (removed) notifyLibraryChanged();
+        return removed;
       }
       return false;
     } catch (e) {

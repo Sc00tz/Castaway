@@ -72,9 +72,14 @@ class _CastawayHomeState extends State<CastawayHome> with WidgetsBindingObserver
   // follows playback instead of waiting for the next reload.
   StreamSubscription<PositionUpdate>? _positionSub;
 
+  void _onLibraryChanged() {
+    if (mounted) _refreshHomeContentSilently();
+  }
+
   @override
   void initState() {
     super.initState();
+    CastawayService.libraryChanged.addListener(_onLibraryChanged);
     WidgetsBinding.instance.addObserver(this);
     _positionSub = GlobalServices.offlineActionQueue?.positionUpdates.listen(_onPositionRecorded);
     _loadHomeContent();
@@ -112,6 +117,7 @@ class _CastawayHomeState extends State<CastawayHome> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    CastawayService.libraryChanged.removeListener(_onLibraryChanged);
     WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     _nowPlayingSub?.cancel();

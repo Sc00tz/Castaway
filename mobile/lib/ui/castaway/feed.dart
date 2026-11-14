@@ -94,9 +94,14 @@ class _CastawayFeedState extends State<CastawayFeed> with WidgetsBindingObserver
     await prefs.setBool(_hidePlayedKey, _hidePlayed);
   }
 
+  void _onLibraryChanged() {
+    if (mounted) _loadRecentEpisodes();
+  }
+
   @override
   void initState() {
     super.initState();
+    CastawayService.libraryChanged.addListener(_onLibraryChanged);
     WidgetsBinding.instance.addObserver(this);
     _positionSub = GlobalServices.offlineActionQueue?.positionUpdates.listen((update) {
       if (!mounted) return;
@@ -874,6 +879,7 @@ class _CastawayFeedState extends State<CastawayFeed> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    CastawayService.libraryChanged.removeListener(_onLibraryChanged);
     WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     // Don't dispose global audio service - it should persist across pages
