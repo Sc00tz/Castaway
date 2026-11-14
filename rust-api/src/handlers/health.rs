@@ -2,7 +2,7 @@ use axum::{extract::State, response::Json};
 use chrono::Utc;
 use crate::{
     error::AppResult,
-    models::{CastawayCheckResponse, HealthResponse, LegacyCheckResponse},
+    models::{CastawayCheckResponse, HealthResponse},
     AppState,
 };
 
@@ -20,14 +20,6 @@ pub async fn castaway_check() -> Json<CastawayCheckResponse> {
     Json(CastawayCheckResponse {
         status_code: 200,
         castaway_instance: true,
-    })
-}
-
-/// The same check under its old address, for apps from before 0.10.2. Not in the API docs.
-pub async fn legacy_check() -> Json<LegacyCheckResponse> {
-    Json(LegacyCheckResponse {
-        status_code: 200,
-        pinepods_instance: true,
     })
 }
 

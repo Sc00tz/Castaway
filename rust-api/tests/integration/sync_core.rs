@@ -340,26 +340,6 @@ async fn the_castaway_device_avoids_a_name_a_client_owns() {
     assert_eq!(subscription_log(&app, &user).await.len(), 1);
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn the_old_internal_device_is_claimed_as_the_castaway_device() {
-    let app = TestApp::new().await;
-    let user = app.user("legacy").await;
-    let legacy = format!("pinepods-internal-{}", user.id);
-    exec(
-        &app,
-        &format!(r#"INSERT INTO "GpodderDevices" (UserID, DeviceName, DeviceType, DeviceCaption) VALUES ({}, '{legacy}', 'server', 'Castaway')"#, user.id),
-    )
-    .await;
-    enable_sync(&app, &user).await;
-    let url = app.feed("legacy.xml", &Feed::with_episodes("Legacy", 1));
-    app.subscribe(&user, &url, 1).await;
-
-    let devices = int(&app, &format!(r#"SELECT COUNT(*) FROM "GpodderDevices" WHERE UserID = {}"#, user.id)).await;
-    assert_eq!(devices, Some(1), "no second Castaway device");
-    let device = text(&app, &format!(r#"SELECT DeviceName FROM "GpodderDevices" WHERE UserID = {} AND SystemRole = 'castaway'"#, user.id)).await;
-    assert_eq!(device, Some(legacy));
-}
-
 // ---------------------------------------------------------------------------------------------
 // Apply
 // ---------------------------------------------------------------------------------------------

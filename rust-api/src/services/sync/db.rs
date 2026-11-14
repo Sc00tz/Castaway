@@ -62,10 +62,6 @@ fn device_name_candidates(user_id: i32) -> [String; 3] {
     [CASTAWAY_DEVICE_NAME.to_string(), "castaway-server".to_string(), format!("castaway-{user_id}")]
 }
 
-fn legacy_device_name(user_id: i32) -> String {
-    format!("pinepods-internal-{user_id}")
-}
-
 // ---------------------------------------------------------------------------------------------
 // Events (inside the caller's transaction)
 // ---------------------------------------------------------------------------------------------
@@ -99,27 +95,13 @@ fn locked(rows: Vec<(i64, bool)>) -> LockedTargets {
     }
 }
 
-// The user's castaway device, created on first use. The pre-overhaul internal device
-// (`pinepods-internal-<uid>`) is claimed if nothing has the role yet, so Castaway keeps one
-// device. A client may already own the name `castaway` (UNIQUE(UserID, DeviceName)), so other
+// The user's castaway device, created on first use. (A taken-over database's old internal
+// device was renamed to this by migration 7.) A client may already own the name `castaway` (UNIQUE(UserID, DeviceName)), so other
 // names are tried after it.
 dialect_fn!([pg_castaway_device]
     pub async fn(conn: &mut q::Conn, user_id: i32) -> AppResult<i32> {
     let by_role = r#"SELECT deviceid FROM "GpodderDevices" WHERE userid = $1 AND systemrole = 'castaway'"#;
     if let Some(id) = q::query_scalar::<i32>(by_role).bind(user_id).fetch_optional(&mut *conn).await? {
-        return Ok(id);
-    }
-    let claimed: Option<i32> = q::query_scalar(
-        r#"UPDATE "GpodderDevices" SET systemrole = 'castaway'
-           WHERE userid = $1 AND devicename = $2 AND systemrole IS NULL
-             AND NOT EXISTS (SELECT 1 FROM "GpodderDevices" d WHERE d.userid = $1 AND d.systemrole = 'castaway')
-           RETURNING deviceid"#,
-    )
-    .bind(user_id)
-    .bind(legacy_device_name(user_id))
-    .fetch_optional(&mut *conn)
-    .await?;
-    if let Some(id) = claimed {
         return Ok(id);
     }
     for name in device_name_candidates(user_id) {

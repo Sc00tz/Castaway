@@ -108,6 +108,57 @@ async fn a_current_pinepods_database_is_adopted_without_reseeding() {
 }
 
 #[tokio::test]
+async fn the_old_internal_sync_device_gets_a_castaway_name() {
+    let db = ScratchDb::new("devname").await;
+    sqlx::raw_sql(BASELINE).execute(&db.pool).await.unwrap();
+    // One user with only the old internal device; one who also already has a Castaway device.
+    sqlx::raw_sql(
+        r#"CREATE TABLE schema_migrations (version VARCHAR(10) PRIMARY KEY, name TEXT, checksum VARCHAR(64));
+           INSERT INTO schema_migrations (version, name, checksum) VALUES ('118', 'y', 'y');
+           INSERT INTO "Users" (fullname, username, email, hashed_pw, isadmin) VALUES
+             ('One', 'one', 'one@b.c', 'x', TRUE), ('Two', 'two', 'two@b.c', 'x', FALSE);
+           INSERT INTO "GpodderDevices" (userid, devicename, devicecaption)
+             SELECT userid, 'pinepods-internal-' || userid, 'PinePods' FROM "Users";
+           INSERT INTO "GpodderDevices" (userid, devicename, systemrole)
+             SELECT userid, 'castaway', 'pinepods' FROM "Users" WHERE username = 'two';
+           INSERT INTO "GpodderDevices" (userid, devicename, devicecaption)
+             SELECT userid, 'pinepods-server', 'PinePods server' FROM "Users" WHERE username = 'two';
+           UPDATE "Users" SET defaultgpodderdevice = 'pinepods-server' WHERE username = 'two';
+           INSERT INTO "SyncTargets" (userid, kind, url, encryptedsecret, devicename, needsfullsync)
+             SELECT userid, 'gpodder', 'https://gpodder.example', 'x', 'pinepods', FALSE FROM "Users" WHERE username = 'two';"#,
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+
+    castaway_api::database::migrate::run(&db.pool).await.unwrap();
+    let devices: Vec<(String, String, Option<String>, Option<String>)> = sqlx::query_as(
+        r#"SELECT u.username, d.devicename, d.systemrole, d.devicecaption FROM "GpodderDevices" d
+           JOIN "Users" u ON u.userid = d.userid ORDER BY u.username, d.systemrole NULLS LAST"#,
+    )
+    .fetch_all(&db.pool)
+    .await
+    .unwrap();
+    for (_, name, role, caption) in &devices {
+        let shown = format!("{name} {} {}", role.as_deref().unwrap_or(""), caption.as_deref().unwrap_or(""));
+        assert!(!shown.to_lowercase().contains("pinepods"), "a sync app would show {shown:?}");
+    }
+    assert_eq!(devices[0].0, "one");
+    assert_eq!((devices[0].1.as_str(), devices[0].2.as_deref()), ("castaway", Some("castaway")), "the old device becomes the Castaway device");
+    let two: Vec<_> = devices.iter().filter(|d| d.0 == "two").collect();
+    assert_eq!(two.len(), 3);
+    assert!(two.iter().any(|d| d.1 == "castaway-server" && d.3.as_deref() == Some("Castaway server")), "{two:?}");
+    let default: Option<String> =
+        sqlx::query_scalar(r#"SELECT defaultgpodderdevice FROM "Users" WHERE username = 'two'"#).fetch_one(&db.pool).await.unwrap();
+    assert_eq!(default.as_deref(), Some("castaway-server"), "the default device follows its new name");
+    let (target, full): (Option<String>, bool) =
+        sqlx::query_as(r#"SELECT devicename, needsfullsync FROM "SyncTargets""#).fetch_one(&db.pool).await.unwrap();
+    assert_eq!((target.as_deref(), full), (Some("castaway"), true), "the sync server sees a new device, so everything is sent again");
+    assert_eq!(two.iter().filter(|d| d.2.as_deref() == Some("castaway")).count(), 1, "still one Castaway device");
+    db.drop().await;
+}
+
+#[tokio::test]
 async fn an_older_pinepods_database_is_refused() {
     let db = ScratchDb::new("old").await;
     sqlx::raw_sql(
@@ -119,7 +170,7 @@ async fn an_older_pinepods_database_is_refused() {
     .unwrap();
 
     let err = castaway_api::database::migrate::run(&db.pool).await.unwrap_err();
-    assert!(format!("{err:?}").contains("older PinePods version"), "{err:?}");
+    assert!(format!("{err:?}").contains("older schema than Castaway can take over"), "{err:?}");
     let tables: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM castaway_migrations").fetch_one(&db.pool).await.unwrap();
     assert_eq!(tables, 0, "nothing is recorded");
     db.drop().await;

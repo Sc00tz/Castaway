@@ -13,8 +13,7 @@ trap shutdown SIGTERM SIGINT
 
 # Everything Castaway keeps (database, downloads, backups) lives under one folder, which
 # should be a mounted volume. The server reads the same variable.
-# (PINEPODS_DATA_DIR is its old name, still read.)
-export CASTAWAY_DATA_DIR=${CASTAWAY_DATA_DIR:-${PINEPODS_DATA_DIR:-/data}}
+export CASTAWAY_DATA_DIR=${CASTAWAY_DATA_DIR:-/data}
 DATA_DIR=$CASTAWAY_DATA_DIR
 
 # Castaway runs on PostgreSQL only. With no DB_HOST it runs the PostgreSQL server built into
@@ -43,7 +42,7 @@ export DB_NAME=$DB_NAME
 export DB_PORT=$DB_PORT
 export DB_TYPE=$DB_TYPE
 export REVERSE_PROXY=$REVERSE_PROXY
-export CASTAWAY_PORT=${CASTAWAY_PORT:-$PINEPODS_PORT}
+export CASTAWAY_PORT=${CASTAWAY_PORT:-}
 export PROXY_PROTOCOL=$PROXY_PROTOCOL
 export DEBUG_MODE=${DEBUG_MODE:-'False'}
 # Without any Valkey settings, the built-in database setup keeps that state in memory (one

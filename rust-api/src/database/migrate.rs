@@ -24,6 +24,7 @@ const MIGRATIONS: &[Migration] = &[
     Migration { version: 4, name: "drop_podpeople", sql: include_str!("../../migrations/0004_drop_podpeople.sql") },
     Migration { version: 5, name: "drop_ai", sql: include_str!("../../migrations/0005_drop_ai.sql") },
     Migration { version: 6, name: "castaway_sync_labels", sql: include_str!("../../migrations/0006_castaway_sync_labels.sql") },
+    Migration { version: 7, name: "castaway_device_name", sql: include_str!("../../migrations/0007_castaway_device_name.sql") },
 ];
 
 /// The last migration version of the old Python runner.
@@ -86,8 +87,9 @@ async fn adopt_pinepods_database(conn: &mut PgConnection) -> AppResult<bool> {
         .await?;
     if !current {
         return Err(AppError::Config(format!(
-            "This database was set up by an older PinePods version. Upgrade it with PinePods first \
-             (schema version {PINEPODS_FINAL_VERSION}), then start Castaway on it."
+            "This database uses an older schema than Castaway can take over (it needs schema \
+             version {PINEPODS_FINAL_VERSION}). Bring it up to that version with the software that \
+             created it, then start Castaway on it."
         )));
     }
     for m in MIGRATIONS.iter().filter(|m| m.version <= ADOPTED_VERSIONS) {
@@ -97,7 +99,7 @@ async fn adopt_pinepods_database(conn: &mut PgConnection) -> AppResult<bool> {
             .execute(&mut *conn)
             .await?;
     }
-    info!("Adopted an existing PinePods database (schema version {PINEPODS_FINAL_VERSION})");
+    info!("Took over an existing database (schema version {PINEPODS_FINAL_VERSION})");
     Ok(true)
 }
 

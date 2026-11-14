@@ -2543,7 +2543,7 @@ pub async fn get_extended_stats(
     }
 }
 
-// The server's Castaway version. Also served at /get_pinepods_version (not in the API docs)
+// The server's Castaway version.
 // for apps from before 0.10.2.
 #[utoipa::path(
     get,

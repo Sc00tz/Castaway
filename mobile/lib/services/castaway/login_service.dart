@@ -25,14 +25,11 @@ class CastawayLoginService {
   static const String userAgent = 'Castaway Mobile/1.0'; // i18n-ignore
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  /// Verify if the server is a valid Castaway instance.
-  ///
-  /// The check's address on servers before 0.10.2.
-  static const legacyCheckPath = '/api/pinepods_check';
+  /// Where a Castaway server answers the "is this Castaway?" check.
+  static const checkPath = '/api/castaway_check';
 
-  /// Whether a check response comes from a Castaway server (any version).
-  static bool isCastawayCheck(dynamic data) =>
-      data is Map && (data['castaway_instance'] == true || data['pinepods_instance'] == true);
+  /// Whether a check response comes from a Castaway server.
+  static bool isCastawayCheck(dynamic data) => data is Map && data['castaway_instance'] == true;
 
   /// Kept for backwards compatibility; prefer [checkServer] which reports *why*
   /// a check failed.
@@ -56,11 +53,7 @@ class CastawayLoginService {
         .timeout(_requestTimeout);
 
     try {
-      var response = await check('/api/castaway_check');
-      // Servers before 0.10.2 answer at the old address.
-      if (response.statusCode == 404) {
-        response = await check(legacyCheckPath);
-      }
+      final response = await check(checkPath);
 
       if (response.statusCode == 200) {
         try {

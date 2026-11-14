@@ -3,7 +3,7 @@
 // #[derive(Debug, Deserialize)]
 // pub struct CastawayCheck {
 //     pub status_code: u16,
-//     pub(crate) pinepods_instance: bool
+//     pub(crate) castaway_instance: bool
 // }
 
 // #[derive(Deserialize, Debug)]

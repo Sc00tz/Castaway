@@ -9,7 +9,6 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:castaway_mobile/services/castaway/login_service.dart';
 import 'package:castaway_mobile/entities/castaway_search.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 
@@ -29,18 +28,16 @@ void main() {
       expect(capturedUrl.toString(), 'https://pods.example.com/api/castaway_check');
     });
 
-    test('a server from before 0.10.2 is found at the old check address', () async {
+    test('only the Castaway check address is asked', () async {
       final paths = <String>[];
       final client = MockClient((request) async {
         paths.add(request.url.path);
-        return request.url.path == '/api/castaway_check'
-            ? http.Response('Not Found', 404)
-            : http.Response('{"status_code": 200, "pinepods_instance": true}', 200);
+        return http.Response('Not Found', 404);
       });
       final service = CastawayService(client: client);
 
-      expect(await service.verifyCastawayInstance('https://pods.example.com'), isTrue);
-      expect(paths, ['/api/castaway_check', CastawayLoginService.legacyCheckPath]);
+      expect(await service.verifyCastawayInstance('https://pods.example.com'), isFalse);
+      expect(paths, ['/api/castaway_check']);
     });
 
     test('Podcast Index search without a key on the server searches Apple instead', () async {

@@ -2,9 +2,9 @@
 name = "app"
 version = "0.10.1"
 description = "Castaway-tauri"
-authors = ["Gooseberry Development"]
+authors = ["Castaway contributors"]
 license = ""
-repository = ""
+repository = "https://github.com/Sc00tz/Castaway"
 default-run = "app"
 edition = "2021"
 rust-version = "1.99"

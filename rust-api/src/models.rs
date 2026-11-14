@@ -9,13 +9,6 @@ pub struct CastawayCheckResponse {
     pub castaway_instance: bool,
 }
 
-/// The check's answer under its PinePods name, for apps from before 0.10.2.
-#[derive(Debug, Serialize)]
-pub struct LegacyCheckResponse {
-    pub status_code: u16,
-    pub pinepods_instance: bool,
-}
-
 // Health check response
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {

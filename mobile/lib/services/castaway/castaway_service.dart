@@ -78,11 +78,7 @@ class CastawayService {
     final normalizedUrl = serverUrl.trim().replaceAll(RegExp(r'/$'), '');
 
     try {
-      var response = await _get(Uri.parse('$normalizedUrl/api/castaway_check'));
-      // Servers before 0.10.2 answer at the old address.
-      if (response.statusCode == 404) {
-        response = await _get(Uri.parse('$normalizedUrl${CastawayLoginService.legacyCheckPath}'));
-      }
+      final response = await _get(Uri.parse('$normalizedUrl${CastawayLoginService.checkPath}'));
 
       if (response.statusCode == 200) {
         return CastawayLoginService.isCastawayCheck(jsonDecode(response.body));
