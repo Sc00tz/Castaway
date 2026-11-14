@@ -32,6 +32,22 @@ async fn podcast_index_search_without_a_key_says_how_to_add_one() {
     assert!(app.fixtures().hits("podcastindex/api/1.0/search/byterm").is_empty(), "Podcast Index isn't asked");
 }
 
+/// The web and phone apps name the index "podcast_index"; both spellings search Podcast Index.
+#[tokio::test(flavor = "multi_thread")]
+async fn podcast_index_search_accepts_the_name_the_apps_send() {
+    let app = TestApp::new().await;
+    let user = app.user("searcher").await;
+    app.db().set_podcast_index_credentials(Some(("my-key", "my-secret"))).await.unwrap();
+    let found = json!({ "feeds": [{ "title": "Found Show", "url": "https://feeds.example.invalid/found.xml" }] });
+    app.fixtures().serve("podcastindex/api/1.0/search/byterm", Fixture::new("application/json", found.to_string()));
+
+    for index in ["podcast_index", "podcastindex"] {
+        let body = app.get(&format!("/api/data/proxy_search?query=found&index={index}")).key(&user).send().await.ok_json();
+        assert_eq!(body["feeds"][0]["title"], "Found Show", "{index}: {body}");
+    }
+    assert_eq!(app.fixtures().hits("podcastindex/api/1.0/search/byterm").len(), 2);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn podcast_index_requests_are_signed_with_this_servers_key() {
     let app = TestApp::new().await;

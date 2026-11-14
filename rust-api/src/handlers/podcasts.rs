@@ -3985,8 +3985,8 @@ pub struct ProxySearchParams {
 }
 
 // Search a podcast directory. `index` is "itunes" (Apple Podcasts, no key needed) or
-// "podcastindex" (needs this server's Podcast Index key); `search_type` "person" searches
-// Podcast Index by host or guest name instead of by title.
+// "podcast_index" (needs this server's Podcast Index key; "podcastindex" works too);
+// `search_type` "person" searches Podcast Index by host or guest name instead of by title.
 #[utoipa::path(
     get,
     path = "/proxy_search",
@@ -4019,13 +4019,19 @@ pub async fn proxy_search(
     }
 
     let api = &state.config.api;
-    let body = match params.index.to_ascii_lowercase().as_str() {
+    // The apps send "podcast_index"; "podcastindex" is accepted too.
+    let body = match params.index.to_ascii_lowercase().replace('_', "").as_str() {
         "itunes" => crate::services::directory::itunes_search(api, term).await?,
         "podcastindex" => {
             let path = if params.search_type.as_deref() == Some("person") { "/search/byperson" } else { "/search/byterm" };
             crate::services::directory::podcast_index(&state.db_pool, api, path, &[("q", term.to_string())]).await?
         }
-        other => return Err(AppError::bad_request(format!("Unknown search index '{other}': use itunes or podcastindex"))),
+        _ => {
+            return Err(AppError::bad_request(format!(
+                "Unknown search index '{}': use itunes or podcast_index",
+                params.index
+            )))
+        }
     };
     Ok(Json(body))
 }
