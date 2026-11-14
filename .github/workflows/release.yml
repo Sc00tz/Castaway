@@ -65,7 +65,9 @@ jobs:
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"
 
-      - name: Tag the next version and create the release
+      # The Android build creates the release with the APK attached, so a release never appears
+      # without its APK; the Docker image and desktop apps are added as they finish.
+      - name: Tag the next version
         id: tag
         if: steps.gate.outputs.go == 'true'
         run: |
@@ -75,7 +77,6 @@ jobs:
           next="v${major}.${minor}.$((patch + 1))"
           git tag "$next" "$SHA"
           git push origin "$next"
-          gh release create "$next" --verify-tag --generate-notes --title "Castaway $next"
           echo "tag=$next" >> "$GITHUB_OUTPUT"
 
       - name: Build the APK, Docker image and desktop apps for the release
