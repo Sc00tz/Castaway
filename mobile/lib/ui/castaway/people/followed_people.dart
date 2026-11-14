@@ -17,6 +17,9 @@ import 'package:castaway_mobile/ui/widgets/castaway_episode_card.dart';
 import 'package:castaway_mobile/ui/widgets/platform_progress_indicator.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/ui/utils/position_utils.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 
 /// Episodes fetched per person, and the most shown in the combined list.
 const int _perPerson = 20;
@@ -30,9 +33,19 @@ class CastawayPeople extends StatefulWidget {
   State<CastawayPeople> createState() => _CastawayPeopleState();
 }
 
-class _CastawayPeopleState extends State<CastawayPeople> {
+class _CastawayPeopleState extends State<CastawayPeople> with LivePositions<CastawayPeople> {
   List<PersonInfo>? _people;
   List<CastawayEpisode>? _feed;
+
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    final feed = _feed;
+    if (feed == null) return false;
+    final updated = PositionUtils.applyUpdate(feed, update);
+    if (identical(updated, feed)) return false;
+    _feed = updated;
+    return true;
+  }
 
   /// Shows outside the library, by name, so their episodes can open the show.
   final Map<String, PersonPodcast> _externalShows = {};
@@ -92,7 +105,7 @@ class _CastawayPeopleState extends State<CastawayPeople> {
       }
       episodes.sort((a, b) => b.episodePubDate.compareTo(a.episodePubDate));
       if (!mounted) return;
-      setState(() => _feed = episodes.take(_feedLimit).toList());
+      setState(() => _feed = withLivePositions(episodes.take(_feedLimit).toList()));
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));

@@ -26,6 +26,9 @@ import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/ui/widgets/hide_played.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/ui/utils/position_utils.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 
 /// Sort direction options for downloads
 enum DownloadSortDirection {
@@ -64,12 +67,30 @@ class CastawayDownloads extends StatefulWidget {
   State<CastawayDownloads> createState() => _CastawayDownloadsState();
 }
 
-class _CastawayDownloadsState extends State<CastawayDownloads> with HidePlayed<CastawayDownloads> {
+class _CastawayDownloadsState extends State<CastawayDownloads> with HidePlayed<CastawayDownloads>, LivePositions<CastawayDownloads> {
   @override
   String get hidePlayedKey => 'downloads_hide_played';
 
   @override
   void onHidePlayedChanged() => _filterLocalDownloads();
+
+  /// Server downloads are updated in place; downloads on this phone pick the
+  /// live position up when their card is built (see [_buildLocalEpisodeCard]).
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    var changed = false;
+    for (final st in _podcastPageState.values) {
+      final updated = PositionUtils.applyUpdate(st.episodes, update);
+      if (!identical(updated, st.episodes)) {
+        st.episodes = updated;
+        changed = true;
+      }
+    }
+    final onPhone = _filteredLocalDownloadsByPodcast.values.any((episodes) => episodes.any((e) =>
+        LocalDownloadUtils.episodeIdFromGuid(e.guid) == update.episodeId &&
+        (e.pguid?.contains('youtube') ?? false) == update.isYoutube));
+    return changed || onPhone;
+  }
 
   static const int _pageSize = 50;
 
@@ -310,7 +331,7 @@ class _CastawayDownloadsState extends State<CastawayDownloads> with HidePlayed<C
 
         setState(() {
           final existingEpisodes = isFirstLoad ? <CastawayEpisode>[] : (current?.episodes ?? []);
-          final allEpisodes = [...existingEpisodes, ...page.episodes];
+          final allEpisodes = [...existingEpisodes, ...withLivePositions(page.episodes)];
           _podcastPageState[podcastId] = _PodcastPageState(
             episodes: allEpisodes,
             offset: allEpisodes.length,
@@ -798,7 +819,9 @@ class _CastawayDownloadsState extends State<CastawayDownloads> with HidePlayed<C
   /// and behaves identically to server episodes (tap opens the episode page,
   /// long-press shows the context menu, play uses the unified path).
   Widget _buildLocalEpisodeCard(Episode episode) {
-    final pe = LocalDownloadUtils.toCastawayEpisode(episode);
+    var pe = LocalDownloadUtils.toCastawayEpisode(episode);
+    final live = livePositionFor(pe.episodeId, pe.isYoutube);
+    if (live != null) pe = pe.withListenDuration(live.round());
     return CastawayEpisodeCard(
       episode: pe,
       isLocalDownload: true,

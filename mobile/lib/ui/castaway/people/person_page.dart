@@ -20,6 +20,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/ui/widgets/hide_played.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/ui/utils/position_utils.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 
 const int _pageSize = 50;
@@ -43,12 +46,20 @@ class PersonPage extends StatefulWidget {
 
 enum _Tab { library, elsewhere }
 
-class _PersonPageState extends State<PersonPage> with HidePlayed<PersonPage> {
+class _PersonPageState extends State<PersonPage> with HidePlayed<PersonPage>, LivePositions<PersonPage> {
   @override
   String get hidePlayedKey => 'person_hide_played';
 
   PersonProfile? _profile;
   List<CastawayEpisode> _episodes = [];
+
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    final updated = PositionUtils.applyUpdate(_episodes, update);
+    if (identical(updated, _episodes)) return false;
+    _episodes = updated;
+    return true;
+  }
   bool _hasMore = false;
   bool _loadingMore = false;
   String? _error;
@@ -83,7 +94,7 @@ class _PersonPageState extends State<PersonPage> with HidePlayed<PersonPage> {
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _episodes = profile.episodes;
+        _episodes = withLivePositions(profile.episodes);
         _hasMore = profile.episodes.length >= limit;
         _error = null;
         // Default to whichever tab has something, until the user picks one.
@@ -110,7 +121,7 @@ class _PersonPageState extends State<PersonPage> with HidePlayed<PersonPage> {
       final page = await service.getPersonProfile(widget.personId, limit: _pageSize, offset: _episodes.length);
       if (!mounted) return;
       setState(() {
-        _episodes = [..._episodes, ...page.episodes];
+        _episodes = [..._episodes, ...withLivePositions(page.episodes)];
         _hasMore = page.episodes.length >= _pageSize;
       });
     } catch (_) {

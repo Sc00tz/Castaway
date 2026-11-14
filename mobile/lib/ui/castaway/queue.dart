@@ -17,6 +17,8 @@ import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/ui/widgets/hide_played.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 
 class CastawayQueue extends StatefulWidget {
   const CastawayQueue({Key? key}) : super(key: key);
@@ -25,7 +27,7 @@ class CastawayQueue extends StatefulWidget {
   State<CastawayQueue> createState() => _CastawayQueueState();
 }
 
-class _CastawayQueueState extends State<CastawayQueue> with HidePlayed<CastawayQueue> {
+class _CastawayQueueState extends State<CastawayQueue> with HidePlayed<CastawayQueue>, LivePositions<CastawayQueue> {
   @override
   String get hidePlayedKey => 'queue_hide_played';
 
@@ -46,6 +48,14 @@ class _CastawayQueueState extends State<CastawayQueue> with HidePlayed<CastawayQ
   bool _isLoading = false;
   String _errorMessage = '';
   List<CastawayEpisode> _episodes = [];
+
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    final updated = PositionUtils.applyUpdate(_episodes, update);
+    if (identical(updated, _episodes)) return false;
+    _episodes = updated;
+    return true;
+  }
   final CastawayService _castawayService = CastawayService();
   // Use global audio service instead of creating local instance
   int? _contextMenuEpisodeIndex;
@@ -94,7 +104,7 @@ class _CastawayQueueState extends State<CastawayQueue> with HidePlayed<CastawayQ
       );
       
       setState(() {
-        _episodes = enrichedEpisodes;
+        _episodes = withLivePositions(enrichedEpisodes);
         _isLoading = false;
       });
       

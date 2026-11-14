@@ -22,6 +22,8 @@ import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/ui/widgets/hide_played.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 
 /// Sort direction options for history episodes
 enum HistorySortDirection {
@@ -47,12 +49,21 @@ class CastawayHistory extends StatefulWidget {
   State<CastawayHistory> createState() => _CastawayHistoryState();
 }
 
-class _CastawayHistoryState extends State<CastawayHistory> with HidePlayed<CastawayHistory> {
+class _CastawayHistoryState extends State<CastawayHistory> with HidePlayed<CastawayHistory>, LivePositions<CastawayHistory> {
   @override
   String get hidePlayedKey => 'history_hide_played';
 
   @override
   void onHidePlayedChanged() => _filterEpisodes();
+
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    final updated = PositionUtils.applyUpdate(_episodes, update);
+    if (identical(updated, _episodes)) return false;
+    _episodes = updated;
+    _filterEpisodes();
+    return true;
+  }
 
   bool _isLoading = false;
   String _errorMessage = '';
@@ -326,7 +337,7 @@ class _CastawayHistoryState extends State<CastawayHistory> with HidePlayed<Casta
       );
 
       setState(() {
-        _episodes = enrichedEpisodes;
+        _episodes = withLivePositions(enrichedEpisodes);
         _total = page.total;
         _offset = enrichedEpisodes.length;
         _filterEpisodes();
@@ -376,7 +387,7 @@ class _CastawayHistoryState extends State<CastawayHistory> with HidePlayed<Casta
       );
 
       setState(() {
-        _episodes.addAll(enrichedEpisodes);
+        _episodes.addAll(withLivePositions(enrichedEpisodes));
         _total = page.total;
         _offset += enrichedEpisodes.length;
         _filterEpisodes();

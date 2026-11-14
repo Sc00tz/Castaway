@@ -36,6 +36,9 @@ import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/ui/utils/l10n_labels.dart';
 import 'package:castaway_mobile/ui/castaway/collection_sheets.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/ui/utils/position_utils.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 
 // Sort direction for episodes within a podcast
 enum EpisodeSortDirection {
@@ -70,7 +73,16 @@ class CastawayPodcastDetails extends StatefulWidget {
   State<CastawayPodcastDetails> createState() => _CastawayPodcastDetailsState();
 }
 
-class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> {
+class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with LivePositions<CastawayPodcastDetails> {
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    final updated = PositionUtils.applyUpdate(_episodes, update);
+    if (identical(updated, _episodes)) return false;
+    _episodes = updated;
+    _filterEpisodes();
+    return true;
+  }
+
   final CastawayService _castawayService = CastawayService();
   // The podcast as shown; replaced when its details are read from the feed again.
   late UnifiedCastawayPodcast _podcast = widget.podcast;
@@ -1124,6 +1136,8 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> {
         }
       }
 
+      episodes = withLivePositions(await PositionUtils.withPendingPositions(episodes));
+      if (!mounted) return;
       setState(() {
         _episodes = episodes;
         _filterEpisodes(); // Initialize filtered list

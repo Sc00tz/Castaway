@@ -15,6 +15,9 @@ import 'package:provider/provider.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/ui/widgets/hide_played.dart';
+import 'package:castaway_mobile/ui/widgets/live_positions.dart';
+import 'package:castaway_mobile/ui/utils/position_utils.dart';
+import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 
 class PlaylistEpisodesPage extends StatefulWidget {
@@ -29,7 +32,7 @@ class PlaylistEpisodesPage extends StatefulWidget {
   State<PlaylistEpisodesPage> createState() => _PlaylistEpisodesPageState();
 }
 
-class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> with HidePlayed<PlaylistEpisodesPage> {
+class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> with HidePlayed<PlaylistEpisodesPage>, LivePositions<PlaylistEpisodesPage> {
   @override
   String get hidePlayedKey => 'playlist_hide_played';
 
@@ -44,6 +47,28 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> with HidePl
 
   final CastawayService _castawayService = CastawayService();
   PlaylistEpisodesResponse? _playlistResponse;
+
+  @override
+  bool applyLivePosition(PositionUpdate update) {
+    final response = _playlistResponse;
+    if (response == null) return false;
+    final updated = PositionUtils.applyUpdate(response.episodes, update);
+    if (identical(updated, response.episodes)) return false;
+    _playlistResponse = PlaylistEpisodesResponse(
+      episodes: updated,
+      playlistInfo: response.playlistInfo,
+      total: response.total,
+    );
+    return true;
+  }
+
+  /// [response] with this phone's unsent and just-recorded positions applied,
+  /// the same rule every other episode list uses.
+  Future<PlaylistEpisodesResponse> _withPositions(PlaylistEpisodesResponse response) async {
+    final episodes = withLivePositions(await PositionUtils.withPendingPositions(response.episodes));
+    if (identical(episodes, response.episodes)) return response;
+    return PlaylistEpisodesResponse(episodes: episodes, playlistInfo: response.playlistInfo, total: response.total);
+  }
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -93,8 +118,9 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> with HidePl
         widget.playlist.playlistId,
         limit: 50,
         offset: 0,
-      );
+      ).then(_withPositions);
 
+      if (!mounted) return;
       setState(() {
         _playlistResponse = response;
         _offset = response.episodes.length;
@@ -129,8 +155,9 @@ class _PlaylistEpisodesPageState extends State<PlaylistEpisodesPage> with HidePl
         widget.playlist.playlistId,
         limit: 50,
         offset: _offset,
-      );
+      ).then(_withPositions);
 
+      if (!mounted) return;
       setState(() {
         final merged = PlaylistEpisodesResponse(
           episodes: [..._playlistResponse!.episodes, ...response.episodes],
