@@ -145,7 +145,11 @@ jobs:
       - name: Build | Compile (UNIX)
         run: |
           cd web
-          RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg getrandom_backend=\"wasm_js\"" trunk build --features server_build
+          # Keep the full output: if the build fails, show its error lines with a prefix so the
+          # log's warning matcher can't swallow them.
+          RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg getrandom_backend=\"wasm_js\"" CARGO_TERM_COLOR=never \
+            trunk build --features server_build > ../trunk.log 2>&1 \
+            || { grep -nE -A25 "^error|panicked" ../trunk.log | grep -v "^[0-9]*[-:]warning" | sed 's/^/>> /' | head -150; exit 1; }
           cd src-tauri
           cat tauri.conf.json
           cargo tauri build
