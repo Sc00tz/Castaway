@@ -45,6 +45,7 @@ jobs:
         shell: bash
         run: |
           v="${{ github.event.release.tag_name || github.event.inputs.version }}"
+          if [ -z "$v" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="$GITHUB_REF_NAME"; fi
           v="${v#v}"
           if [ -z "$v" ]; then
             v=$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' web/src-tauri/tauri.conf.json)
@@ -212,42 +213,42 @@ jobs:
         if: ${{ matrix.os == 'windows-latest' }}
 
       - name: Upload release assets (Linux x86_64)
-        if: github.event_name == 'release' && matrix.os == 'ubuntu-latest'
+        if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && matrix.os == 'ubuntu-latest'
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             ./web/src-tauri/target/release/bundle/deb/${{ env.ARTIFACT_NAME1 }}
             ./web/src-tauri/target/release/bundle/appimage/${{ env.ARTIFACT_NAME2 }}
             ./web/src-tauri/target/release/bundle/rpm/${{ env.ARTIFACT_NAME3 }}
 
       - name: Upload release assets (Linux ARM64)
-        if: github.event_name == 'release' && matrix.os == 'ubuntu-arm64'
+        if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && matrix.os == 'ubuntu-arm64'
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             ./web/src-tauri/target/release/bundle/deb/${{ env.ARTIFACT_NAME1 }}
             ./web/src-tauri/target/release/bundle/appimage/${{ env.ARTIFACT_NAME2 }}
             ./web/src-tauri/target/release/bundle/rpm/${{ env.ARTIFACT_NAME3 }}
 
       - name: Upload release assets (macOS)
-        if: github.event_name == 'release' && matrix.os == 'macOS-latest'
+        if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && matrix.os == 'macOS-latest'
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             ./web/src-tauri/target/release/bundle/dmg/${{ env.ARTIFACT_NAME1 }}
 
       - name: Upload release assets (Windows)
-        if: github.event_name == 'release' && matrix.os == 'windows-latest'
+        if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             ./web/src-tauri/target/release/bundle/nsis/${{ env.ARTIFACT_NAME1 }}
             ./web/src-tauri/target/release/bundle/msi/${{ env.ARTIFACT_NAME2 }}

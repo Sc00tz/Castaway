@@ -1,0 +1,87 @@
+name: Release
+
+# Every push to main that passes all its checks becomes a release: the next patch version is
+# tagged (v0.10.2, v0.10.3, ...), a GitHub release is created, and the Android APK, the Docker
+# image and the desktop apps are built for that tag and attached.
+#
+# It runs each time one of the checks below finishes, and releases only once every workflow run
+# for that commit has finished and passed. A tag made with the workflow token doesn't start other
+# workflows, so this one starts the tag builds itself.
+
+on:
+  workflow_run:
+    workflows:
+      - Castaway CI
+      - rust-api tests
+      - Mobile Tests
+      - OpenAPI Spec Check
+      - i18n String Coverage
+      - CodeQL
+      - Docker image
+      - Android app
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'push'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Release only when main's checks have all passed
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ "$(git rev-parse origin/main)" != "$SHA" ]; then
+            echo "Not main's newest commit; a later push will release."; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git tag --points-at "$SHA" | grep -q '^v'; then
+            echo "Already released: $(git tag --points-at "$SHA" | grep '^v')"; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          runs=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=$SHA&per_page=100" \
+            --jq '[.workflow_runs[] | select(.event == "push" and .name != "Release")]')
+          echo "$runs" | jq -r '.[] | "\(.name): \(.status) \(.conclusion)"'
+          if [ "$(echo "$runs" | jq 'length')" = "0" ]; then echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')" != "0" ]; then
+            echo "Checks still running; the last one to finish releases."; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$(echo "$runs" | jq '[.[] | select(.conclusion != "success" and .conclusion != "skipped")] | length')" != "0" ]; then
+            echo "::error::A check failed on $SHA, so it isn't released."; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the next version and create the release
+        id: tag
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
+          IFS=. read -r major minor patch <<< "${last#v}"
+          next="v${major}.${minor}.$((patch + 1))"
+          git tag "$next" "$SHA"
+          git push origin "$next"
+          gh release create "$next" --verify-tag --generate-notes --title "Castaway $next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Build the APK, Docker image and desktop apps for the release
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          tag="${{ steps.tag.outputs.tag }}"
+          gh workflow run android.yml --ref "$tag"
+          gh workflow run docker.yml --ref "$tag"
+          gh workflow run build-tauri-clients.yml --ref "$tag" -f version="$tag"

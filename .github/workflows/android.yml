@@ -78,8 +78,15 @@ jobs:
 
       - run: flutter test
 
+      # A release APK carries the release's version and a build number that always goes up, so it
+      # installs over the previous one.
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          args=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            args="--build-name=${GITHUB_REF_NAME#v} --build-number=$(( $(date +%s) / 60 ))"
+          fi
+          flutter build apk --release $args
 
       - name: Name the APK
         id: apk
