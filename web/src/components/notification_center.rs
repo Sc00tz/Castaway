@@ -887,148 +887,118 @@ struct ToastItem {
     expiry_time: f64, // When this toast should expire (timestamp)
 }
 
+/// The toasts on screen. Every change goes through [`ToastAction`], so it applies to the current
+/// list: errors that arrive together each get their toast, and the expiry timer can't put back
+/// an older list.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct ToastQueue {
+    items: Vec<ToastItem>,
+    next_id: usize,
+}
+
+enum ToastAction {
+    /// Show a message for 5 seconds, unless the same one is already showing.
+    Add { content: String, toast_type: &'static str, now: f64 },
+    /// Hide expired toasts, and drop them once they've faded out.
+    Tick(f64),
+    Dismiss(usize),
+}
+
+impl ToastQueue {
+    fn apply(&self, action: ToastAction) -> Option<ToastQueue> {
+        let mut next = self.clone();
+        match action {
+            ToastAction::Add { content, toast_type, now } => {
+                if self.items.iter().any(|t| t.visible && t.toast_type == toast_type && t.content == content) {
+                    return None;
+                }
+                next.items.push(ToastItem {
+                    id: self.next_id,
+                    content,
+                    toast_type: toast_type.to_string(),
+                    visible: true,
+                    expiry_time: now + 5000.0,
+                });
+                next.next_id += 1;
+            }
+            ToastAction::Tick(now) => {
+                for toast in next.items.iter_mut() {
+                    if toast.visible && now >= toast.expiry_time {
+                        toast.visible = false;
+                    }
+                }
+                next.items.retain(|toast| toast.visible || now < toast.expiry_time + 500.0);
+            }
+            ToastAction::Dismiss(id) => {
+                for toast in next.items.iter_mut().filter(|t| t.id == id) {
+                    toast.visible = false;
+                }
+            }
+        }
+        (next != *self).then_some(next)
+    }
+}
+
+impl Reducible for ToastQueue {
+    type Action = ToastAction;
+
+    fn reduce(self: std::rc::Rc<Self>, action: ToastAction) -> std::rc::Rc<Self> {
+        match self.apply(action) {
+            Some(next) => std::rc::Rc::new(next),
+            None => self,
+        }
+    }
+}
+
+/// Clear `message` from the shared state after the toast has had its time, unless it changed.
+fn clear_later(dispatch: &Dispatch<NotificationState>, message: String, field: fn(&mut NotificationState) -> &mut Option<String>) {
+    let dispatch = dispatch.clone();
+    Timeout::new(5500, move || {
+        dispatch.reduce_mut(|state| {
+            let slot = field(state);
+            if slot.as_ref() == Some(&message) {
+                *slot = None;
+            }
+        });
+    })
+    .forget();
+}
+
 #[function_component(ToastNotification)]
 pub fn toast_notification() -> Html {
     let (state, dispatch) = use_store::<NotificationState>();
-    let toast_queue = use_state(|| vec![]);
-    let counter = use_state(|| 0);
+    let toast_queue = use_reducer(ToastQueue::default);
 
-    // Single cleanup timer for all toasts - runs every 100ms
+    // One timer for all toasts, started once.
     {
-        let toast_queue = toast_queue.clone();
-
-        use_effect(move || {
-            let interval_handle = Interval::new(100, move || {
-                let now = js_sys::Date::now();
-
-                toast_queue.set({
-                    let mut new_queue: Vec<ToastItem> = (*toast_queue).clone();
-                    let mut changed = false;
-
-                    for toast in new_queue.iter_mut() {
-                        if toast.visible && now >= toast.expiry_time {
-                            toast.visible = false;
-                            changed = true;
-                        }
-                    }
-
-                    let before_len = new_queue.len();
-                    new_queue.retain(|toast| toast.visible || now < toast.expiry_time + 500.0);
-                    if new_queue.len() != before_len {
-                        changed = true;
-                    }
-
-                    if changed {
-                        new_queue
-                    } else {
-                        (*toast_queue).clone()
-                    }
-                });
-            });
-
+        let queue = toast_queue.dispatcher();
+        use_effect_with((), move |_| {
+            let interval_handle = Interval::new(100, move || queue.dispatch(ToastAction::Tick(js_sys::Date::now())));
             move || {
                 interval_handle.cancel();
             }
         });
     }
 
-    // Process error messages
     {
-        let toast_queue = toast_queue.clone();
-        let counter = counter.clone();
+        let queue = toast_queue.dispatcher();
         let dispatch = dispatch.clone();
-        let error_message = state.error_message.clone();
-
-        use_effect_with(error_message.clone(), move |error_message| {
-            if let Some(error_msg) = error_message {
-                let existing_message = (*toast_queue).iter().any(|toast: &ToastItem| {
-                    toast.content == *error_msg && toast.toast_type == "error" && toast.visible
-                });
-
-                if !existing_message {
-                    let new_id = *counter;
-                    counter.set(new_id + 1);
-
-                    let now = js_sys::Date::now();
-                    let expiry_time = now + 5000.0;
-
-                    let new_toast = ToastItem {
-                        id: new_id,
-                        content: error_msg.clone(),
-                        toast_type: "error".to_string(),
-                        visible: true,
-                        expiry_time,
-                    };
-
-                    toast_queue.set({
-                        let mut new_queue = (*toast_queue).clone();
-                        new_queue.push(new_toast);
-                        new_queue
-                    });
-
-                    let dispatch_clone = dispatch.clone();
-                    let error_msg_clone = error_msg.clone();
-                    let handle = Timeout::new(5500, move || {
-                        dispatch_clone.reduce_mut(|state| {
-                            if state.error_message.as_ref() == Some(&error_msg_clone) {
-                                state.error_message = None;
-                            }
-                        });
-                    });
-
-                    handle.forget();
-                }
+        use_effect_with(state.error_message.clone(), move |error_message| {
+            if let Some(message) = error_message {
+                queue.dispatch(ToastAction::Add { content: message.clone(), toast_type: "error", now: js_sys::Date::now() });
+                clear_later(&dispatch, message.clone(), |s| &mut s.error_message);
             }
             || ()
         });
     }
 
-    // Process info messages
     {
-        let toast_queue = toast_queue.clone();
-        let counter = counter.clone();
+        let queue = toast_queue.dispatcher();
         let dispatch = dispatch.clone();
-        let info_message = state.info_message.clone();
-
-        use_effect_with(info_message.clone(), move |info_message| {
-            if let Some(info_msg) = info_message {
-                let existing_message = (*toast_queue).iter().any(|toast: &ToastItem| {
-                    toast.content == *info_msg && toast.toast_type == "info" && toast.visible
-                });
-
-                if !existing_message {
-                    let new_id = *counter;
-                    counter.set(new_id + 1);
-
-                    let now = js_sys::Date::now();
-                    let expiry_time = now + 5000.0;
-
-                    let new_toast = ToastItem {
-                        id: new_id,
-                        content: info_msg.clone(),
-                        toast_type: "info".to_string(),
-                        visible: true,
-                        expiry_time,
-                    };
-
-                    toast_queue.set({
-                        let mut new_queue = (*toast_queue).clone();
-                        new_queue.push(new_toast);
-                        new_queue
-                    });
-
-                    let dispatch_clone = dispatch.clone();
-                    let info_msg_clone = info_msg.clone();
-                    let handle = Timeout::new(5500, move || {
-                        dispatch_clone.reduce_mut(|state| {
-                            if state.info_message.as_ref() == Some(&info_msg_clone) {
-                                state.info_message = None;
-                            }
-                        });
-                    });
-
-                    handle.forget();
-                }
+        use_effect_with(state.info_message.clone(), move |info_message| {
+            if let Some(message) = info_message {
+                queue.dispatch(ToastAction::Add { content: message.clone(), toast_type: "info", now: js_sys::Date::now() });
+                clear_later(&dispatch, message.clone(), |s| &mut s.info_message);
             }
             || ()
         });
@@ -1037,7 +1007,7 @@ pub fn toast_notification() -> Html {
     html! {
         <div class="toast-container">
             {
-                (*toast_queue).iter().map(|toast| {
+                toast_queue.items.iter().map(|toast| {
                     let toast_class = if toast.toast_type == "error" {
                         "toast-error"
                     } else {
@@ -1069,17 +1039,9 @@ pub fn toast_notification() -> Html {
                                     <button
                                         class="toast-dismiss text-lg ml-2"
                                         onclick={
-                                            let toast_queue = toast_queue.clone();
+                                            let queue = toast_queue.dispatcher();
                                             let toast_id = toast.id;
-                                            Callback::from(move |_| {
-                                                toast_queue.set({
-                                                    let mut new_queue = (*toast_queue).clone();
-                                                    if let Some(t) = new_queue.iter_mut().find(|t| t.id == toast_id) {
-                                                        t.visible = false;
-                                                    }
-                                                    new_queue
-                                                });
-                                            })
+                                            Callback::from(move |_| queue.dispatch(ToastAction::Dismiss(toast_id)))
                                         }
                                     >
                                         <i class="ph ph-x"></i>
@@ -1160,5 +1122,25 @@ mod tests {
         assert_eq!(group.progress, 50.0);
         assert!(!group.all_done);
         assert!(group.any_failed);
+    }
+
+    #[wasm_bindgen_test]
+    fn toasts_that_arrive_together_are_all_kept() {
+        let add = |q: &ToastQueue, text: &str, now: f64| {
+            q.apply(ToastAction::Add { content: text.into(), toast_type: "error", now }).unwrap_or_else(|| q.clone())
+        };
+        let q = add(&add(&ToastQueue::default(), "Is the server reachable?", 0.0), "HTTP 404", 1.0);
+        let shown: Vec<&str> = q.items.iter().map(|t| t.content.as_str()).collect();
+        assert_eq!(shown, ["Is the server reachable?", "HTTP 404"]);
+        assert!(q.apply(ToastAction::Add { content: "HTTP 404".into(), toast_type: "error", now: 2.0 }).is_none(), "a repeat isn't shown twice");
+
+        assert!(q.apply(ToastAction::Tick(100.0)).is_none(), "nothing expires early");
+        let faded = q.apply(ToastAction::Tick(5000.5)).unwrap();
+        assert_eq!(faded.items.iter().filter(|t| t.visible).count(), 1);
+        let gone = faded.apply(ToastAction::Tick(6000.0)).unwrap();
+        assert_eq!(gone.items.len(), 0);
+
+        let dismissed = q.apply(ToastAction::Dismiss(q.items[0].id)).unwrap();
+        assert!(!dismissed.items[0].visible && dismissed.items[1].visible);
     }
 }
