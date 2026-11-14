@@ -54,7 +54,7 @@ impl TrendingFeed {
             self.artwork
         };
         UnifiedPodcast {
-            id: self.id,
+            id: self.id as i64,
             index_id: self.id,
             title: self.title,
             url: self.url.clone(),
@@ -105,7 +105,7 @@ impl RecommendedPodcast {
         let url = self.feedurl.clone().unwrap_or_default();
         let author = self.author.clone().unwrap_or_default();
         UnifiedPodcast {
-            id: idx,
+            id: idx as i64,
             index_id: idx,
             title: self.title.clone(),
             url: url.clone(),

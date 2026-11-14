@@ -1990,6 +1990,9 @@ class CastawayService {
         final data = jsonDecode(response.body);
         // Search API response received
         return CastawaySearchResult.fromJson(data);
+      } else if (response.statusCode == 503 && provider == SearchProvider.podcastIndex) {
+        // Podcast Index has no key on this server (or is down): search Apple instead.
+        return searchPodcasts(query, SearchProvider.itunes);
       } else {
         throw Exception('Failed to search podcasts: ${response.statusCode}');
       }

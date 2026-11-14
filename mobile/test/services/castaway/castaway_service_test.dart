@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:castaway_mobile/services/castaway/login_service.dart';
+import 'package:castaway_mobile/entities/castaway_search.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 
 void main() {
@@ -40,6 +41,27 @@ void main() {
 
       expect(await service.verifyCastawayInstance('https://pods.example.com'), isTrue);
       expect(paths, ['/api/castaway_check', CastawayLoginService.legacyCheckPath]);
+    });
+
+    test('Podcast Index search without a key on the server searches Apple instead', () async {
+      final indexes = <String?>[];
+      final client = MockClient((request) async {
+        final index = request.url.queryParameters['index'];
+        indexes.add(index);
+        if (index == 'podcast_index') {
+          return http.Response('{"message": "Podcast Index needs an API key"}', 503);
+        }
+        return http.Response(
+            '{"resultCount": 1, "results": [{"trackId": 6785225885, "collectionId": 6785225885, '
+            '"trackName": "Big Id Show", "artistName": "Host", "feedUrl": "https://feeds.example.invalid/x.xml"}]}',
+            200);
+      });
+      final service = CastawayService(client: client)..setCredentials('https://pods.example.com', 'key');
+
+      final result = await service.searchPodcasts('show', SearchProvider.podcastIndex);
+
+      expect(indexes, ['podcast_index', 'itunes']);
+      expect(result.getUnifiedPodcasts().single.title, 'Big Id Show');
     });
 
     test('a request that never responds times out instead of hanging forever', () async {

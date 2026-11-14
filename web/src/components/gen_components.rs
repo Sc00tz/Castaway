@@ -280,8 +280,15 @@ pub fn search_bar() -> Html {
                         }
                     }
                 } else {
-                    match call_get_podcast_info(&search_value, &server_name, &api_key, &search_index)
-                        .await
+                    // Podcast Index needs a key (or may be down): search Apple instead, and keep
+                    // Apple selected for the next search.
+                    let mut result = call_get_podcast_info(&search_value, &server_name, &api_key, &search_index).await;
+                    let unavailable = matches!(&result, Err(e) if e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>().is_some());
+                    if unavailable && *search_index == "podcast_index" {
+                        search_index.set("itunes".to_string());
+                        result = call_get_podcast_info(&search_value, &server_name, &api_key, "itunes").await;
+                    }
+                    match result
                     {
                         Ok(search_results) => {
                             Dispatch::<SearchState>::global().reduce_mut(move |state| {

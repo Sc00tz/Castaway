@@ -24,7 +24,7 @@ pub struct PodcastSearchResult {
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 #[allow(non_snake_case)]
 pub struct UnifiedPodcast {
-    pub(crate) id: i32,
+    pub(crate) id: i64,
     pub(crate) index_id: i32,
     pub(crate) title: String,
     pub(crate) url: String,
@@ -49,7 +49,7 @@ pub struct UnifiedPodcast {
 impl From<Podcast> for UnifiedPodcast {
     fn from(podcast: Podcast) -> Self {
         UnifiedPodcast {
-            id: podcast.id,
+            id: podcast.id as i64,
             index_id: podcast.id,
             title: podcast.title,
             url: podcast.url,
@@ -135,7 +135,7 @@ pub struct ITunesPodcast {
     pub wrapperType: String,
     pub kind: String,
     pub collectionId: i64,
-    pub trackId: i32,
+    pub trackId: i64,
     pub(crate) artistName: String,
     pub(crate) trackName: String,
     pub(crate) collectionViewUrl: String,
@@ -826,4 +826,25 @@ pub async fn call_search_transcripts(
         .json::<TranscriptSearchPage>()
         .await
         .map_err(|e| anyhow::Error::msg(format!("Deserialization failed: {}", e)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    /// Apple's ids no longer fit in 32 bits; a real answer must still parse.
+    #[wasm_bindgen_test]
+    fn apple_results_with_large_ids_parse() {
+        let body = r#"{"resultCount":1,"results":[{"wrapperType":"track","kind":"podcast",
+            "collectionId":6785225885,"trackId":6785225885,"artistName":"Host","trackName":"Big Id Show",
+            "collectionViewUrl":"https://podcasts.apple.com/x","feedUrl":"https://feeds.example.invalid/x.xml",
+            "artworkUrl100":"https://img.example.invalid/x.jpg","releaseDate":"2026-11-01T00:00:00Z",
+            "genres":["Comedy"],"collectionExplicitness":"notExplicit","trackCount":3}]}"#;
+        let parsed: PodcastSearchResult = serde_json::from_str(body).expect("parses");
+        let show: UnifiedPodcast = parsed.results.unwrap().remove(0).into();
+        assert_eq!(show.id, 6785225885);
+        assert_eq!(show.index_id, 0, "an Apple result has no Podcast Index id");
+        assert_eq!(show.title, "Big Id Show");
+    }
 }

@@ -291,7 +291,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                         &api_key.unwrap(),
                         user_id.unwrap(),
                         &podcast_values,
-                        podcast.id,
+                        podcast.index_id,
                     )
                     .await
                     {
