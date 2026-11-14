@@ -951,10 +951,9 @@ impl Reducible for ToastQueue {
 }
 
 /// Clear `message` from the shared state after the toast has had its time, unless it changed.
-fn clear_later(dispatch: &Dispatch<NotificationState>, message: String, field: fn(&mut NotificationState) -> &mut Option<String>) {
-    let dispatch = dispatch.clone();
+fn clear_later(message: String, field: fn(&mut NotificationState) -> &mut Option<String>) {
     Timeout::new(5500, move || {
-        dispatch.reduce_mut(|state| {
+        Dispatch::<NotificationState>::global().reduce_mut(|state| {
             let slot = field(state);
             if slot.as_ref() == Some(&message) {
                 *slot = None;
@@ -966,7 +965,6 @@ fn clear_later(dispatch: &Dispatch<NotificationState>, message: String, field: f
 
 #[function_component(ToastNotification)]
 pub fn toast_notification() -> Html {
-    let (state, dispatch) = use_store::<NotificationState>();
     let toast_queue = use_reducer(ToastQueue::default);
 
     // One timer for all toasts, started once.
@@ -980,27 +978,31 @@ pub fn toast_notification() -> Html {
         });
     }
 
+    // Listen to every change of the shared messages, not just the value at the next redraw:
+    // when two errors are set back to back, the first would otherwise never be seen.
     {
         let queue = toast_queue.dispatcher();
-        let dispatch = dispatch.clone();
-        use_effect_with(state.error_message.clone(), move |error_message| {
-            if let Some(message) = error_message {
-                queue.dispatch(ToastAction::Add { content: message.clone(), toast_type: "error", now: js_sys::Date::now() });
-                clear_later(&dispatch, message.clone(), |s| &mut s.error_message);
-            }
-            || ()
-        });
-    }
-
-    {
-        let queue = toast_queue.dispatcher();
-        let dispatch = dispatch.clone();
-        use_effect_with(state.info_message.clone(), move |info_message| {
-            if let Some(message) = info_message {
-                queue.dispatch(ToastAction::Add { content: message.clone(), toast_type: "info", now: js_sys::Date::now() });
-                clear_later(&dispatch, message.clone(), |s| &mut s.info_message);
-            }
-            || ()
+        use_effect_with((), move |_| {
+            let seen = std::rc::Rc::new(std::cell::RefCell::new((None::<String>, None::<String>)));
+            let subscription = Dispatch::<NotificationState>::global().subscribe(move |state: std::rc::Rc<NotificationState>| {
+                let mut seen = seen.borrow_mut();
+                let now = js_sys::Date::now();
+                if state.error_message != seen.0 {
+                    if let Some(message) = &state.error_message {
+                        queue.dispatch(ToastAction::Add { content: message.clone(), toast_type: "error", now });
+                        clear_later(message.clone(), |s| &mut s.error_message);
+                    }
+                    seen.0 = state.error_message.clone();
+                }
+                if state.info_message != seen.1 {
+                    if let Some(message) = &state.info_message {
+                        queue.dispatch(ToastAction::Add { content: message.clone(), toast_type: "info", now });
+                        clear_later(message.clone(), |s| &mut s.info_message);
+                    }
+                    seen.1 = state.info_message.clone();
+                }
+            });
+            move || drop(subscription)
         });
     }
 

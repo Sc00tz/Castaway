@@ -12,7 +12,7 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 use yewdux::prelude::*;
 
-use crate::components::context::AppState;
+use crate::components::context::{AppState, NotificationState};
 use crate::pages::discover::Discover;
 use crate::pages::downloads::Downloads;
 use crate::pages::feed::Feed;
@@ -230,6 +230,30 @@ async fn the_discover_page_has_its_sections() {
 #[wasm_bindgen_test]
 async fn the_settings_page_tells_you_when_the_server_cannot_be_reached() {
     assert_shows(&shown_when_signed_in(Page::Settings, json!({}), "Is the server reachable?").await, "Is the server reachable?");
+}
+
+/// Pages often fail several requests at once; each error must still get its toast, even when the
+/// next one replaces it in the shared state before the page redraws.
+#[wasm_bindgen_test]
+async fn errors_raised_together_each_show_a_toast() {
+    answer_api_with(json!({}));
+    sign_in();
+    let (root, app) = render(Page::Home).await;
+    let notify = Dispatch::<NotificationState>::global();
+    notify.reduce_mut(|s| s.error_message = Some("First problem".to_string()));
+    notify.reduce_mut(|s| s.error_message = Some("Second problem".to_string()));
+    let mut shown = text(&root);
+    for _ in 0..50 {
+        if shown.contains("Second problem") {
+            break;
+        }
+        TimeoutFuture::new(100).await;
+        shown = text(&root);
+    }
+    close(root, app);
+    sign_out();
+    assert_shows(&shown, "Second problem");
+    assert_shows(&shown, "First problem");
 }
 
 #[wasm_bindgen_test]
