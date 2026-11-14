@@ -15,10 +15,38 @@ pub struct RecentEps {
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 #[allow(non_snake_case)]
 pub struct PodcastSearchResult {
-    pub status: Option<String>,              // for PodcastIndex
-    pub resultCount: Option<i32>,            // for iTunes
-    pub feeds: Option<Vec<Podcast>>,         // for PodcastIndex
+    #[serde(default, deserialize_with = "or_default")]
+    pub status: Option<String>, // for PodcastIndex
+    #[serde(default, deserialize_with = "or_default")]
+    pub resultCount: Option<i64>, // for iTunes
+    #[serde(default, deserialize_with = "readable_entries")]
+    pub feeds: Option<Vec<Podcast>>, // for PodcastIndex
+    #[serde(default, deserialize_with = "readable_entries")]
     pub results: Option<Vec<ITunesPodcast>>, // for iTunes
+}
+
+// Directory answers vary: a field can be missing or null, and one odd entry mustn't sink the
+// whole search. Missing or null fields take their default, and entries that still can't be
+// read are skipped.
+fn or_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned + Default,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value::<Option<T>>(value).ok().flatten().unwrap_or_default())
+}
+
+fn readable_entries<'de, D, T>(deserializer: D) -> Result<Option<Vec<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(match value {
+        serde_json::Value::Array(items) => Some(items.into_iter().filter_map(|item| serde_json::from_value(item).ok()).collect()),
+        _ => None,
+    })
 }
 
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
@@ -109,42 +137,69 @@ impl From<ITunesPodcast> for UnifiedPodcast {
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 #[allow(non_snake_case)]
 pub struct Podcast {
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) id: i32,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) title: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) url: String,
     #[allow(non_snake_case)]
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) originalUrl: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) link: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) description: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) author: String,
     #[allow(non_snake_case)]
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) ownerName: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) image: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) artwork: String,
     #[allow(non_snake_case)]
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) lastUpdateTime: i64,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) categories: Option<HashMap<String, String>>,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) explicit: bool,
     #[allow(non_snake_case)]
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) episodeCount: i32,
 }
 
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 #[allow(non_snake_case)]
 pub struct ITunesPodcast {
+    #[serde(default, deserialize_with = "or_default")]
     pub wrapperType: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub kind: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub collectionId: i64,
+    #[serde(default, deserialize_with = "or_default")]
     pub trackId: i64,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) artistName: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) trackName: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) collectionViewUrl: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) feedUrl: Option<String>,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) artworkUrl100: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) releaseDate: String,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) genres: Vec<String>,
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) collectionExplicitness: String,
     #[allow(non_snake_case)]
+    #[serde(default, deserialize_with = "or_default")]
     pub(crate) trackCount: Option<i32>,
     // add other fields as needed
 }
@@ -846,5 +901,28 @@ mod tests {
         assert_eq!(show.id, 6785225885);
         assert_eq!(show.index_id, 0, "an Apple result has no Podcast Index id");
         assert_eq!(show.title, "Big Id Show");
+    }
+
+    /// Apple sometimes leaves fields out or sends null; those results still show, and an entry
+    /// that can't be read at all is skipped instead of failing the whole search.
+    #[wasm_bindgen_test]
+    fn apple_results_missing_fields_still_show() {
+        let body = r#"{"resultCount":3,"results":[
+            {"trackId":6785225885,"trackName":"No Date Show","feedUrl":"https://feeds.example.invalid/a.xml"},
+            {"trackId":12,"trackName":"Null Fields Show","releaseDate":null,"genres":null,"artworkUrl100":null,"trackCount":null},
+            "not a podcast"]}"#;
+        let parsed: PodcastSearchResult = serde_json::from_str(body).expect("parses");
+        let titles: Vec<String> = parsed.results.unwrap().into_iter().map(|p| UnifiedPodcast::from(p).title).collect();
+        assert_eq!(titles, ["No Date Show", "Null Fields Show"]);
+    }
+
+    /// The same for Podcast Index feeds.
+    #[wasm_bindgen_test]
+    fn podcast_index_feeds_missing_fields_still_show() {
+        let body = r#"{"status":"true","feeds":[{"id":5,"title":"Sparse Feed","url":"https://feeds.example.invalid/b.xml","categories":null}]}"#;
+        let parsed: PodcastSearchResult = serde_json::from_str(body).expect("parses");
+        let feeds = parsed.feeds.unwrap();
+        assert_eq!(feeds.len(), 1);
+        assert_eq!(feeds[0].title, "Sparse Feed");
     }
 }
