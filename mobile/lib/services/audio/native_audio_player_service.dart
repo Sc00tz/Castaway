@@ -242,6 +242,10 @@ class NativeAudioPlayerService extends AudioPlayerService {
       case 'mediaButtonAction':
         _handleMediaButtonAction(event);
         break;
+      case 'seeked':
+        final ms = event['position'] as int? ?? 0;
+        _castawayAudioService?.recordJump(ms / 1000.0);
+        break;
     }
   }
 
@@ -637,6 +641,7 @@ class NativeAudioPlayerService extends AudioPlayerService {
       // Convert seconds to milliseconds for native player
       final positionMs = position * 1000;
       await platform.invokeMethod('seek', {'position': positionMs});
+      _castawayAudioService?.recordJump(position.toDouble());
       // Persist the new position immediately so a crash/quick-close right after
       // a scrub doesn't lose it (steady-state saver only runs every 15s).
       await _saveLocalPosition(positionMs: positionMs);

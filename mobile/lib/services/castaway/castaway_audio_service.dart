@@ -680,6 +680,22 @@ class CastawayAudioService {
     }
   }
 
+  Timer? _jumpTimer;
+
+  /// Save a jump (skip, scrub, lock screen or car button) to the server promptly, playing or
+  /// paused, so other devices see the new position. Quick repeated skips send one update.
+  void recordJump(double seconds) {
+    final episodeId = _currentEpisodeId;
+    final userId = _currentUserId;
+    if (episodeId == null || userId == null) return;
+    _jumpTimer?.cancel();
+    _jumpTimer = Timer(const Duration(milliseconds: 800), () {
+      if (_currentEpisodeId != episodeId) return;
+      _lastRecordedPosition = seconds;
+      unawaited(_recordPosition(episodeId, userId, seconds));
+    });
+  }
+
   /// Sync current position to server immediately (for pause/stop events)
   Future<void> syncCurrentPositionToServer() async {
     // Syncing current position to server

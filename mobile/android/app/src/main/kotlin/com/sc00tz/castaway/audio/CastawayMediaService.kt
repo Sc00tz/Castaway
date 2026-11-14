@@ -246,6 +246,19 @@ class CastawayMediaService : MediaLibraryService() {
                 }
             }
 
+            // A jump (in-app skip or scrub, lock screen, headphones, car) is reported straight
+            // away, playing or paused, so the app can save the new position to the server.
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                    sendEvent(mapOf("type" to "seeked", "position" to newPosition.positionMs))
+                    sendPlaybackStateEvent()
+                }
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 logPlayer("Is playing changed: $isPlaying")
                 sendPlaybackStateEvent()

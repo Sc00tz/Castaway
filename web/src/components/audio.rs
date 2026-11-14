@@ -797,6 +797,61 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
         }
     });
 
+    // Send the position the moment you pause or jump, not just every 30 seconds while playing.
+    // On resume, take up a newer position another device saved meanwhile (the phone skipped
+    // ahead while this tab sat paused).
+    {
+        let media = audio_state.media_element.clone();
+        let src = audio_state.currently_playing.as_ref().map(|p| p.src.clone());
+        let server_name = server_name.clone();
+        let api_key = api_key.clone().flatten();
+        let offline = offline_status.unwrap_or(false);
+        use_effect_with((episode_id, src), move |(episode_id, _)| {
+            let mut listeners: Vec<gloo_events::EventListener> = Vec::new();
+            if let (Some(media), Some(episode_id), Some(server), Some(key), Some(user_id), false) =
+                (media, *episode_id, server_name, api_key, user_id, offline)
+            {
+                let target: web_sys::HtmlMediaElement = media.as_media_element().clone();
+                let last_sent = Rc::new(Cell::new(None::<f64>));
+                let send: Rc<dyn Fn(f64)> = {
+                    let (server, key, last_sent) = (server.clone(), key.clone(), last_sent.clone());
+                    Rc::new(move |seconds: f64| {
+                        last_sent.set(Some(seconds));
+                        let (server, key) = (server.clone(), key.clone());
+                        spawn_local(async move {
+                            let request = RecordListenDurationRequest {
+                                episode_id,
+                                user_id,
+                                listen_duration: seconds,
+                                is_youtube: Some(is_youtube_vid),
+                            };
+                            let _ = call_record_listen_duration(&server, &key, request).await;
+                        });
+                    })
+                };
+                for event in ["pause", "seeked"] {
+                    let (send, element) = (send.clone(), target.clone());
+                    listeners.push(gloo_events::EventListener::new(&target, event, move |_| send(element.current_time())));
+                }
+                let element = target.clone();
+                listeners.push(gloo_events::EventListener::new(&target, "play", move |_| {
+                    let Some(sent) = last_sent.get() else { return };
+                    let (server, key, element) = (server.clone(), key.clone(), element.clone());
+                    spawn_local(async move {
+                        let request = EpisodeRequest { episode_id, user_id, person_episode: false, is_youtube: is_youtube_vid };
+                        if let Ok(episode) = call_get_episode_metadata(&server, Some(key), &request).await {
+                            let saved = episode.listenduration as f64;
+                            if (saved - sent).abs() > 3.0 && (saved - element.current_time()).abs() > 3.0 {
+                                element.set_current_time(saved);
+                            }
+                        }
+                    });
+                }));
+            }
+            move || drop(listeners)
+        });
+    }
+
     // Effect for incrementing user listen time
     let state_increment_clone = audio_state.clone();
     use_effect_with((offline_status.clone(), episode_id.clone()), {
@@ -2150,7 +2205,7 @@ pub fn on_play_click(
         let description = episode.episodedescription.clone();
         let pubdate = episode.episodepubdate.clone();
         let artworkurl = episode.episodeartwork.clone();
-        let episode = episode.clone();
+        let mut episode = episode.clone();
         wasm_bindgen_futures::spawn_local(async move {
             // Function to get actual duration from audio file
             async fn get_actual_duration(audio_src: &str) -> Option<f64> {
@@ -2263,6 +2318,17 @@ pub fn on_play_click(
                         .await
                         {
                             Ok((playback_speed, start_skip, end_skip, _playback_speed_customized)) => {
+                                // The page's list may be older than the server (another device
+                                // played on since it loaded): start from the saved position.
+                                let request = EpisodeRequest {
+                                    episode_id: episode.episodeid,
+                                    user_id,
+                                    person_episode: false,
+                                    is_youtube: episode.is_youtube,
+                                };
+                                if let Ok(fresh) = call_get_episode_metadata(&server_name_for_player, Some(api_key_for_player.clone()), &request).await {
+                                    episode.listenduration = fresh.listenduration;
+                                }
                                 let start_pos_sec = episode.listenduration.max(start_skip) as f64;
                                 let end_pos_sec = end_skip as f64;
 
