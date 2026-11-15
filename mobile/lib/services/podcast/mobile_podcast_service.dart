@@ -515,10 +515,14 @@ class MobilePodcastService extends PodcastService {
       if (settingsService.markDeletedEpisodesAsPlayed) {
         episode.played = true;
       }
-    } else if (episode.downloadState == DownloadState.downloading && episode.downloadPercentage! < 100) {
+    } else if (episode.downloadTaskId != null) {
+      // Downloading, queued, paused or waiting to retry: stop it and its partial file.
       await MobileDownloaderManager.cancel(episode.downloadTaskId!);
     }
 
+    // The cover saved next to the audio for offline use goes with it.
+    final artwork = episode.localImagePath;
+    episode.localImagePath = null;
     episode.downloadTaskId = null;
     episode.downloadPercentage = 0;
     episode.position = 0;
@@ -536,11 +540,17 @@ class MobilePodcastService extends PodcastService {
       log.fine('Deleting file ${f.path}');
 
       if (await f.exists()) {
-        f.delete();
+        await f.delete();
       }
     }
 
-    return;
+    if (artwork != null && artwork.isNotEmpty) {
+      final cover = File(artwork);
+      if (await cover.exists()) {
+        log.fine('Deleting cached artwork ${cover.path}');
+        await cover.delete();
+      }
+    }
   }
 
   @override
