@@ -44,7 +44,13 @@ void main() {
   group('normalizeBottomBarOrder', () {
     test('a saved order from before People keeps its order and gains People at the end', () {
       final saved = ['Search', 'Home', 'Feed', 'Saved', 'Podcasts', 'Downloads', 'History', 'Playlists'];
-      expect(normalizeBottomBarOrder(saved), [...saved, 'People']);
+      expect(normalizeBottomBarOrder(saved), [...saved, 'Discover', 'People']);
+    });
+
+    test('Discover is a page, and an order saved before it gains it at the end', () {
+      expect(defaultBottomBarOrder, contains('Discover'));
+      final saved = ['Home', 'Feed', 'Saved', 'Podcasts', 'People', 'Downloads', 'History', 'Playlists', 'Search'];
+      expect(normalizeBottomBarOrder(saved), [...saved, 'Discover']);
     });
 
     test('unknown and duplicate entries are dropped', () {

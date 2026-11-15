@@ -228,4 +228,29 @@ void main() {
       expect(page.results, isNotEmpty);
     });
   }, skip: skip);
+
+  group('discover', () {
+    test('trending comes from Apple\'s chart without a Podcast Index key', () async {
+      final shows = await service.getTrending();
+      expect(shows.single.title, 'Chart Show');
+      expect(shows.single.url, 'https://feeds.example.invalid/chart.xml');
+      expect(shows.single.indexId, 0);
+    });
+
+    test('trending in one category', () async {
+      final shows = await service.getTrending(category: 'Arts');
+      expect(shows.single.title, 'Chart Show');
+    });
+
+    test('categories are Apple\'s main genres', () async {
+      final categories = await service.getDiscoverCategories();
+      expect(categories.map((c) => c.name), containsAll(['Arts', 'Society & Culture', 'True Crime']));
+      expect(categories, hasLength(19));
+    });
+
+    test('For You loads, and refreshing is accepted', () async {
+      await service.getRecommendations();
+      await service.getRecommendations(refresh: true);
+    });
+  }, skip: skip);
 }

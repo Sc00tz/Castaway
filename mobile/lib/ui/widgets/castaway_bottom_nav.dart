@@ -23,6 +23,7 @@ String bottomNavLabel(BuildContext context, String page) {
     'History' => l.history,
     'Playlists' => l.playlists,
     'Search' => l.search,
+    'Discover' => l.nav_discover,
     _ => page,
   };
 }
@@ -59,6 +60,8 @@ IconData bottomNavIcon(String label, {bool selected = false}) {
       return selected
           ? PhosphorIconsFill.magnifyingGlass
           : PhosphorIconsRegular.magnifyingGlass;
+    case 'Discover':
+      return selected ? PhosphorIconsFill.compass : PhosphorIconsRegular.compass;
     default:
       return selected ? PhosphorIconsFill.house : PhosphorIconsRegular.house;
   }

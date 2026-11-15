@@ -19,6 +19,24 @@ async fn mobile_contract() {
     }
     let pod = app.subscribe(&user, &app.feed("show.xml", &feed), 3).await;
 
+    // Discover without a Podcast Index key: Apple's chart (overall and Arts) and its lookup.
+    let chart = json!({ "feed": { "entry": [{
+        "im:name": { "label": "Chart Show" },
+        "summary": { "label": "A charted show" },
+        "id": { "label": "https://podcasts.apple.com/us/podcast/id555", "attributes": { "im:id": "555" } }
+    }] } })
+    .to_string();
+    for path in ["itunes/charts/limit=24/json", "itunes/charts/limit=24/genre=1301/json"] {
+        app.fixtures().serve(path, Fixture::new("application/json", chart.clone()));
+    }
+    let lookup = json!({ "resultCount": 1, "results": [{
+        "collectionId": 555, "collectionName": "Chart Show", "artistName": "Chart Maker",
+        "feedUrl": "https://feeds.example.invalid/chart.xml", "artworkUrl600": "https://art.example.invalid/555.jpg",
+        "genres": ["Arts", "Podcasts"], "genreIds": ["1301", "26"], "trackCount": 9
+    }] })
+    .to_string();
+    app.fixtures().serve("itunes/lookup", Fixture::new("application/json", lookup));
+
     let mobile = crate::harness::env::repo_root().join("mobile");
     let output = tokio::process::Command::new("flutter")
         .args(["test", "test/contract/server_contract_test.dart", "--reporter", "expanded"])

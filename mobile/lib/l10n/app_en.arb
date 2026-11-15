@@ -2234,5 +2234,42 @@
   "hide_played": "Hide played",
   "@hide_played": {
     "description": "Toggle on episode lists that hides episodes already played"
+  },
+  "unfollow_label": "Unfollow",
+  "@unfollow_label": {
+    "description": "Button on a show from search or Discover that the user already follows"
+  },
+  "nav_discover": "Discover",
+  "@nav_discover": {
+    "description": "Bottom bar tab and screen title: trending shows, categories and suggestions"
+  },
+  "discover_for_you": "For You",
+  "@discover_for_you": {
+    "description": "Discover section with shows suggested from what the user listens to"
+  },
+  "discover_for_you_empty": "Follow a few podcasts and shows you might like will appear here.",
+  "@discover_for_you_empty": {
+    "description": "Shown in For You when there are no suggestions yet"
+  },
+  "discover_trending": "Trending",
+  "@discover_trending": {
+    "description": "Discover section with trending shows"
+  },
+  "discover_all_categories": "All",
+  "@discover_all_categories": {
+    "description": "Category chip that shows trending shows from every category"
+  },
+  "discover_nothing_trending": "Nothing trending here right now.",
+  "@discover_nothing_trending": {
+    "description": "Shown when a category has no trending shows"
+  },
+  "discover_unavailable": "Couldn't load Discover: {error}",
+  "@discover_unavailable": {
+    "description": "Shown when the server couldn't load trending shows",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   }
 }
