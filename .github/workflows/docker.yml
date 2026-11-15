@@ -12,8 +12,8 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # Phone changes run too: the real-flow test below exercises the phone's code.
     paths-ignore:
-      - "mobile/**"
       - "**.md"
       - "images/**"
       - "deployment/**"
@@ -90,8 +90,44 @@ jobs:
             --push \
             -f dockerfile .
 
+  # The real server image, recorded real Apple answers, the phone's own code and the web app in a
+  # real browser, end to end (tests/real-flow/run.sh). The image is only published if it passes.
+  real-flow:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.9"
+          channel: "stable"
+          cache: true
+      - name: Phone and browser dependencies
+        run: |
+          (cd mobile && flutter pub get)
+          (cd tests/real-flow && npm ci --no-fund --no-audit && npx playwright install --with-deps chromium)
+      - name: Real flow against this image
+        env:
+          IMAGE: ${{ env.IMAGE }}:build-${{ github.run_id }}-amd64
+        run: tests/real-flow/run.sh
+      - name: Screenshots of a failed browser step
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: real-flow-screenshots
+          path: tests/real-flow/real-flow-*.png
+          if-no-files-found: ignore
+
   publish:
-    needs: [version, build]
+    needs: [version, build, real-flow]
     runs-on: ubuntu-latest
     permissions:
       contents: read

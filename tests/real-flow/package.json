@@ -1,0 +1,9 @@
+{
+  "name": "castaway-real-flow",
+  "private": true,
+  "type": "module",
+  "description": "The web app's half of the real-flow test (see run.sh).",
+  "dependencies": {
+    "playwright": "1.64.1"
+  }
+}
