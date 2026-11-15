@@ -50,6 +50,7 @@ GITHUB_ONLY_JOBS = {
     ("docker.yml", "build"): "builds the server image (built on GitHub only)",
     ("docker.yml", "publish"): "publishes the server image",
     ("release.yml", "release"): "tags and publishes releases",
+    ("all-checks.yml", "all-checks"): "waits for every check on GitHub (this run is the local equivalent)",
 }
 
 
@@ -233,6 +234,12 @@ def run_job(worktree, name, wf, job_id, job, matrix, events, log_dir):
             env[k] = substitute(str(v), Context(github=github, matrix=matrix, env=env))
     ctx = Context(github=github, matrix=matrix, env=env, secrets={}, needs={}, steps={}, inputs={})
 
+    runs_on = str(job.get("runs-on", ""))
+    if "macos" in runs_on and not glob.glob("/Applications/Xcode*.app"):
+        result.status = "github-only"
+        result.notes.append("needs Xcode, which isn't installed on this Mac (GitHub's Mac machines have it)")
+        return result
+
     job_if = job.get("if")
     if job_if and not evaluate(str(job_if), ctx):
         result.status = "not-run"
@@ -268,6 +275,9 @@ def run_job(worktree, name, wf, job_id, job, matrix, events, log_dir):
             continue
         if re.search(r"\bgh release\b|imagetools create|--push\b", script):
             result.notes.append(f"'{step_name}': publishes (GitHub only)")
+            continue
+        if re.search(r"\bdocker load\b", script):
+            result.notes.append(f"'{step_name}': loads the image GitHub built for the pull request")
             continue
         script = substitute(script, ctx)
         step_env = {k: substitute(str(v), ctx) for k, v in (step.get("env") or {}).items()}

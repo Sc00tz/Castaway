@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Ship the commits that aren't on GitHub's main yet:
+#   1. run what GitHub's workflows run, here (scripts/ci-local); stop if anything fails
+#   2. push them to a branch and open a pull request into main
+#   3. set the pull request to merge itself once every check on GitHub has passed
+#      (main only takes changes that way; see .github/workflows/all-checks.yml)
+#
+#   scripts/ship                 # from main or a branch
+#   scripts/ship --wait          # also wait until it has merged (or a check failed)
+#   SHIP_FOOTER="..." scripts/ship   # extra line at the end of the pull request description
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+wait=false
+[ "${1:-}" = "--wait" ] && wait=true
+
+git fetch -q origin main
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "Commit or stash your changes first: GitHub tests commits, not the working folder."
+  exit 1
+fi
+ahead=$(git rev-list --count origin/main..HEAD)
+if [ "$ahead" -eq 0 ]; then
+  echo "Nothing to ship: HEAD is already on origin/main."
+  exit 0
+fi
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$branch" = "main" ]; then
+  # Move the commits to their own branch; local main goes back to GitHub's main (the commits
+  # stay on the branch, and come back to main when the pull request merges).
+  branch="ship/$(date +%Y%m%d-%H%M)-$(git rev-parse --short HEAD)"
+  git switch -q -c "$branch"
+  git branch -f main origin/main
+fi
+
+echo "== Running GitHub's checks here first"
+scripts/ci-local
+
+echo "== Pushing $branch and opening a pull request"
+git push -q -u origin "$branch"
+title=$(git log --reverse --format=%s origin/main..HEAD | head -1)
+[ "$ahead" -gt 1 ] && title="$title (+$((ahead - 1)) more)"
+body=$(git log --reverse --format='- %s' origin/main..HEAD)
+body="$body
+
+Passed scripts/ci-local before pushing. Merges itself when every check on GitHub passes."
+[ -n "${SHIP_FOOTER:-}" ] && body="$body
+
+$SHIP_FOOTER"
+url=$(gh pr create --base main --head "$branch" --title "$title" --body "$body")
+gh pr merge "$url" --auto --rebase --delete-branch >/dev/null
+echo "Pull request: $url (merges itself when every check passes)"
+
+if $wait; then
+  echo "== Waiting for it to merge"
+  while true; do
+    state=$(gh pr view "$url" --json state -q .state)
+    [ "$state" = "MERGED" ] && { echo "Merged."; break; }
+    [ "$state" = "CLOSED" ] && { echo "The pull request was closed without merging."; exit 1; }
+    if gh pr checks "$url" --json name,bucket -q '.[] | select(.bucket=="fail") | .name' | grep -q .; then
+      echo "A check failed:"; gh pr checks "$url" | grep -i fail; exit 1
+    fi
+    sleep 60
+  done
+  git switch -q main && git pull -q --ff-only origin main
+fi
