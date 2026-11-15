@@ -10,10 +10,16 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/app_localizations.dart';
 
 /// Castaway version of the Up Next queue that shows the server queue.
 ///
 /// This replaces the local queue functionality with server-based queue management.
+/// What Up Next says when nothing is after the playing episode. Up Next leaves out the episode
+/// that's playing, so when that's the only one queued the queue isn't empty: say so.
+String upNextEmptyMessage(AppLocalizations l, {required bool playingIsQueued}) =>
+    playingIsQueued ? l.up_next_nothing_after : l.up_next_empty;
+
 class CastawayUpNextView extends StatefulWidget {
   const CastawayUpNextView({
     Key? key,
@@ -358,7 +364,7 @@ class _CastawayUpNextViewState extends State<CastawayUpNextView> {
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Text(
-                  L.of(context)!.up_next_empty,
+                  upNextEmptyMessage(L.of(context)!, playingIsQueued: _playing != null),
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),

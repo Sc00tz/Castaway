@@ -2271,5 +2271,9 @@
         "type": "String"
       }
     }
+  },
+  "up_next_nothing_after": "Nothing is queued after this episode.",
+  "@up_next_nothing_after": {
+    "description": "Up Next when the only queued episode is the one playing"
   }
 }
