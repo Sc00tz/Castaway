@@ -3,117 +3,121 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:isolate';
-import 'dart:ui';
 
+import 'package:background_downloader/background_downloader.dart';
 import 'package:castaway_mobile/core/environment.dart';
 import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/services/download/download_manager.dart';
-import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
-/// A [DownloadManager] for handling downloading of podcasts on a mobile device.
-@pragma('vm:entry-point')
+/// A [DownloadManager] for downloading episodes on a phone, on top of
+/// background_downloader (which supports Android's built-in Kotlin; the
+/// previous flutter_downloader never did).
 class MobileDownloaderManager implements DownloadManager {
-  static const portName = 'downloader_send_port';
   final log = Logger('MobileDownloaderManager');
-  final ReceivePort _port = ReceivePort();
   final downloadController = StreamController<DownloadProgress>();
+  final FileDownloader _downloader;
+  StreamSubscription<TaskUpdate>? _updates;
   var _lastUpdateTime = 0;
+
+  /// The last percentage reported per task, for status changes that carry none.
+  final Map<String, int> _percentages = {};
 
   @override
   Stream<DownloadProgress> get downloadProgress => downloadController.stream;
 
-  MobileDownloaderManager() {
+  MobileDownloaderManager({FileDownloader? downloader}) : _downloader = downloader ?? FileDownloader() {
     _init();
   }
 
-  Future _init() async {
+  /// Without starting the downloader: tests feed [onUpdate] directly.
+  @visibleForTesting
+  MobileDownloaderManager.withoutStarting() : _downloader = FileDownloader();
+
+  Future<void> _init() async {
     log.fine('Initialising download manager');
 
-    await FlutterDownloader.initialize();
-    IsolateNameServer.removePortNameMapping(portName);
+    // One episode at a time, as before.
+    await _downloader.configure(globalConfig: [(Config.holdingQueue, (1, null, null))]);
+    _downloader.configureNotification(
+      running: const TaskNotification('{filename}', '{progress}'),
+      complete: TaskNotification('{filename}', L.current.downloaded),
+      error: TaskNotification('{filename}', L.current.failed_to_download_episode),
+      progressBar: true,
+    );
 
-    IsolateNameServer.registerPortWithName(_port.sendPort, portName);
+    _updates = _downloader.updates.listen(onUpdate);
 
-    var tasks = await FlutterDownloader.loadTasks();
-
-    // Update the status of any tasks that may have been updated whilst
-    // Castaway was close or in the background.
-    if (tasks != null && tasks.isNotEmpty) {
-      for (var t in tasks) {
-        _updateDownloadState(id: t.taskId, progress: t.progress, status: t.status);
-
-        /// If we are not queued or running we can safely clean up this event
-        if (t.status != DownloadTaskStatus.enqueued && t.status != DownloadTaskStatus.running) {
-          FlutterDownloader.remove(taskId: t.taskId, shouldDeleteContent: false);
-        }
-      }
-    }
-
-    _port.listen((dynamic data) {
-      final id = (data as List<dynamic>)[0] as String;
-      final status = DownloadTaskStatus.fromInt(data[1] as int);
-      final progress = data[2] as int;
-
-      _updateDownloadState(id: id, progress: progress, status: status);
-    });
-
-    FlutterDownloader.registerCallback(downloadCallback);
+    // Also delivers what changed while Castaway was closed or in the background.
+    await _downloader.start(autoCleanDatabase: true);
   }
 
   @override
   Future<String?> enqueueTask(String url, String downloadPath, String fileName) async {
-    return await FlutterDownloader.enqueue(
+    final (baseDirectory, directory, filename) = await Task.split(filePath: '$downloadPath/$fileName');
+    final task = DownloadTask(
       url: url,
-      savedDir: downloadPath,
-      fileName: fileName,
-      showNotification: true,
-      openFileFromNotification: false,
-      headers: {
-        'User-Agent': Environment.userAgent(),
-      },
+      filename: filename,
+      directory: directory,
+      baseDirectory: baseDirectory,
+      headers: {'User-Agent': Environment.userAgent()},
+      updates: Updates.statusAndProgress,
+      retries: 3,
+      allowPause: true,
     );
+
+    if (!await _downloader.enqueue(task)) {
+      log.warning('Could not start the download of $url');
+      return null;
+    }
+    return task.taskId;
   }
+
+  /// Stop a download and remove its partial file.
+  static Future<void> cancel(String taskId) => FileDownloader().cancelTaskWithId(taskId);
 
   @override
   void dispose() {
-    IsolateNameServer.removePortNameMapping(portName);
+    _updates?.cancel();
     downloadController.close();
   }
 
-  void _updateDownloadState({required String id, required int progress, required DownloadTaskStatus status}) {
-    var state = DownloadState.none;
-    var updateTime = DateTime.now().millisecondsSinceEpoch;
-
-    if (status == DownloadTaskStatus.enqueued) {
-      state = DownloadState.queued;
-    } else if (status == DownloadTaskStatus.canceled) {
-      state = DownloadState.cancelled;
-    } else if (status == DownloadTaskStatus.complete) {
-      state = DownloadState.downloaded;
-    } else if (status == DownloadTaskStatus.running) {
-      state = DownloadState.downloading;
-    } else if (status == DownloadTaskStatus.failed) {
-      state = DownloadState.failed;
-    } else if (status == DownloadTaskStatus.paused) {
-      state = DownloadState.paused;
-    }
-
-    /// If we are running, we want to limit notifications to 1 per second. Otherwise,
-    /// small downloads can cause a flood of events. Any other status we always want
-    /// to push through.
-    if (status != DownloadTaskStatus.running ||
-        progress == 0 ||
-        progress == 100 ||
-        updateTime > _lastUpdateTime + 1000) {
-      downloadController.add(DownloadProgress(id, progress, state));
-      _lastUpdateTime = updateTime;
+  /// Turns the downloader's updates into [DownloadProgress] for the rest of the app,
+  /// which treats a download as finished when it reports 100%.
+  void onUpdate(TaskUpdate update) {
+    final id = update.task.taskId;
+    switch (update) {
+      case TaskStatusUpdate(:final status):
+        if (status == TaskStatus.complete) _percentages[id] = 100;
+        _report(id, _percentages[id] ?? 0, _state(status), always: true);
+        if (status.isFinalState) _percentages.remove(id);
+      case TaskProgressUpdate(:final progress):
+        // Negative values signal a status change, which arrives as its own update.
+        if (progress < 0) return;
+        final percentage = (progress * 100).round().clamp(0, 100);
+        _percentages[id] = percentage;
+        _report(id, percentage, DownloadState.downloading);
     }
   }
 
-  @pragma('vm:entry-point')
-  static void downloadCallback(String id, int status, int progress) {
-    IsolateNameServer.lookupPortByName('downloader_send_port')?.send([id, status, progress]);
+  static DownloadState _state(TaskStatus status) => switch (status) {
+        TaskStatus.enqueued || TaskStatus.waitingToRetry => DownloadState.queued,
+        TaskStatus.running => DownloadState.downloading,
+        TaskStatus.complete => DownloadState.downloaded,
+        TaskStatus.canceled => DownloadState.cancelled,
+        TaskStatus.paused => DownloadState.paused,
+        TaskStatus.failed || TaskStatus.notFound => DownloadState.failed,
+      };
+
+  /// Progress is limited to one update a second, so small downloads can't flood
+  /// the app; status changes, the start and the end always go through.
+  void _report(String id, int percentage, DownloadState state, {bool always = false}) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (always || percentage == 0 || percentage == 100 || now > _lastUpdateTime + 1000) {
+      if (!downloadController.isClosed) downloadController.add(DownloadProgress(id, percentage, state));
+      _lastUpdateTime = now;
+    }
   }
 }

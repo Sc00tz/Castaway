@@ -1,6 +1,5 @@
 import UIKit
 import Flutter
-import flutter_downloader
 import AVFoundation
 import MediaPlayer
 
@@ -11,9 +10,6 @@ import MediaPlayer
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Register flutter_downloader callback
-        FlutterDownloaderPlugin.setPluginRegistrantCallback(registerPlugins)
-
         // CRITICAL: Set up audio session and remote control events EARLY
         // This must happen before CarPlay connects for Now Playing to work
         setupAudioForCarPlay()
@@ -48,8 +44,3 @@ import MediaPlayer
     }
 }
 
-private func registerPlugins(registry: FlutterPluginRegistry) {
-    if (!registry.hasPlugin("FlutterDownloaderPlugin")) {
-        FlutterDownloaderPlugin.register(with: registry.registrar(forPlugin: "FlutterDownloaderPlugin")!)
-    }
-}

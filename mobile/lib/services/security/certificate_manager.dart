@@ -52,7 +52,7 @@ class CertificateState {
 /// hint.
 ///
 /// Out of scope (native, deferred): audio streaming (ExoPlayer/AVPlayer) and
-/// downloads (`flutter_downloader`) use native HTTP stacks that bypass Dart TLS,
+/// downloads (`background_downloader`) use native HTTP stacks that bypass Dart TLS,
 /// so mTLS-required playback/downloads need separate native work.
 class CertificateManager {
   CertificateManager._();
