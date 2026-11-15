@@ -15,12 +15,12 @@ import 'package:castaway_mobile/entities/person.dart';
 import 'package:castaway_mobile/entities/podcast.dart';
 import 'package:castaway_mobile/entities/transcript.dart';
 import 'package:castaway_mobile/l10n/app_localizations.dart';
+import 'package:castaway_mobile/services/download/mobile_download_manager.dart';
 import 'package:castaway_mobile/services/podcast/podcast_service.dart';
 import 'package:castaway_mobile/state/episode_state.dart';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:podcast_search/podcast_search.dart' as podcast_search;
@@ -516,7 +516,7 @@ class MobilePodcastService extends PodcastService {
         episode.played = true;
       }
     } else if (episode.downloadState == DownloadState.downloading && episode.downloadPercentage! < 100) {
-      await FlutterDownloader.cancel(taskId: episode.downloadTaskId!);
+      await MobileDownloaderManager.cancel(episode.downloadTaskId!);
     }
 
     episode.downloadTaskId = null;
