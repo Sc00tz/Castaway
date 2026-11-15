@@ -1,0 +1,57 @@
+name: All checks
+
+# The one check main requires. A pull request merges itself (auto-merge) only when this passes,
+# and it passes only when every other check on the pull request's latest commit has finished and
+# none failed. Which checks run depends on the files changed, so main requires this instead of a
+# fixed list (a required check that never starts would block the pull request forever).
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  checks: read
+  contents: read
+
+concurrency:
+  group: all-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  all-checks:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Wait for every other check, then pass only if all passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          self="All checks passed"
+          started=$(date +%s)
+          quiet_since=$started
+          last=""
+          while true; do
+            runs=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+              --jq ".check_runs[] | select(.name != \"$self\") | \"\(.name)|\(.status)|\(.conclusion // \"\")\"" | sort -u)
+            now=$(date +%s)
+            [ "$runs" != "$last" ] && quiet_since=$now && last=$runs
+            pending=$(printf '%s\n' "$runs" | grep -c -v '|completed|' || true)
+            [ -z "$runs" ] && pending=1
+            # Done when everything has finished and no new check has appeared for two minutes
+            # (workflows start a little after the push, some only after others).
+            if [ "$pending" -eq 0 ] && [ $((now - quiet_since)) -ge 120 ]; then break; fi
+            sleep 30
+          done
+          echo "Checks on $SHA:"
+          printf '%s\n' "$runs" | sed 's/^/  /'
+          failed=$(printf '%s\n' "$runs" | awk -F'|' '$3 !~ /^(success|skipped|neutral)$/' || true)
+          if [ -n "$failed" ]; then
+            echo "::error::Not all checks passed:"
+            printf '%s\n' "$failed" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "Every check passed."

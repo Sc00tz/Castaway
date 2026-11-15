@@ -7,12 +7,19 @@ name: Docker image
 #   push to main  ->  :latest, :main, :sha-<short sha>
 #   tag vX.Y.Z    ->  :X.Y.Z, :latest
 #   manual run    ->  :manual-<short sha>
+#   pull request  ->  built (x86_64) and real-flow tested only; nothing is published
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
     # Phone changes run too: the real-flow test below exercises the phone's code.
+    paths-ignore:
+      - "**.md"
+      - "images/**"
+      - "deployment/**"
+  pull_request:
+    branches: [main]
     paths-ignore:
       - "**.md"
       - "images/**"
@@ -48,6 +55,9 @@ jobs:
           elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
             version="main-$short"
             tags="latest main sha-$short"
+          elif [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            version="pr-$short"
+            tags=""
           else
             version="manual-$short"
             tags="manual-$short"
@@ -78,6 +88,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push ${{ matrix.arch }}
+        if: github.event_name != 'pull_request'
         run: |
           docker buildx build \
             --platform "linux/${{ matrix.arch }}" \
@@ -89,6 +100,24 @@ jobs:
             --tag "$IMAGE:build-${{ github.run_id }}-${{ matrix.arch }}" \
             --push \
             -f dockerfile .
+      # A pull request builds x86_64 only, for the real-flow test, and publishes nothing.
+      - name: Build for testing (pull request)
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg "CASTAWAY_VERSION=${{ needs.version.outputs.version }}" \
+            --cache-from "type=gha,scope=amd64" \
+            --tag castaway:pull-request \
+            --output "type=docker,dest=${{ runner.temp }}/castaway-image.tar" \
+            -f dockerfile .
+      - name: Keep the image for the real-flow test (pull request)
+        if: github.event_name == 'pull_request' && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: castaway-image
+          path: ${{ runner.temp }}/castaway-image.tar
+          retention-days: 1
 
   # The real server image, recorded real Apple answers, the phone's own code and the web app in a
   # real browser, end to end (tests/real-flow/run.sh). The image is only published if it passes.
@@ -110,13 +139,22 @@ jobs:
           flutter-version: "3.47.9"
           channel: "stable"
           cache: true
+      - name: The image built for this pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v8
+        with:
+          name: castaway-image
+          path: ${{ runner.temp }}
+      - name: Load it (pull request)
+        if: github.event_name == 'pull_request'
+        run: docker load --input "${{ runner.temp }}/castaway-image.tar"
       - name: Phone and browser dependencies
         run: |
           (cd mobile && flutter pub get)
           (cd tests/real-flow && npm ci --no-fund --no-audit && npx playwright install --with-deps chromium)
       - name: Real flow against this image
         env:
-          IMAGE: ${{ env.IMAGE }}:build-${{ github.run_id }}-amd64
+          IMAGE: ${{ github.event_name == 'pull_request' && 'castaway:pull-request' || format('{0}:build-{1}-amd64', env.IMAGE, github.run_id) }}
         run: tests/real-flow/run.sh
       - name: Screenshots of a failed browser step
         if: failure()
@@ -128,6 +166,7 @@ jobs:
 
   publish:
     needs: [version, build, real-flow]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
