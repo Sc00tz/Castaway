@@ -2275,5 +2275,34 @@
   "up_next_nothing_after": "Nothing is queued after this episode.",
   "@up_next_nothing_after": {
     "description": "Up Next when the only queued episode is the one playing"
+  },
+  "downloading_percent": "Downloading {percent}%",
+  "@downloading_percent": {
+    "description": "Episode download button while the episode downloads to the phone",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "download_waiting": "Waiting to download",
+  "@download_waiting": {
+    "description": "Episode download button while it waits for another download to finish"
+  },
+  "stop_download_title": "Stop this download?",
+  "@stop_download_title": {
+    "description": "Dialog when tapping a download that's in progress"
+  },
+  "stop_download_description": "The part downloaded so far is deleted.",
+  "@stop_download_description": {
+    "description": "Dialog body when stopping a download"
+  },
+  "stop_download": "Stop",
+  "@stop_download": {
+    "description": "Button that stops a download in progress"
+  },
+  "download_waiting_short": "Waiting",
+  "@download_waiting_short": {
+    "description": "Short label under the download button while it waits for another download"
   }
 }

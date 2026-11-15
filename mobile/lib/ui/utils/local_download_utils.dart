@@ -94,8 +94,10 @@ class LocalDownloadUtils {
 
       logger.debug('LocalDownload', 'Final download status for $guid: $isDownloaded');
 
-      // Cache the result
-      _localDownloadStatusCache[guid] = isDownloaded;
+      // Cache the result, except "not yet" while a download is running: it changes when it finishes.
+      if (isDownloaded || !matchingEpisodes.any(_inProgress)) {
+        _localDownloadStatusCache[guid] = isDownloaded;
+      }
       return isDownloaded;
     } catch (e) {
       final logger = AppLogger();
@@ -172,6 +174,34 @@ class LocalDownloadUtils {
     } catch (e) {
       return false;
     }
+  }
+
+  static bool _inProgress(Episode ep) =>
+      ep.downloadTaskId != null &&
+      (ep.downloadState == DownloadState.queued ||
+          ep.downloadState == DownloadState.downloading ||
+          ep.downloadState == DownloadState.paused);
+
+  /// The phone's copy of [episode]: downloaded, being downloaded (with the downloader's task id
+  /// and how far it has got), or none.
+  static Future<LocalDownloadState> localDownloadState(BuildContext context, CastawayEpisode episode) async {
+    final downloaded = await isEpisodeDownloadedLocally(context, episode);
+    if (downloaded) return const LocalDownloadState(downloaded: true);
+    try {
+      if (!context.mounted) return const LocalDownloadState(downloaded: false);
+      final repository = Provider.of<PodcastBloc>(context, listen: false).podcastService.repository;
+      final rows = await repository.findEpisodesByGuidOrLegacy(generateEpisodeGuid(episode));
+      final row = rows.where(_inProgress).firstOrNull;
+      if (row != null) {
+        return LocalDownloadState(
+          downloaded: false,
+          taskId: row.downloadTaskId,
+          percent: row.downloadPercentage ?? 0,
+          waiting: row.downloadState == DownloadState.queued,
+        );
+      }
+    } catch (_) {}
+    return const LocalDownloadState(downloaded: false);
   }
 
   /// Update local download status cache
@@ -291,7 +321,8 @@ class LocalDownloadUtils {
       
       if (success) {
         _startedThisSession.add(localEpisode.guid);
-        updateLocalDownloadStatus(episode, true);
+        // Not "on device" until it has finished; screens follow its progress meanwhile.
+        _localDownloadStatusCache.remove(generateEpisodeGuid(episode));
         await DownloadCleanupService.recordDownload(episode);
       }
       
@@ -390,4 +421,20 @@ class LocalDownloadUtils {
       ),
     );
   }
+}
+
+/// See [LocalDownloadUtils.localDownloadState].
+class LocalDownloadState {
+  final bool downloaded;
+
+  /// Set while a download is queued or running.
+  final String? taskId;
+  final int percent;
+
+  /// Queued behind another download (one runs at a time).
+  final bool waiting;
+
+  const LocalDownloadState({required this.downloaded, this.taskId, this.percent = 0, this.waiting = false});
+
+  bool get downloading => !downloaded && taskId != null;
 }

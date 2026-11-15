@@ -1,6 +1,9 @@
 // lib/ui/castaway/episode_details.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:castaway_mobile/entities/downloadable.dart';
+import 'package:castaway_mobile/services/download/download_manager.dart';
+import 'package:castaway_mobile/services/download/mobile_download_service.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
@@ -52,6 +55,13 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
   // True once people loaded from a server that supports adding them.
   bool _isDownloadedLocally = false;
 
+  /// While this episode downloads to the phone: the downloader's task, how far it has got, and
+  /// whether it's waiting for another download to finish.
+  String? _downloadTaskId;
+  int _downloadPercent = 0;
+  bool _downloadWaiting = false;
+  StreamSubscription<DownloadProgress>? _downloadSub;
+
   // Play-button loading feedback: true while we've kicked off playback for this
   // episode but the audio system hasn't yet acknowledged it as now-playing.
   bool _isStartingPlayback = false;
@@ -74,6 +84,28 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
     _episode = widget.initialEpisode;
     _loadEpisodeDetails();
     _checkLocalDownloadStatus();
+    _downloadSub = MobileDownloadService.downloadProgress.listen(_onDownloadProgress);
+  }
+
+  void _onDownloadProgress(DownloadProgress progress) {
+    if (!mounted || _downloadTaskId == null || progress.id != _downloadTaskId) return;
+    setState(() {
+      switch (progress.status) {
+        case DownloadState.downloaded:
+          _isDownloadedLocally = true;
+          _downloadTaskId = null;
+        case DownloadState.failed || DownloadState.cancelled || DownloadState.none:
+          _downloadTaskId = null;
+        case DownloadState.queued:
+          _downloadWaiting = true;
+        default:
+          _downloadWaiting = false;
+          _downloadPercent = progress.percentage;
+      }
+    });
+    if (progress.status == DownloadState.downloaded && _episode != null) {
+      LocalDownloadUtils.updateLocalDownloadStatus(_episode!, true);
+    }
   }
 
   @override
@@ -128,11 +160,14 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
   Future<void> _checkLocalDownloadStatus() async {
     if (_episode == null) return;
     
-    final isDownloaded = await LocalDownloadUtils.isEpisodeDownloadedLocally(context, _episode!);
-    
+    final state = await LocalDownloadUtils.localDownloadState(context, _episode!);
+
     if (mounted) {
       setState(() {
-        _isDownloadedLocally = isDownloaded;
+        _isDownloadedLocally = state.downloaded;
+        _downloadTaskId = state.taskId;
+        _downloadPercent = state.percent;
+        _downloadWaiting = state.waiting;
       });
     }
   }
@@ -1024,13 +1059,24 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
           accent: accent,
           onTap: busy ? null : () => _runGuarded(_toggleQueue),
         ),
-        _EpisodeAction(
-          icon: _isDownloadedLocally ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.downloadSimple,
-          label: _isDownloadedLocally ? L.of(context)!.on_device : L.of(context)!.download,
-          active: _isDownloadedLocally,
-          accent: accent,
-          onTap: busy ? null : () => _runGuarded(_isDownloadedLocally ? _confirmDeleteLocalDownload : _localDownloadEpisode),
-        ),
+        if (_downloadTaskId != null && !_isDownloadedLocally)
+          _EpisodeAction(
+            icon: PhosphorIconsRegular.circleNotch,
+            label: _downloadWaiting ? L.of(context)!.download_waiting : L.of(context)!.downloading_percent(_downloadPercent),
+            shortLabel: _downloadWaiting ? L.of(context)!.download_waiting_short : '$_downloadPercent%',
+            progress: _downloadWaiting ? 0 : _downloadPercent / 100,
+            active: true,
+            accent: accent,
+            onTap: busy ? null : () => _runGuarded(_confirmStopLocalDownload),
+          )
+        else
+          _EpisodeAction(
+            icon: _isDownloadedLocally ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.downloadSimple,
+            label: _isDownloadedLocally ? L.of(context)!.on_device : L.of(context)!.download,
+            active: _isDownloadedLocally,
+            accent: accent,
+            onTap: busy ? null : () => _runGuarded(_isDownloadedLocally ? _confirmDeleteLocalDownload : _localDownloadEpisode),
+          ),
         _EpisodeAction(
           icon: e.completed ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.checkCircle,
           label: L.of(context)!.episode_filter_played_label,
@@ -1058,6 +1104,21 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(L.of(context)!.cancel_button_label)),
           TextButton(onPressed: () => Navigator.pop(context, true), child: Text(L.of(context)!.remove)),
+        ],
+      ),
+    );
+    if (confirmed == true) await _deleteLocalDownload();
+  }
+
+  Future<void> _confirmStopLocalDownload() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(L.of(context)!.stop_download_title),
+        content: Text(L.of(context)!.stop_download_description),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(L.of(context)!.cancel_button_label)),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(L.of(context)!.stop_download)),
         ],
       ),
     );
@@ -1115,6 +1176,7 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
     _episodeSub?.cancel();
     _stateSub?.cancel();
     // Don't dispose global audio service - it should persist across pages
+    _downloadSub?.cancel();
     super.dispose();
   }
 }
@@ -1123,6 +1185,12 @@ class _CastawayEpisodeDetailsState extends State<CastawayEpisodeDetails> {
 class _EpisodeAction extends StatelessWidget {
   final IconData icon;
   final String label;
+
+  /// Shown instead of [label] where space is short; [label] is still what's read out.
+  final String? shortLabel;
+
+  /// 0–1: draws a progress ring in place of the icon (a download in progress).
+  final double? progress;
   final bool active;
   final Color accent;
   final VoidCallback? onTap;
@@ -1133,6 +1201,8 @@ class _EpisodeAction extends StatelessWidget {
     required this.active,
     required this.accent,
     required this.onTap,
+    this.shortLabel,
+    this.progress,
   });
 
   @override
@@ -1152,10 +1222,25 @@ class _EpisodeAction extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 26, color: color),
+                if (progress != null)
+                  SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: CircularProgressIndicator(
+                        value: progress == 0 ? null : progress,
+                        strokeWidth: 3,
+                        color: color,
+                        backgroundColor: color.withOpacity(0.2),
+                      ),
+                    ),
+                  )
+                else
+                  Icon(icon, size: 26, color: color),
                 const SizedBox(height: 4),
                 Text(
-                  label,
+                  shortLabel ?? label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w500, letterSpacing: 0),
