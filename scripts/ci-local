@@ -1,0 +1,362 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pyyaml==6.0.2"]
+# ///
+"""Run, on this Mac, what GitHub's workflows run for your commit, before you push.
+
+    scripts/ci-local            # everything a pull request and the merge to main would run
+    scripts/ci-local --list     # show the plan without running it
+    scripts/ci-local --only mobile-tests,openapi
+
+It reads .github/workflows/*.yml, works out which workflows a pull request into main and the
+push to main would start for the files you changed (their branch and path rules), and runs every
+job's commands as written, in a clean checkout of your commit (what GitHub tests). Tools are the
+versions the workflows name (Flutter is fetched if needed).
+
+Steps that can only happen on GitHub are listed with the reason instead of being skipped silently:
+installing Linux packages, anything that needs the repository's secrets (release signing),
+publishing, CodeQL's analysis, and building the server image (built on GitHub only). The real-flow
+job runs against the newest published image instead of the one GitHub will build from your commit.
+"""
+
+import argparse
+import fnmatch
+import glob
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+import yaml
+
+REPO = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
+CACHE = os.path.expanduser("~/Library/Caches/castaway-ci")
+EXTRA_PATH = ["/opt/homebrew/opt/libpq/bin", "/opt/homebrew/opt/rustup/bin", os.path.expanduser("~/.cargo/bin")]
+PUBLISHED_IMAGE = "ghcr.io/sc00tz/castaway:main"
+
+# Commands that set up GitHub's Linux machine; this Mac has its own tools (checked before running).
+SETUP = [
+    (re.compile(r"^\s*sudo\b|\bapt(-get)?\s+(install|update)\b", re.M), "installs Linux packages on GitHub's machine"),
+    (re.compile(r"\bsdkmanager\b"), "installs the Android NDK on GitHub's machine"),
+    (re.compile(r"\bcargo binstall\b|\brustup target add\b|\bbrew install\b|\bcargo install\b"), "installs a tool on GitHub's machine"),
+]
+# Jobs that only GitHub can do, by workflow file and job id.
+GITHUB_ONLY_JOBS = {
+    ("docker.yml", "version"): "names the image GitHub builds",
+    ("docker.yml", "build"): "builds the server image (built on GitHub only)",
+    ("docker.yml", "publish"): "publishes the server image",
+    ("release.yml", "release"): "tags and publishes releases",
+}
+
+
+def sh(cmd, **kw):
+    return subprocess.run(cmd, shell=isinstance(cmd, str), text=True, **kw)
+
+
+# ---------------------------------------------------------------- which workflows run
+
+def changed_files():
+    sh(["git", "fetch", "-q", "origin", "main"], cwd=REPO)
+    out = sh(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=REPO, capture_output=True).stdout
+    return [f for f in out.splitlines() if f]
+
+
+def glob_match(path, pattern):
+    # GitHub's path filters: ** spans directories, * stays within one.
+    regex = re.escape(pattern).replace(r"\*\*/", "(.*/)?").replace(r"\*\*", ".*").replace(r"\*", "[^/]*")
+    return re.fullmatch(regex, path) is not None
+
+
+def triggered(trigger, files):
+    if trigger is None:
+        return False
+    if trigger == {} or trigger is True:
+        return True
+    branches = trigger.get("branches")
+    if branches and "main" not in branches:
+        return False
+    if "paths" in trigger:
+        return any(glob_match(f, p) for f in files for p in trigger["paths"])
+    if "paths-ignore" in trigger:
+        return any(not any(glob_match(f, p) for p in trigger["paths-ignore"]) for f in files)
+    return True
+
+
+def events_for(on, files):
+    if isinstance(on, str):
+        on = {on: {}}
+    elif isinstance(on, list):
+        on = {e: {} for e in on}
+    events = []
+    for event in ("pull_request", "push"):
+        if event in on and triggered(on[event] if on[event] is not None else {}, files):
+            events.append(event)
+    return events
+
+
+# ---------------------------------------------------------------- expressions
+
+class Context(dict):
+    pass
+
+
+def lookup(ctx, dotted):
+    cur = ctx
+    for part in dotted.split("."):
+        if isinstance(cur, dict) and part in cur:
+            cur = cur[part]
+        else:
+            return ""
+    return cur
+
+
+def evaluate(expr, ctx):
+    """Enough of GitHub's expression language for these workflows."""
+    expr = expr.strip()
+    if expr.startswith("${{") and expr.endswith("}}"):
+        expr = expr[3:-2].strip()
+    strings = []
+
+    def keep(m):
+        strings.append(m.group(0))
+        return f"\x00{len(strings) - 1}\x00"
+
+    def ident(m):
+        name = m.group(0)
+        if name in ("true", "false", "null"):
+            return {"true": "True", "false": "False", "null": "None"}[name]
+        if name in ("startsWith", "endsWith", "contains"):
+            return name
+        return repr(lookup(ctx, name))
+
+    py = re.sub(r"'(?:[^']|'')*'", keep, expr)
+    py = re.sub(r"[A-Za-z_][A-Za-z0-9_\-]*(?:\.[A-Za-z_][A-Za-z0-9_\-]*)*", ident, py)
+    py = py.replace("&&", " and ").replace("||", " or ").replace("!=", "\x01").replace("!", " not ").replace("\x01", "!=")
+    py = re.sub(r"\x00(\d+)\x00", lambda m: strings[int(m.group(1))], py)
+    funcs = {
+        "startsWith": lambda a, b: str(a).lower().startswith(str(b).lower()),
+        "endsWith": lambda a, b: str(a).lower().endswith(str(b).lower()),
+        "contains": lambda a, b: (b in a) if isinstance(a, list) else str(b).lower() in str(a).lower(),
+    }
+    try:
+        return eval(py, {"__builtins__": {}}, funcs)
+    except Exception:
+        return ""
+
+
+def substitute(text, ctx):
+    return re.sub(r"\$\{\{(.*?)\}\}", lambda m: str(evaluate(m.group(1), ctx)), text)
+
+
+# ---------------------------------------------------------------- tools
+
+def flutter_for(version):
+    """The Flutter SDK a workflow names, fetched once into the cache."""
+    if not version:
+        return None
+    home = os.path.join(CACHE, f"flutter-{version}")
+    if not os.path.exists(os.path.join(home, "bin", "flutter")):
+        print(f"  fetching Flutter {version} (once)…", flush=True)
+        os.makedirs(CACHE, exist_ok=True)
+        sh(["git", "clone", "-q", "--depth", "1", "--branch", version, "https://github.com/flutter/flutter.git", home], check=True)
+        sh([os.path.join(home, "bin", "flutter"), "--version"], capture_output=True)
+    return os.path.join(home, "bin")
+
+
+def preflight():
+    missing = [t for t in ("git", "docker", "cargo", "wasm-pack", "node", "npx", "python3", "java") if not shutil.which(t, path=os.pathsep.join(EXTRA_PATH + [os.environ["PATH"]]))]
+    if missing:
+        print(f"Missing tools: {', '.join(missing)}")
+        sys.exit(2)
+    free_gb = shutil.disk_usage(tempfile.gettempdir()).free / 1e9
+    if free_gb < 15:
+        print(f"Warning: only {free_gb:.0f} GB free. The Android builds need around 10 GB and fail with")
+        print("'no space left on device' when the disk fills up.")
+    if sh(["docker", "info"], capture_output=True).returncode != 0:
+        print("Docker isn't running (the server's integration tests and the real flow need it).")
+        sys.exit(2)
+
+
+# ---------------------------------------------------------------- running
+
+class Result:
+    def __init__(self, workflow, job, label):
+        self.workflow, self.job, self.label = workflow, job, label
+        self.status, self.notes, self.seconds, self.failed_step = "passed", [], 0, None
+
+
+def plan(files, only):
+    jobs = []
+    for path in sorted(glob.glob(os.path.join(REPO, ".github/workflows/*.y*ml"))):
+        name = os.path.basename(path)
+        wf = yaml.safe_load(open(path))
+        on = wf.get(True, wf.get("on"))
+        events = events_for(on, files)
+        if not events:
+            continue
+        for job_id, job in wf["jobs"].items():
+            if only and not any(o in (name.rsplit(".", 1)[0], job_id) for o in only):
+                continue
+            matrices = [{}]
+            include = (job.get("strategy") or {}).get("matrix", {}).get("include") if isinstance((job.get("strategy") or {}).get("matrix"), dict) else None
+            if include:
+                matrices = include
+            for matrix in matrices:
+                jobs.append((name, wf, job_id, job, matrix, events))
+    return jobs
+
+
+def run_job(worktree, name, wf, job_id, job, matrix, events, log_dir):
+    label = f"{wf.get('name', name)} / {job.get('name', job_id)}"
+    ctx = Context(matrix=matrix)
+    label = substitute(label, ctx)
+    result = Result(name, job_id, label)
+    if (name, job_id) in GITHUB_ONLY_JOBS:
+        result.status = "github-only"
+        result.notes.append(GITHUB_ONLY_JOBS[(name, job_id)])
+        return result
+
+    event = "pull_request" if "pull_request" in events else "push"
+    head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, capture_output=True).stdout.strip()
+    github = {
+        "event_name": event, "ref": "refs/heads/main" if event == "push" else "refs/pull/0/merge",
+        "base_ref": "main" if event == "pull_request" else "", "sha": head, "repository": "Sc00tz/Castaway",
+        "run_id": "local", "workspace": worktree,
+    }
+    env = {}
+    for scope in (wf.get("env") or {}, job.get("env") or {}):
+        for k, v in scope.items():
+            env[k] = substitute(str(v), Context(github=github, matrix=matrix, env=env))
+    ctx = Context(github=github, matrix=matrix, env=env, secrets={}, needs={}, steps={}, inputs={})
+
+    job_if = job.get("if")
+    if job_if and not evaluate(str(job_if), ctx):
+        result.status = "not-run"
+        result.notes.append("its condition is false for this event")
+        return result
+
+    path_dirs = list(EXTRA_PATH)
+    default_wd = ((job.get("defaults") or {}).get("run") or {}).get("working-directory", "")
+    gh_files = {k: tempfile.mkstemp(prefix=f"ci-{k}-")[1] for k in ("GITHUB_OUTPUT", "GITHUB_ENV", "GITHUB_STEP_SUMMARY", "GITHUB_PATH")}
+    log = open(os.path.join(log_dir, f"{name.rsplit('.', 1)[0]}-{job_id}{('-' + '-'.join(map(str, matrix.values()))) if matrix else ''}.log"), "w")
+    started = time.time()
+    print(f"\n▶ {label}", flush=True)
+
+    for step in job.get("steps", []):
+        step_name = substitute(step.get("name") or step.get("uses") or step.get("run", "").strip().splitlines()[0], ctx)
+        cond = step.get("if")
+        if cond is not None and not evaluate(str(cond), ctx):
+            continue
+        if "uses" in step:
+            uses = step["uses"]
+            if uses.startswith("subosito/flutter-action"):
+                path_dirs.insert(0, flutter_for(str((step.get("with") or {}).get("flutter-version", ""))))
+            elif uses.startswith("github/codeql-action/analyze"):
+                result.notes.append("CodeQL's analysis runs on GitHub only")
+            continue
+        script = step["run"]
+        if "secrets." in script:
+            result.notes.append(f"'{step_name}': needs the repository's secrets (GitHub only)")
+            continue
+        reason = next((why for rx, why in SETUP if rx.search(script)), None)
+        if reason:
+            result.notes.append(f"'{step_name}': {reason}")
+            continue
+        if re.search(r"\bgh release\b|imagetools create|--push\b", script):
+            result.notes.append(f"'{step_name}': publishes (GitHub only)")
+            continue
+        script = substitute(script, ctx)
+        step_env = {k: substitute(str(v), ctx) for k, v in (step.get("env") or {}).items()}
+        wd = os.path.join(worktree, step.get("working-directory") or default_wd or "")
+        run_env = dict(os.environ)
+        run_env.update(env)
+        run_env.update(step_env)
+        run_env.update({f"GITHUB_{k.upper()}": str(v) for k, v in github.items()})
+        run_env.update({"GITHUB_EVENT_NAME": event, "GITHUB_REF_NAME": "main", "CI": "true", **gh_files})
+        run_env["PATH"] = os.pathsep.join([p for p in path_dirs if p] + [run_env["PATH"]])
+        # Build caches from the main checkout, so a clean checkout doesn't recompile everything.
+        target = "web" if "web" in os.path.relpath(wd, worktree).split(os.sep)[:1] or "cd web" in script else ("rust-api" if "rust-api" in script or os.path.relpath(wd, worktree).startswith("rust-api") else None)
+        if target:
+            run_env["CARGO_TARGET_DIR"] = os.path.join(REPO, target, "target")
+        if name == "docker.yml" and job_id == "real-flow":
+            run_env["IMAGE"] = PUBLISHED_IMAGE
+            script = script.replace("npx playwright install --with-deps chromium", "npx playwright install chromium")
+            note = f"ran against the published image {PUBLISHED_IMAGE}; GitHub runs it against the image it builds from your commit"
+            if note not in result.notes:
+                result.notes.append(note)
+        log.write(f"\n===== {step_name}\n$ {script}\n")
+        log.flush()
+        print(f"  • {step_name}", flush=True)
+        proc = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script], cwd=wd, env=run_env, stdout=log, stderr=subprocess.STDOUT)
+        # Steps can set outputs and env for later steps.
+        outputs = dict(line.split("=", 1) for line in open(gh_files["GITHUB_OUTPUT"]).read().splitlines() if "=" in line)
+        if step.get("id"):
+            ctx["steps"][step["id"]] = {"outputs": outputs}
+        for line in open(gh_files["GITHUB_ENV"]).read().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                env[k] = v
+        if proc.returncode != 0:
+            result.status, result.failed_step = "failed", step_name
+            break
+    log.close()
+    for f in gh_files.values():
+        os.unlink(f)
+    result.seconds = int(time.time() - started)
+    result.log = log.name
+    print(f"  {'✓' if result.status == 'passed' else '✗'} {result.status} ({result.seconds}s)", flush=True)
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--list", action="store_true", help="show what would run, without running it")
+    parser.add_argument("--only", default="", help="comma-separated workflow files (without .yml) or job ids")
+    args = parser.parse_args()
+    only = [o for o in args.only.split(",") if o]
+
+    files = changed_files()
+    dirty = sh(["git", "status", "--porcelain"], cwd=REPO, capture_output=True).stdout.strip()
+    if not files:
+        print("No changes against origin/main: nothing GitHub would run.")
+        return 0
+    jobs = plan(files, only)
+    print(f"Changed against origin/main: {len(files)} file(s). GitHub would run {len(jobs)} job(s):")
+    for name, wf, job_id, job, matrix, events in jobs:
+        tag = " (GitHub only)" if (name, job_id) in GITHUB_ONLY_JOBS else ""
+        m = f" {matrix}" if matrix else ""
+        print(f"  {name:28} {job_id}{m}  on {' + '.join(events)}{tag}")
+    if dirty:
+        print("\nNote: you have uncommitted changes. GitHub tests your commit, so they aren't included.")
+    if args.list:
+        return 0
+
+    preflight()
+    log_dir = os.path.join(REPO, ".ci-local")
+    os.makedirs(log_dir, exist_ok=True)
+    worktree = tempfile.mkdtemp(prefix="castaway-ci-")
+    sh(["git", "worktree", "add", "-q", "--detach", worktree, "HEAD"], cwd=REPO, check=True)
+    results = []
+    try:
+        for job in jobs:
+            results.append(run_job(worktree, *job, log_dir))
+    finally:
+        sh(["git", "worktree", "remove", "--force", worktree], cwd=REPO)
+
+    print("\n================ Summary")
+    for r in results:
+        mark = {"passed": "✓", "failed": "✗", "github-only": "–", "not-run": "·"}[r.status]
+        print(f"{mark} {r.label}: {r.status}" + (f" at '{r.failed_step}' (log: {os.path.relpath(r.log, REPO)})" if r.failed_step else ""))
+        for note in r.notes:
+            print(f"    {note}")
+    failed = [r for r in results if r.status == "failed"]
+    print(f"\n{'Everything that runs here passed.' if not failed else f'{len(failed)} job(s) failed.'} Logs: .ci-local/")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
