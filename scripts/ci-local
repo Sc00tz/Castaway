@@ -25,6 +25,7 @@ import fnmatch
 import glob
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -182,6 +183,41 @@ def preflight():
         sys.exit(2)
 
 
+# ---------------------------------------------------------------- services
+
+def start_services(job, label):
+    """Start a job's `services:` containers as GitHub does (image, env, ports, health check) and
+    wait until they're healthy. Returns their names, for stop_services."""
+    names = []
+    for name, svc in (job.get("services") or {}).items():
+        container = f"ci-local-{re.sub(r'[^a-z0-9]+', '-', label.lower())}-{name}"
+        sh(["docker", "rm", "-f", container], capture_output=True)
+        cmd = ["docker", "run", "-d", "--name", container]
+        for port in svc.get("ports") or []:
+            cmd += ["-p", f"127.0.0.1:{port}"]
+        for k, v in (svc.get("env") or {}).items():
+            cmd += ["-e", f"{k}={v}"]
+        cmd += shlex.split(svc.get("options") or "")
+        cmd.append(svc["image"])
+        sh(cmd, check=True, capture_output=True)
+        names.append(container)
+    for container in names:
+        for _ in range(120):
+            state = sh(["docker", "inspect", "-f", "{{if .State.Health}}{{.State.Health.Status}}{{else}}healthy{{end}}", container],
+                       capture_output=True).stdout.strip()
+            if state == "healthy":
+                break
+            time.sleep(1)
+        else:
+            raise RuntimeError(f"service {container} never became healthy")
+    return names
+
+
+def stop_services(names):
+    for container in names:
+        sh(["docker", "rm", "-f", "-v", container], capture_output=True)
+
+
 # ---------------------------------------------------------------- running
 
 class Result:
@@ -249,6 +285,9 @@ def run_job(worktree, name, wf, job_id, job, matrix, events, log_dir):
     path_dirs = list(EXTRA_PATH)
     default_wd = ((job.get("defaults") or {}).get("run") or {}).get("working-directory", "")
     gh_files = {k: tempfile.mkstemp(prefix=f"ci-{k}-")[1] for k in ("GITHUB_OUTPUT", "GITHUB_ENV", "GITHUB_STEP_SUMMARY", "GITHUB_PATH")}
+    services = start_services(job, label) if job.get("services") else []
+    if services:
+        result.notes.append(f"started its services here: {', '.join(job['services'])}")
     log = open(os.path.join(log_dir, f"{name.rsplit('.', 1)[0]}-{job_id}{('-' + '-'.join(map(str, matrix.values()))) if matrix else ''}.log"), "w")
     started = time.time()
     print(f"\n▶ {label}", flush=True)
@@ -314,6 +353,7 @@ def run_job(worktree, name, wf, job_id, job, matrix, events, log_dir):
             result.status, result.failed_step = "failed", step_name
             break
     log.close()
+    stop_services(services)
     for f in gh_files.values():
         os.unlink(f)
     result.seconds = int(time.time() - started)
