@@ -85,6 +85,43 @@ void main() {
   });
 
   group('resolveDownloadUrl', () {
+    // A hop that accepts the connection but never answers used to leave the download waiting
+    // forever. It now gives up after the time limit and hands over the original address.
+    test('a stalled hop falls back to the original address within the time limit', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) {}); // never responds
+      addTearDown(() => server.close(force: true));
+
+      final url = 'http://127.0.0.1:${server.port}/ep.mp3';
+      final watch = Stopwatch()..start();
+      expect(await resolveDownloadUrl(url, hopTimeout: const Duration(milliseconds: 300)), url);
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+    });
+
+    test('a long chain of slow hops is cut off by the overall limit', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        request.response.redirect(Uri.parse('/hop${DateTime.now().microsecondsSinceEpoch}'));
+      });
+      addTearDown(() => server.close(force: true));
+
+      final url = 'http://127.0.0.1:${server.port}/ep.mp3';
+      final watch = Stopwatch()..start();
+      final resolved = await resolveDownloadUrl(url,
+          hopTimeout: const Duration(seconds: 1), totalTimeout: const Duration(milliseconds: 700));
+      expect(resolved, url);
+      expect(watch.elapsed, lessThan(const Duration(seconds: 3)));
+    });
+
+    test('an unreachable host falls back to the original address', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final port = server.port;
+      await server.close(force: true);
+      final url = 'http://127.0.0.1:$port/ep.mp3';
+      expect(await resolveDownloadUrl(url, hopTimeout: const Duration(seconds: 2)), url);
+    });
+
     // A host that only serves plain http (nothing answers https on its port): the download
     // must use the http address, not an https one nobody serves.
     test('keeps a plain-http host\'s address, through its redirects', () async {

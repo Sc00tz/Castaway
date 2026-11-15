@@ -111,11 +111,19 @@ String? safeFile(String? s) {
 /// first, and used only if it works. A chain that still goes through plain
 /// http is resolved to its final address, kept as it is, since the native
 /// downloaders refuse an https -> http redirect.
-Future<String> resolveDownloadUrl(String url) async {
+///
+/// Each hop has a time limit ([hopTimeout]) and so does the whole chain ([totalTimeout]). If the
+/// chain can't be followed in time (a stalled, slow or unreachable hop), the original URL is used:
+/// the downloader follows redirects itself.
+Future<String> resolveDownloadUrl(
+  String url, {
+  Duration hopTimeout = const Duration(seconds: 15),
+  Duration totalTimeout = const Duration(seconds: 30),
+}) async {
   final original = Uri.parse(url);
   if (original.scheme == 'http') {
     try {
-      final secure = await redirectChain(httpsVariant(original).toString());
+      final secure = await redirectChain(httpsVariant(original).toString(), hopTimeout: hopTimeout).timeout(totalTimeout);
       if (secure.status < 400 && secure.chain.every((uri) => uri.scheme == 'https')) {
         return secure.chain.first.toString();
       }
@@ -124,7 +132,11 @@ Future<String> resolveDownloadUrl(String url) async {
     }
   }
 
-  return pickDownloadUrl((await redirectChain(url)).chain);
+  try {
+    return pickDownloadUrl((await redirectChain(url, hopTimeout: hopTimeout).timeout(totalTimeout)).chain);
+  } catch (_) {
+    return url;
+  }
 }
 
 /// [uri] over https. BBC media selector URLs also name the protocol of the
@@ -152,17 +164,20 @@ String pickDownloadUrl(List<Uri> chain) {
 
 /// [url] followed by each redirect target (up to 10), and the status code of
 /// the last response.
-Future<({List<Uri> chain, int status})> redirectChain(String url) async {
-  final client = HttpClient();
+///
+/// Connecting and each response's headers must arrive within [hopTimeout], or it throws a
+/// TimeoutException.
+Future<({List<Uri> chain, int status})> redirectChain(String url, {Duration hopTimeout = const Duration(seconds: 15)}) async {
+  final client = HttpClient()..connectionTimeout = hopTimeout;
 
   try {
     var uri = Uri.parse(url);
     final chain = [uri];
-    var request = await client.getUrl(uri);
+    var request = await client.getUrl(uri).timeout(hopTimeout);
 
     request.followRedirects = false;
 
-    var response = await request.close();
+    var response = await request.close().timeout(hopTimeout);
 
     // Follow redirects manually up to a reasonable limit
     var redirectCount = 0;
@@ -179,9 +194,9 @@ Future<({List<Uri> chain, int status})> redirectChain(String url) async {
 
       uri = uri.resolve(location);
       chain.add(uri);
-      request = await client.getUrl(uri);
+      request = await client.getUrl(uri).timeout(hopTimeout);
       request.followRedirects = false;
-      response = await request.close();
+      response = await request.close().timeout(hopTimeout);
       redirectCount++;
     }
 
