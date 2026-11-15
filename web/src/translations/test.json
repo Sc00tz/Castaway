@@ -609,8 +609,7 @@
     "unknown": "ZZTEST-UNKNOWN-ZZTEST",
     "username": "ZZTEST-USERNAME-ZZTEST",
     "valid_email_required": "ZZTEST-VALID-EMAIL-REQUIRED-ZZTEST",
-    "welcome_to_castaway": "",
-    "youtube": "ZZTEST-YOUTUBE-ZZTEST"
+    "welcome_to_castaway": ""
   },
   "history": {
     "history": "ZZTEST-HISTORY-ZZTEST",
@@ -1619,20 +1618,6 @@
   "theme_options": {
     "my_themes": "",
     "show_fewer": ""
-  },
-  "youtube_layout": {
-    "channel_thumbnail": "ZZTEST-CHANNEL-THUMBNAIL-ZZTEST",
-    "enter_channel_name": "ZZTEST-ENTER-CHANNEL-NAME-ZZTEST",
-    "failed_to_subscribe": "ZZTEST-FAILED-TO-SUBSCRIBE-ZZTEST",
-    "failed_to_unsubscribe": "ZZTEST-FAILED-TO-UNSUBSCRIBE-ZZTEST",
-    "no_channels_found": "ZZTEST-NO-CHANNELS-FOUND-ZZTEST",
-    "search_youtube_channels": "ZZTEST-SEARCH-YOUTUBE-CHANNELS-ZZTEST",
-    "show_less": "ZZTEST-SHOW-LESS-ZZTEST",
-    "show_more": "ZZTEST-SHOW-MORE-ZZTEST",
-    "successfully_subscribed": "ZZTEST-SUCCESSFULLY-SUBSCRIBED-ZZTEST",
-    "successfully_unsubscribed": "ZZTEST-SUCCESSFULLY-UNSUBSCRIBED-ZZTEST",
-    "try_different_keywords": "ZZTEST-TRY-DIFFERENT-KEYWORDS-ZZTEST",
-    "youtube_channels": "ZZTEST-YOUTUBE-CHANNELS-ZZTEST"
   },
   "collections": {
     "add_episodes_count": "",

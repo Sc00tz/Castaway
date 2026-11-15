@@ -1617,19 +1617,9 @@
       }
     }
   },
-  "latest_title": "Latest: {title}",
-  "@latest_title": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
   "search_for_podcasts": "Search for podcasts",
   "search_empty_body": "Find new shows to follow by name, topic or host",
-  "search_youtube_channels": "Search YouTube channels",
   "search_unavailable": "Search Unavailable",
-  "failed_to_search_youtube": "Failed to search YouTube",
   "failed_to_search_podcasts": "Failed to search for podcasts",
   "try_different_keywords": "Try different keywords or another search provider",
   "couldnt_open_name": "Couldn't open {name}",
@@ -1709,36 +1699,6 @@
   "delete_server_downloads_when_finished_description": "Remove an episode's server download about an hour after you finish it. With server auto-download, the server keeps only what you haven't heard.",
   "delete_server_downloads_when_finished": "Delete server downloads when finished",
   "delete_server_downloads_after": "Delete server downloads after",
-  "subscribed_to_channel": "Subscribed to {name}. Videos are being added in the background.",
-  "@subscribed_to_channel": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "couldnt_subscribe": "Couldn't subscribe: {error}",
-  "@couldnt_subscribe": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "couldnt_unsubscribe_error": "Couldn't unsubscribe: {error}",
-  "@couldnt_unsubscribe_error": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "youtube_subscribe_explainer": "Subscribing adds the channel to your library. Your server downloads the audio of its videos so you can play them like podcast episodes.",
-  "couldnt_unsubscribe": "Couldn't unsubscribe",
-  "couldnt_open_youtube": "Couldn't open YouTube",
-  "open_on_youtube": "Open on YouTube",
-  "open_channel": "Open channel",
-  "recent_videos": "Recent videos",
   "more_options": "More Options",
   "saved_episodes": "Saved Episodes",
   "failed_to_start_playlist": "Failed to start playlist: {error}",
@@ -2117,14 +2077,6 @@
     "placeholders": {
       "count": {
         "type": "int"
-      }
-    }
-  },
-  "subscribers_count": "{count} subscribers",
-  "@subscribers_count": {
-    "placeholders": {
-      "count": {
-        "type": "String"
       }
     }
   },

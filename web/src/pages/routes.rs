@@ -52,8 +52,6 @@ pub enum Route {
     EpisodeLayout,
     #[at("/episode")]
     Episode,
-    #[at("/youtube_layout")]
-    YoutubeLayout,
     #[at("/playlists")]
     Playlists,
     #[at("/shared_episode/:url_key")]

@@ -29,7 +29,6 @@ use crate::pages::shared_episode::SharedEpisode;
 use crate::pages::subscribed_people::SubscribedPeople;
 use crate::pages::discover::Discover;
 use crate::pages::user_stats::UserStats;
-use crate::pages::youtube_layout::YouTubeLayout;
 
 use yew_router::history::BrowserHistory;
 use yew_router::history::History;
@@ -84,7 +83,6 @@ fn switch(route: Route) -> Html {
         Route::Discover => html! { <Discover /> },
         Route::DiscoverHosts => html! { <Discover /> },
         Route::UserStats => html! { <UserStats /> },
-        Route::YoutubeLayout => html! { <YouTubeLayout /> },
         #[cfg(not(feature = "server_build"))]
         Route::LocalDownloads => html! { <LocalDownloads /> },
         #[cfg(feature = "server_build")]

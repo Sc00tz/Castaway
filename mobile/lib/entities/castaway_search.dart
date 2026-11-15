@@ -338,7 +338,6 @@ class UnifiedCastawayPodcast {
 enum SearchProvider {
   podcastIndex,
   itunes,
-  youtube,
 }
 
 extension SearchProviderExtension on SearchProvider {
@@ -348,8 +347,6 @@ extension SearchProviderExtension on SearchProvider {
         return 'Podcast Index'; // i18n-ignore
       case SearchProvider.itunes:
         return 'iTunes';
-      case SearchProvider.youtube:
-        return 'YouTube';
     }
   }
 
@@ -359,8 +356,6 @@ extension SearchProviderExtension on SearchProvider {
         return 'podcast_index';
       case SearchProvider.itunes:
         return 'itunes';
-      case SearchProvider.youtube:
-        return 'youtube';
     }
   }
 }

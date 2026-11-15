@@ -2143,34 +2143,6 @@ class CastawayService {
     }
   }
 
-  /// YouTube channels matching [query], through the server's search proxy.
-  Future<List<YouTubeChannelResult>> searchYouTubeChannels(String query) async {
-    if (_server == null || _apiKey == null) {
-      throw Exception('Server and API key must be set');
-    }
-    final url = Uri.parse('$_server/api/data/proxy_search')
-        .replace(queryParameters: {'query': query, 'index': 'youtube'});
-    final response =
-        await _client.get(url, headers: _authHeaders).timeout(const Duration(seconds: 60));
-    if (response.statusCode != 200) throw Exception(_errorMessage(response));
-    final data = jsonDecode(response.body);
-    final results = data is Map ? data['results'] as List<dynamic>? ?? const [] : const [];
-    return results
-        .whereType<Map<String, dynamic>>()
-        .map(YouTubeChannelResult.fromJson)
-        .where((c) => c.channelId.isNotEmpty)
-        .toList();
-  }
-
-  /// Feed URL to podcast ID for everything the user follows.
-  Future<Map<String, int>> getFollowedFeedIds(int userId) async {
-    final podcasts = await getUserPodcasts(userId);
-    return {
-      for (final p in podcasts)
-        if (p.url.isNotEmpty && p.id != null) p.url: p.id!,
-    };
-  }
-
   /// Subscribes to a channel and returns its podcast ID. The server adds its
   /// videos in the background.
   Future<int> subscribeToYouTubeChannel(String channelId, int userId) async {

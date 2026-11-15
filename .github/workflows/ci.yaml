@@ -13,6 +13,14 @@ on:
 jobs:
   # Backend (rust-api) tests live in rust-api-tests.yml.
 
+  # Fails if code for something we decided to remove comes back (server, web or phone).
+  removed-stays-removed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check nothing we removed is back
+        run: python3 .github/scripts/check_removed.py
+
   frontend-tests:
     runs-on: ubuntu-latest
     steps:

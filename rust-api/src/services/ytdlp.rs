@@ -7,7 +7,7 @@
 //! YouTube fixes usually land there the same day, before a stable release.
 //!
 //! All yt-dlp invocations across the app resolve the binary through [`ytdlp_binary`], so the
-//! updater and the callers (YouTube search / channel / download) always agree on which file
+//! updater and the callers (channel subscriptions and downloads) always agree on which file
 //! to run — the persistent, user-writable managed copy seeded by `startup.sh`.
 
 use crate::database::DatabasePool;

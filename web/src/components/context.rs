@@ -14,8 +14,7 @@ use crate::requests::pod_req::{
 };
 use crate::requests::people_req::CreditedPerson;
 use crate::requests::search_pods::{
-    PodcastFeedResult, PodcastSearchResult, SearchResponse, YouTubeChannel,
-    YouTubeSearchResults,
+    PodcastFeedResult, PodcastSearchResult, SearchResponse,
 };
 use crate::requests::stat_reqs::{UserStats, ExtendedUserStats};
 use serde::Deserialize;
@@ -128,9 +127,6 @@ pub struct SearchState {
     pub search_results: Option<PodcastSearchResult>,
     pub podcast_feed_results: Option<PodcastFeedResult>,
     pub search_episodes: Option<SearchResponse>,
-    pub youtube_search_results: Option<YouTubeSearchResults>,
-    pub selected_youtube_channel: Option<YouTubeChannel>,
-    pub is_youtube_loading: Option<bool>,
 }
 
 /// User preference state kept separate from AppState so that settings changes

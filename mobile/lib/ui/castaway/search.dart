@@ -6,11 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/core/html_text.dart';
 import 'package:castaway_mobile/entities/castaway_search.dart';
-import 'package:castaway_mobile/entities/youtube_channel.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:castaway_mobile/services/search_history_service.dart';
 import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
-import 'package:castaway_mobile/ui/castaway/youtube_channel.dart';
 import 'package:castaway_mobile/ui/widgets/platform_progress_indicator.dart';
 import 'package:castaway_mobile/ui/widgets/server_error_page.dart';
 import 'package:castaway_mobile/services/error_handling_service.dart';
@@ -43,10 +41,6 @@ class _CastawaySearchState extends State<CastawaySearch> {
   bool _showHistory = false;
   String? _errorMessage;
   List<UnifiedCastawayPodcast> _searchResults = [];
-  List<YouTubeChannelResult> _channelResults = [];
-  // Feed URL to podcast ID of each subscribed channel in [_channelResults].
-  final Map<String, int> _subscribedChannels = {};
-  final Set<String> _channelsBusy = {};
   List<String> _searchHistory = [];
   Set<String> _addedPodcastUrls = {};
 
@@ -104,13 +98,10 @@ class _CastawaySearchState extends State<CastawaySearch> {
     });
   }
 
-  bool get _isYoutube => _selectedProvider == SearchProvider.youtube;
-
-  bool get _hasResults => _isYoutube ? _channelResults.isNotEmpty : _searchResults.isNotEmpty;
+  bool get _hasResults => _searchResults.isNotEmpty;
 
   void _clearResults() {
     _searchResults = [];
-    _channelResults = [];
   }
 
   void _selectHistoryItem(String searchTerm) {
@@ -145,18 +136,6 @@ class _CastawaySearchState extends State<CastawaySearch> {
 
     final provider = _selectedProvider;
     try {
-      if (provider == SearchProvider.youtube) {
-        final channels = await _castawayService.searchYouTubeChannels(query);
-        if (!mounted || provider != _selectedProvider) return;
-        setState(() {
-          _clearResults();
-          _channelResults = channels;
-          _isLoading = false;
-        });
-        await _checkSubscribedChannels();
-        return;
-      }
-
       final result = await _castawayService.searchPodcasts(query, provider);
       final podcasts = result.getUnifiedPodcasts();
       if (!mounted || provider != _selectedProvider) return;
@@ -177,46 +156,6 @@ class _CastawaySearchState extends State<CastawaySearch> {
         _clearResults();
       });
     }
-  }
-
-  Future<void> _checkSubscribedChannels() async {
-    final userId = Provider.of<SettingsBloc>(context, listen: false).currentSettings.castawayUserId;
-    if (userId == null) return;
-    try {
-      final followed = await _castawayService.getFollowedFeedIds(userId);
-      if (!mounted) return;
-      setState(() {
-        _subscribedChannels.clear();
-        for (final channel in _channelResults) {
-          final id = followed[channel.url];
-          if (id != null) _subscribedChannels[channel.url] = id;
-        }
-      });
-    } catch (e) {
-      debugPrint('Failed to check subscribed channels: $e');
-    }
-  }
-
-  void _setChannelSubscription(YouTubeChannelResult channel, int? podcastId) {
-    setState(() {
-      if (podcastId == null) {
-        _subscribedChannels.remove(channel.url);
-      } else {
-        _subscribedChannels[channel.url] = podcastId;
-      }
-    });
-  }
-
-  Future<void> _toggleChannel(YouTubeChannelResult channel) async {
-    if (_channelsBusy.contains(channel.url)) return;
-    setState(() => _channelsBusy.add(channel.url));
-    if (_subscribedChannels.containsKey(channel.url)) {
-      if (await unsubscribeFromChannel(context, channel) && mounted) _setChannelSubscription(channel, null);
-    } else {
-      final id = await subscribeToChannel(context, channel);
-      if (id != null && mounted) _setChannelSubscription(channel, id);
-    }
-    if (mounted) setState(() => _channelsBusy.remove(channel.url));
   }
 
   Future<void> _checkAddedPodcasts() async {
@@ -440,90 +379,6 @@ class _CastawaySearchState extends State<CastawaySearch> {
     );
   }
 
-  Widget _buildChannelCard(YouTubeChannelResult channel) {
-    final theme = Theme.of(context);
-    final podcastId = _subscribedChannels[channel.url];
-    final subscribed = podcastId != null;
-    final busy = _channelsBusy.contains(channel.url);
-    final videos = channel.recentVideos.length;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => YouTubeChannelPage(
-                channel: channel,
-                podcastId: podcastId,
-                onSubscriptionChanged: (id) => _setChannelSubscription(channel, id),
-              ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipOval(child: LazyNetworkImage(imageUrl: channel.thumbnailUrl, width: 72, height: 72)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      channel.name,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.25),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (channel.description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        channel.description,
-                        style: TextStyle(fontSize: 12.5, color: theme.hintColor, height: 1.3),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (videos > 0) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        L.of(context)!.latest_title(channel.recentVideos.first.title),
-                        style: TextStyle(fontSize: 12, color: theme.hintColor),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              CircleAction(
-                size: 40,
-                tooltip: subscribed ? 'Unsubscribe' : L.of(context)!.subscribe,
-                onTap: busy ? null : () => _toggleChannel(channel),
-                icon: busy
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor),
-                      )
-                    : Icon(
-                        subscribed ? PhosphorIconsBold.check : PhosphorIconsBold.plus,
-                        size: 18,
-                        color: subscribed ? theme.primaryColor : softNeutral(theme).withOpacity(0.8),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -553,7 +408,7 @@ class _CastawaySearchState extends State<CastawaySearch> {
                   });
                 },
                 decoration: InputDecoration(
-                  hintText: _isYoutube ? L.of(context)!.search_youtube_channels : L.of(context)!.search_podcasts,
+                  hintText: L.of(context)!.search_podcasts,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
@@ -597,13 +452,11 @@ class _CastawaySearchState extends State<CastawaySearch> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                   children: [
-                    // YouTube search is dropped: it never worked reliably. Only podcast directories.
-                    for (final provider in SearchProvider.values.where((p) => p != SearchProvider.youtube))
+                    for (final provider in SearchProvider.values)
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterPill(
                           label: provider.name,
-                          icon: provider == SearchProvider.youtube ? PhosphorIconsFill.youtubeLogo : null,
                           selected: provider == _selectedProvider,
                           onTap: () {
                             if (provider == _selectedProvider) return;
@@ -641,9 +494,7 @@ class _CastawaySearchState extends State<CastawaySearch> {
               title: L.of(context)!.search_unavailable,
               subtitle: _errorMessage!.isServerConnectionError
                 ? L.of(context)!.unable_to_connect_server
-                : _isYoutube
-                  ? L.of(context)!.failed_to_search_youtube
-                  : L.of(context)!.failed_to_search_podcasts,
+                : L.of(context)!.failed_to_search_podcasts,
             )
           else if (!_hasResults && _searchController.text.isNotEmpty)
             SliverFillRemaining(
@@ -651,20 +502,13 @@ class _CastawaySearchState extends State<CastawaySearch> {
               child: Center(
                 child: SoftEmptyState(
                   icon: PhosphorIconsRegular.magnifyingGlassMinus,
-                  title: _isYoutube ? 'No channels found' : L.of(context)!.no_search_results_message,
+                  title: L.of(context)!.no_search_results_message,
                   body: L.of(context)!.try_different_keywords,
                 ),
               ),
             )
           else if (!_hasResults)
             _buildSearchHistorySliver()
-          else if (_isYoutube)
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildChannelCard(_channelResults[index]),
-                childCount: _channelResults.length,
-              ),
-            )
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(

@@ -609,8 +609,7 @@
     "unknown": "",
     "username": "",
     "valid_email_required": "",
-    "welcome_to_castaway": "",
-    "youtube": ""
+    "welcome_to_castaway": ""
   },
   "history": {
     "history": "",
@@ -1619,20 +1618,6 @@
   "theme_options": {
     "my_themes": "",
     "show_fewer": ""
-  },
-  "youtube_layout": {
-    "channel_thumbnail": "",
-    "enter_channel_name": "",
-    "failed_to_subscribe": "",
-    "failed_to_unsubscribe": "",
-    "no_channels_found": "",
-    "search_youtube_channels": "",
-    "show_less": "",
-    "show_more": "",
-    "successfully_subscribed": "",
-    "successfully_unsubscribed": "",
-    "try_different_keywords": "",
-    "youtube_channels": ""
   },
   "collections": {
     "add_episodes_count": "",

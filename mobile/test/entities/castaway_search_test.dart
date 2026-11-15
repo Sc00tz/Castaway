@@ -248,6 +248,10 @@ void main() {
   });
 
   group('SearchProviderExtension', () {
+    test('only podcast directories can be searched (YouTube search was dropped)', () {
+      expect(SearchProvider.values, [SearchProvider.podcastIndex, SearchProvider.itunes]);
+    });
+
     test('has a display name and value for every provider', () {
       expect(SearchProvider.podcastIndex.name, 'Podcast Index');
       expect(SearchProvider.podcastIndex.value, 'podcast_index');

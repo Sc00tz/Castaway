@@ -609,8 +609,7 @@
     "unknown": "Inconnu",
     "username": "Nom d'utilisateur",
     "valid_email_required": "Merci d'entrer une adresse email valide",
-    "welcome_to_castaway": "Bienvenue sur Castaway",
-    "youtube": "YouTube"
+    "welcome_to_castaway": "Bienvenue sur Castaway"
   },
   "history": {
     "history": "Historique",
@@ -1619,20 +1618,6 @@
   "theme_options": {
     "my_themes": "",
     "show_fewer": ""
-  },
-  "youtube_layout": {
-    "channel_thumbnail": "miniature de la chaîne",
-    "enter_channel_name": "Entrez un nom de chaîne dans la barre de recherche ci-dessus.",
-    "failed_to_subscribe": "Échec de l'abonnement à la chaîne",
-    "failed_to_unsubscribe": "Échec de désabonnement à la chaîne",
-    "no_channels_found": "Pas de chaîne trouvée",
-    "search_youtube_channels": "Chercher des chaînes YouTube",
-    "show_less": "Afficher moins",
-    "show_more": "Afficher plus",
-    "successfully_subscribed": "Abonnement à la chaîne avec succès. Les vidéos vont se charger dans l'arrière-plan.",
-    "successfully_unsubscribed": "Désabonnement à la chaîne avec succès.",
-    "try_different_keywords": "Essayez de rechercher avec des mots-clé différents.",
-    "youtube_channels": "Chaînes YouTube"
   },
   "collections": {
     "add_episodes_count": "",

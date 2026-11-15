@@ -389,7 +389,6 @@ fn create_data_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::settings::list_oidc_providers))
         .routes(routes!(handlers::settings::remove_oidc_provider))
         .routes(routes!(handlers::settings::get_startpage, handlers::settings::update_startpage))
-        .routes(routes!(handlers::youtube::search_youtube_channels))
         .routes(routes!(handlers::youtube::subscribe_to_youtube_channel))
         .routes(routes!(handlers::youtube::check_youtube_channel))
         .routes(routes!(handlers::youtube::get_youtube_video_filter))

@@ -73,6 +73,17 @@ async fn unknown_indexes_are_refused() {
     app.get("/api/data/proxy_search?query=x&index=youtube").key(&user).send().await.assert_status(400);
 }
 
+/// YouTube search was dropped: neither the search index nor the old channel search address exists.
+#[tokio::test(flavor = "multi_thread")]
+async fn youtube_search_is_gone() {
+    let app = TestApp::new().await;
+    let user = app.user("searcher").await;
+    let resp = app.get("/api/data/search_youtube_channels?query=x&user_id=1").key(&user).send().await;
+    resp.assert_status(404);
+    let spec = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.json")).unwrap();
+    assert!(!spec.contains("search_youtube"), "the API docs don't list YouTube search");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn an_admin_saves_a_checked_key_and_the_secret_is_never_sent_back() {
     let app = TestApp::new().await;

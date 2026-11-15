@@ -1,14 +1,11 @@
 use crate::components::context::{AppState, EpisodeDetailState, EpisodeNavigationState, EpisodeStatusState, NotificationState, PageLoadState, PodcastFeedState, SearchState, UIState};
 use i18nrs::yew::use_translation;
 
-use crate::components::gen_funcs::format_error_message;
 use crate::components::gen_funcs::format_time;
 use crate::components::notification_center::{NotificationCenter, ToastNotification};
 use crate::components::remote_devices::{RemoteDevices, RemoteDevicesPanel};
 use crate::components::safehtml::SafeHtml;
-use crate::requests::search_pods::{
-    call_get_podcast_info, call_youtube_search, YouTubeSearchResults,
-};
+use crate::requests::search_pods::call_get_podcast_info;
 use gloo_events::EventListener;
 use gloo_timers::callback::Timeout;
 use wasm_bindgen::closure::Closure;
@@ -253,64 +250,36 @@ pub fn search_bar() -> Html {
 
             wasm_bindgen_futures::spawn_local(async move {
                 Dispatch::<PageLoadState>::global().reduce_mut(|state| state.is_loading = Some(true));
-                if *search_index == "youtube" {
-                    match call_youtube_search(&search_value, &server_name, &api_key).await {
-                        Ok(yt_results) => {
-                            let search_results = YouTubeSearchResults {
-                                channels: yt_results.results,
-                                videos: Vec::new(),
-                            };
-                            Dispatch::<SearchState>::global().reduce_mut(|state| {
-                                state.youtube_search_results = Some(search_results);
-                            });
-                            Dispatch::<PageLoadState>::global().reduce_mut(|state| {
-                                state.is_loading = Some(false);
-                            });
-                            history.push("/youtube_layout");
-                        }
-                        Err(e) => {
-                            let formatted_error = format_error_message(&e.to_string());
-                            Dispatch::<PageLoadState>::global().reduce_mut(|state| {
-                                state.is_loading = Some(false);
-                            });
-                            Dispatch::<NotificationState>::global().reduce_mut(|state| {
-                                state.error_message =
-                                    Some(format!("YouTube search error: {}", formatted_error));
-                            });
-                        }
+                // Podcast Index needs a key (or may be down): search Apple instead, and keep
+                // Apple selected for the next search.
+                let mut result = call_get_podcast_info(&search_value, &server_name, &api_key, &search_index).await;
+                let unavailable = matches!(&result, Err(e) if e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>().is_some());
+                if unavailable && *search_index == "podcast_index" {
+                    search_index.set("itunes".to_string());
+                    result = call_get_podcast_info(&search_value, &server_name, &api_key, "itunes").await;
+                }
+                match result
+                {
+                    Ok(search_results) => {
+                        Dispatch::<SearchState>::global().reduce_mut(move |state| {
+                            state.search_results = Some(search_results);
+                        });
+                        Dispatch::<PodcastFeedState>::global().reduce_mut(|state| {
+                            state.podcast_added = Some(false);
+                        });
+                        Dispatch::<PageLoadState>::global()
+                            .reduce_mut(|state| state.is_loading = Some(false));
+                        history.push("/pod_layout");
                     }
-                } else {
-                    // Podcast Index needs a key (or may be down): search Apple instead, and keep
-                    // Apple selected for the next search.
-                    let mut result = call_get_podcast_info(&search_value, &server_name, &api_key, &search_index).await;
-                    let unavailable = matches!(&result, Err(e) if e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>().is_some());
-                    if unavailable && *search_index == "podcast_index" {
-                        search_index.set("itunes".to_string());
-                        result = call_get_podcast_info(&search_value, &server_name, &api_key, "itunes").await;
-                    }
-                    match result
-                    {
-                        Ok(search_results) => {
-                            Dispatch::<SearchState>::global().reduce_mut(move |state| {
-                                state.search_results = Some(search_results);
-                            });
-                            Dispatch::<PodcastFeedState>::global().reduce_mut(|state| {
-                                state.podcast_added = Some(false);
-                            });
-                            Dispatch::<PageLoadState>::global()
-                                .reduce_mut(|state| state.is_loading = Some(false));
-                            history.push("/pod_layout");
-                        }
-                        Err(e) => {
-                            Dispatch::<PageLoadState>::global()
-                                .reduce_mut(|state| state.is_loading = Some(false));
-                            let message = if let Some(u) = e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>() {
-                                if u.0.is_empty() { search_unavailable_msg.clone() } else { u.0.clone() }
-                            } else {
-                                format!("{}: {}", search_failed_msg, e)
-                            };
-                            Dispatch::<NotificationState>::global().reduce_mut(|state| state.error_message = Some(message));
-                        }
+                    Err(e) => {
+                        Dispatch::<PageLoadState>::global()
+                            .reduce_mut(|state| state.is_loading = Some(false));
+                        let message = if let Some(u) = e.downcast_ref::<crate::requests::search_pods::SearchUnavailable>() {
+                            if u.0.is_empty() { search_unavailable_msg.clone() } else { u.0.clone() }
+                        } else {
+                            format!("{}: {}", search_failed_msg, e)
+                        };
+                        Dispatch::<NotificationState>::global().reduce_mut(|state| state.error_message = Some(message));
                     }
                 }
                 is_submitting_clone.set(false);
@@ -515,20 +484,17 @@ pub fn search_bar() -> Html {
     let search_index_display = match search_index.as_str() {
         "podcast_index" => "Podcast Index",
         "itunes" => "iTunes",
-        "youtube" => "YouTube",
         _ => "Unknown",
     };
 
     let src_icon_class = match search_index.as_str() {
         "itunes" => "ph ph-apple-logo",
-        "youtube" => "ph ph-youtube-logo",
         _ => "ph ph-globe-hemisphere-west",
     };
 
     let search_src_placeholder = match search_index.as_str() {
         "podcast_index" => "Search Podcast Index\u{2026}".to_string(),
         "itunes" => "Search iTunes\u{2026}".to_string(),
-        "youtube" => "Search YouTube\u{2026}".to_string(),
         _ => "Search\u{2026}".to_string(),
     };
 

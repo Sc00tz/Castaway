@@ -6,7 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     error::AppError,
@@ -15,36 +15,6 @@ use crate::{
     AppState,
 };
 use crate::database::dialect::dialect_match;
-
-// Query struct for YouTube channel search
-#[derive(Deserialize, utoipa::IntoParams)]
-pub struct YouTubeSearchQuery {
-    pub query: String,
-    pub max_results: Option<i32>,
-    pub user_id: i32,
-}
-
-// YouTube channel struct for search results - matches Python response exactly
-#[derive(Serialize, Debug, utoipa::ToSchema)]
-pub struct YouTubeChannel {
-    pub channel_id: String,
-    pub name: String,
-    pub description: String,
-    pub subscriber_count: Option<i64>,
-    pub url: String,
-    pub video_count: Option<i64>,
-    pub thumbnail_url: String,
-    pub recent_videos: Vec<YouTubeVideo>,
-}
-
-// YouTube video struct for recent videos in channel - matches Python response exactly
-#[derive(Serialize, Debug, Clone, utoipa::ToSchema)]
-pub struct YouTubeVideo {
-    pub id: String,
-    pub title: String,
-    pub duration: Option<f64>,  // Note: Python uses float, not i64
-    pub url: String,
-}
 
 // Query struct for YouTube subscription endpoint
 #[derive(Deserialize, utoipa::IntoParams)]
@@ -61,162 +31,6 @@ pub struct CheckYouTubeChannelQuery {
     pub channel_name: String,
     pub channel_url: String,
 }
-
-// Search YouTube channels - matches Python search_youtube_channels function exactly
-#[utoipa::path(
-    get,
-    path = "/search_youtube_channels",
-    tag = "youtube",
-    summary = "Search youtube channels",
-    params(YouTubeSearchQuery),
-    security(("api_key" = [])),
-    responses(
-        (status = 200, description = "Success", body = serde_json::Value),
-        (status = 401, description = "Invalid or missing API key"),
-    ),
-)]
-pub async fn search_youtube_channels(
-    State(state): State<AppState>,
-    Query(query): Query<YouTubeSearchQuery>,
-    headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let api_key = extract_api_key(&headers)?;
-    require_valid_api_key(&state, &api_key).await?;
-
-    // Check authorization - web key or user can only search for themselves  
-    let key_id = state.db_pool.get_user_id_from_api_key(&api_key).await?;
-    let is_web_key = state.db_pool.is_web_key(&api_key).await?;
-
-    if key_id != query.user_id && !is_web_key {
-        return Err(AppError::forbidden("You can only search with your own account."));
-    }
-
-    let max_results = query.max_results.unwrap_or(5);
-    
-    // First get channel ID using a search - matches Python exactly  
-    let search_url = format!("ytsearch{}:{}", max_results * 4, query.query);
-    
-    info!("Searching YouTube with query: {}", query.query);
-    
-    // Use the local yt-dlp binary to search
-    let bin = ytdlp_binary();
-    let output = Command::new(&bin)
-        .args(&[
-            "--quiet",
-            "--no-warnings",
-            "--flat-playlist",
-            "--skip-download",
-            "--dump-json",
-            &search_url
-        ])
-        .output()
-        .await
-        .map_err(|e| {
-            error!("yt-dlp search: failed to execute {}: {}", bin, e);
-            AppError::external_error(&format!("Failed to execute yt-dlp: {}", e))
-        })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        error!("yt-dlp search failed for '{}': {}", query.query, stderr.trim());
-        return Err(AppError::external_error(&format!("yt-dlp search failed: {}", stderr.trim())));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    
-    // Parse each line as a separate JSON object (yt-dlp outputs one JSON per line for search results)
-    let mut entries = Vec::new();
-    for line in stdout.lines() {
-        if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
-            entries.push(entry);
-        }
-    }
-
-    if entries.is_empty() {
-        return Ok(Json(serde_json::json!({"results": []})));
-    }
-
-    let mut processed_results = Vec::new();
-    let mut seen_channels = HashSet::new();
-    let mut channel_videos: HashMap<String, Vec<YouTubeVideo>> = HashMap::new();
-
-    // Process entries to collect videos by channel - matches Python logic exactly
-    for entry in &entries {
-        if let Some(channel_id) = entry.get("channel_id").and_then(|v| v.as_str())
-            .or_else(|| entry.get("uploader_id").and_then(|v| v.as_str())) {
-            
-            // First collect the video regardless of whether we've seen the channel
-            if !channel_videos.contains_key(channel_id) {
-                channel_videos.insert(channel_id.to_string(), Vec::new());
-            }
-            
-            if let Some(videos) = channel_videos.get_mut(channel_id) {
-                if videos.len() < 3 {  // Limit to 3 videos like Python
-                    if let Some(video_id) = entry.get("id").and_then(|v| v.as_str()) {
-                        let video = YouTubeVideo {
-                            id: video_id.to_string(),
-                            title: entry.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                            duration: entry.get("duration").and_then(|v| v.as_f64()),
-                            url: format!("https://www.youtube.com/watch?v={}", video_id),
-                        };
-                        videos.push(video);
-                        debug!("Added video to channel {}, now has {} videos", channel_id, videos.len());
-                    }
-                }
-            }
-        }
-    }
-
-    // Now process channels - matches Python logic exactly
-    for entry in &entries {
-        if let Some(channel_id) = entry.get("channel_id").and_then(|v| v.as_str())
-            .or_else(|| entry.get("uploader_id").and_then(|v| v.as_str())) {
-            
-            // Check if we've already processed this channel
-            if seen_channels.contains(channel_id) {
-                continue;
-            }
-            seen_channels.insert(channel_id.to_string());
-
-            // Get minimal channel info
-            let channel_url = format!("https://www.youtube.com/channel/{}", channel_id);
-            
-            // Get thumbnail from search result - much faster than individual channel lookups
-            let thumbnail_url = entry.get("channel_thumbnail").and_then(|v| v.as_str())
-                .or_else(|| entry.get("thumbnail").and_then(|v| v.as_str()))
-                .unwrap_or("").to_string();
-
-            let channel_name = entry.get("channel").and_then(|v| v.as_str())
-                .or_else(|| entry.get("uploader").and_then(|v| v.as_str()))
-                .unwrap_or("").to_string();
-
-            info!("Creating channel {} with {} videos", channel_id, 
-                channel_videos.get(channel_id).map(|v| v.len()).unwrap_or(0));
-
-            let channel = YouTubeChannel {
-                channel_id: channel_id.to_string(),
-                name: channel_name,
-                description: entry.get("description").and_then(|v| v.as_str())
-                    .unwrap_or("").chars().take(500).collect::<String>(),
-                subscriber_count: None,  // Always null like Python
-                url: channel_url,
-                video_count: None,       // Always null like Python
-                thumbnail_url,
-                recent_videos: channel_videos.get(channel_id).cloned().unwrap_or_default(),
-            };
-
-            if processed_results.len() < max_results as usize {
-                processed_results.push(channel);
-            } else {
-                break;
-            }
-        }
-    }
-
-    debug!("Found {} channels", processed_results.len());
-    Ok(Json(serde_json::json!({"results": processed_results})))
-}
-
 
 // Subscribe to YouTube channel - matches Python subscribe_to_youtube_channel function exactly
 #[utoipa::path(
