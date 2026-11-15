@@ -46,6 +46,33 @@ pub struct ApiConfig {
     pub youtube_feed_url: String,
 }
 
+impl ApiConfig {
+    /// The real directories, unless CASTAWAY_APPLE_URL (Apple's base address, default
+    /// https://itunes.apple.com) or CASTAWAY_PODCAST_INDEX_URL point elsewhere. The real-flow
+    /// test points them at saved answers.
+    pub fn from_env() -> Self {
+        use crate::services::directory::*;
+        let api = match env_value("CASTAWAY_APPLE_URL") {
+            Some(base) => {
+                let base = base.trim_end_matches('/').to_string();
+                (format!("{base}/search"), format!("{base}/lookup"), format!("{base}/us/rss/toppodcasts"))
+            }
+            None => (
+                DEFAULT_ITUNES_SEARCH_URL.to_string(),
+                DEFAULT_ITUNES_LOOKUP_URL.to_string(),
+                DEFAULT_APPLE_CHARTS_URL.to_string(),
+            ),
+        };
+        ApiConfig {
+            itunes_search_url: api.0,
+            itunes_lookup_url: api.1,
+            apple_charts_url: api.2,
+            podcast_index_url: env_value("CASTAWAY_PODCAST_INDEX_URL").unwrap_or_else(|| DEFAULT_PODCAST_INDEX_URL.to_string()),
+            youtube_feed_url: YOUTUBE_FEED_URL.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub host: String,
@@ -293,13 +320,7 @@ impl Config {
             trust_unverified_email: oidc_env("OIDC_TRUST_UNVERIFIED_EMAIL").is_some_and(|v| env_flag(&v)),
         };
 
-        let api = ApiConfig {
-            itunes_search_url: crate::services::directory::DEFAULT_ITUNES_SEARCH_URL.to_string(),
-            podcast_index_url: crate::services::directory::DEFAULT_PODCAST_INDEX_URL.to_string(),
-            apple_charts_url: crate::services::directory::DEFAULT_APPLE_CHARTS_URL.to_string(),
-            itunes_lookup_url: crate::services::directory::DEFAULT_ITUNES_LOOKUP_URL.to_string(),
-            youtube_feed_url: YOUTUBE_FEED_URL.to_string(),
-        };
+        let api = ApiConfig::from_env();
 
         // Validate OIDC configuration
         if let Err(validation_error) = oidc.validate() {
