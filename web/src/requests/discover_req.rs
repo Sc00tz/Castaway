@@ -139,16 +139,23 @@ struct CategoriesResponse {
     feeds: Vec<PodcastCategory>,
 }
 
+// The server reads `refresh` as true/false only; `refresh=1` was refused with HTTP 400.
+fn recommendations_url(server_name: &str, refresh: bool) -> String {
+    let url = format!("{}/api/data/recommendations", server_name);
+    if refresh {
+        format!("{url}?refresh=true")
+    } else {
+        url
+    }
+}
+
 // Personalized "podcasts you might like". refresh=true forces a server-side recompute.
 pub async fn call_get_recommendations(
     server_name: &str,
     api_key: &str,
     refresh: bool,
 ) -> Result<Vec<RecommendedPodcast>, Error> {
-    let mut url = format!("{}/api/data/recommendations", server_name);
-    if refresh {
-        url.push_str("?refresh=1");
-    }
+    let url = recommendations_url(server_name, refresh);
     let response = Request::get(&url).header("Api-Key", api_key).send().await?;
     if !response.ok() {
         return Err(Error::msg(format!(
@@ -221,6 +228,13 @@ mod tests {
         assert_eq!(card.url, "https://feeds.simplecast.com/qm_9xx0g");
         assert_eq!(card.image, "https://is1-ssl.mzstatic.com/x/600x600bb.jpg");
         assert_eq!(card.categories.unwrap().get("1488").map(String::as_str), Some("True Crime"));
+    }
+
+    /// Asking for fresh suggestions uses the value the server accepts.
+    #[wasm_bindgen_test]
+    fn refreshing_for_you_sends_true() {
+        assert_eq!(recommendations_url("https://pods.example", true), "https://pods.example/api/data/recommendations?refresh=true");
+        assert_eq!(recommendations_url("https://pods.example", false), "https://pods.example/api/data/recommendations");
     }
 
     /// Apple's genres as categories.
