@@ -13,6 +13,7 @@ import 'package:castaway_mobile/entities/user_stats.dart';
 import 'package:castaway_mobile/entities/home_data.dart';
 import 'package:castaway_mobile/entities/people.dart';
 import 'package:castaway_mobile/entities/podcast.dart';
+import 'package:castaway_mobile/entities/discover.dart';
 import 'package:castaway_mobile/entities/youtube_channel.dart';
 
 /// Debug-only logger: in release builds this compiles out, so request URLs and
@@ -2141,6 +2142,36 @@ class CastawayService {
       _devLog('Error removing podcast: $e');
       rethrow;
     }
+  }
+
+  /// Trending shows for Discover, optionally in one category (by name). Podcast Index's when the
+  /// server has a key, otherwise Apple's charts.
+  Future<List<UnifiedCastawayPodcast>> getTrending({String? category, int max = 24}) async {
+    final params = {'max': '$max', if (category != null && category.isNotEmpty) 'cat': category};
+    final url = Uri.parse('$_server/api/data/proxy_trending').replace(queryParameters: params);
+    final response = await _get(url, headers: _authHeaders);
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    return trendingFromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Categories for Discover's "Browse by category", sorted by name.
+  Future<List<DiscoverCategory>> getDiscoverCategories() async {
+    final response = await _get(Uri.parse('$_server/api/data/proxy_categories'), headers: _authHeaders);
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    final feeds = (jsonDecode(response.body) as Map<String, dynamic>)['feeds'] as List<dynamic>? ?? const [];
+    return feeds.whereType<Map<String, dynamic>>().map(DiscoverCategory.fromJson).where((c) => c.name.isNotEmpty).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  /// "For You": shows like the ones the user listens to. [refresh] asks the server to work them
+  /// out again instead of using the last result (kept for a day).
+  Future<List<Recommendation>> getRecommendations({bool refresh = false}) async {
+    final url = Uri.parse('$_server/api/data/recommendations')
+        .replace(queryParameters: refresh ? {'refresh': 'true'} : null);
+    final response = await _get(url, headers: _authHeaders);
+    if (response.statusCode != 200) throw Exception(_errorMessage(response));
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list.whereType<Map<String, dynamic>>().map(Recommendation.fromJson).toList();
   }
 
   /// Subscribes to a channel and returns its podcast ID. The server adds its

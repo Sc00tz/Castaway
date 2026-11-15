@@ -7,7 +7,7 @@ import 'package:castaway_mobile/entities/search_providers.dart';
 /// Every bottom-bar page, in the default order.
 /// These are page ids, not display text; see bottomNavLabel.
 const List<String> defaultBottomBarOrder = [
-  'Home', 'Feed', 'Saved', 'Podcasts', 'People', 'Downloads', 'History', 'Playlists', 'Search', // i18n-ignore
+  'Home', 'Feed', 'Saved', 'Podcasts', 'Discover', 'People', 'Downloads', 'History', 'Playlists', 'Search', // i18n-ignore
 ];
 
 /// A saved bar order made usable: pages it doesn't know are dropped, and pages

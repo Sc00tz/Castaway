@@ -68,6 +68,7 @@ import 'package:castaway_mobile/ui/auth/auth_wrapper.dart';
 import 'package:castaway_mobile/ui/castaway/user_stats.dart';
 import 'package:castaway_mobile/ui/castaway/podcasts.dart';
 import 'package:castaway_mobile/ui/castaway/episode_search.dart';
+import 'package:castaway_mobile/ui/castaway/discover.dart';
 import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
 import 'package:castaway_mobile/entities/castaway_search.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
@@ -904,6 +905,8 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
         return const CastawayPlaylists();
       case 'Search':
         return const EpisodeSearchPage();
+      case 'Discover':
+        return const CastawayDiscover();
       default:
         return const CastawayHome(); // Default to Home
     }

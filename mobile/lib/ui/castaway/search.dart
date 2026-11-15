@@ -4,17 +4,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
-import 'package:castaway_mobile/core/html_text.dart';
 import 'package:castaway_mobile/entities/castaway_search.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:castaway_mobile/services/search_history_service.dart';
-import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
 import 'package:castaway_mobile/ui/widgets/platform_progress_indicator.dart';
+import 'package:castaway_mobile/ui/widgets/podcast_result_card.dart';
 import 'package:castaway_mobile/ui/widgets/server_error_page.dart';
 import 'package:castaway_mobile/services/error_handling_service.dart';
 import 'package:provider/provider.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
-import 'package:castaway_mobile/ui/widgets/lazy_network_image.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 
@@ -284,98 +282,19 @@ class _CastawaySearchState extends State<CastawaySearch> {
   }
 
   Widget _buildPodcastCard(UnifiedCastawayPodcast podcast) {
-    final theme = Theme.of(context);
-    final isAdded = _addedPodcastUrls.contains(podcast.url);
-    final meta = [
-      if (podcast.episodeCount > 0) L.of(context)!.episodes_count(podcast.episodeCount),
-      if (podcast.explicit) L.of(context)!.explicit,
-    ].join('  ·  ');
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CastawayPodcastDetails(
-                podcast: podcast,
-                isFollowing: isAdded,
-                onFollowChanged: (following) {
-                  setState(() {
-                    if (following) {
-                      _addedPodcastUrls.add(podcast.url);
-                    } else {
-                      _addedPodcastUrls.remove(podcast.url);
-                    }
-                  });
-                },
-              ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              LazyNetworkImage(
-                imageUrl: podcast.artwork,
-                width: 72,
-                height: 72,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      podcast.title,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.25),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (podcast.author.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        podcast.author,
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: theme.primaryColor),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (podcast.description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        htmlToPlainText(podcast.description),
-                        style: TextStyle(fontSize: 12.5, color: theme.hintColor, height: 1.3),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (meta.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(meta, style: TextStyle(fontSize: 12, color: theme.hintColor)),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              CircleAction(
-                size: 40,
-                tooltip: isAdded ? 'Unfollow' : L.of(context)!.subscribe_label,
-                onTap: () => _togglePodcast(podcast),
-                icon: Icon(
-                  isAdded ? PhosphorIconsBold.check : PhosphorIconsBold.plus,
-                  size: 18,
-                  color: isAdded ? theme.primaryColor : softNeutral(theme).withOpacity(0.8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return PodcastResultCard(
+      podcast: podcast,
+      isAdded: _addedPodcastUrls.contains(podcast.url),
+      onToggle: () => _togglePodcast(podcast),
+      onFollowChanged: (following) {
+        setState(() {
+          if (following) {
+            _addedPodcastUrls.add(podcast.url);
+          } else {
+            _addedPodcastUrls.remove(podcast.url);
+          }
+        });
+      },
     );
   }
 
