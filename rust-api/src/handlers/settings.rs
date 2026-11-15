@@ -4775,7 +4775,9 @@ pub async fn get_unmatched_podcasts(
 
     if key_id == request.user_id || is_web_key {
         let podcasts = state.db_pool.get_unmatched_podcasts(request.user_id).await?;
-        Ok(Json(serde_json::json!({"podcasts": podcasts})))
+        // Linking needs a Podcast Index key; the web only suggests it when there is one.
+        let podcast_index_configured = crate::services::directory::podcast_index_configured(&state.db_pool).await?;
+        Ok(Json(serde_json::json!({"podcasts": podcasts, "podcast_index_configured": podcast_index_configured})))
     } else {
         Err(AppError::forbidden("You can only access your own podcasts"))
     }

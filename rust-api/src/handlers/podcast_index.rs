@@ -1,5 +1,6 @@
 //! Admin settings for the Podcast Index API key Castaway searches with. Apple Podcasts search
-//! needs no key; Podcast Index search, person search, trending and categories need one.
+//! needs no key; Podcast Index search and person search need one. Trending and categories use
+//! Apple's charts without one.
 
 use axum::{extract::State, http::HeaderMap, Json};
 use serde::{Deserialize, Serialize};

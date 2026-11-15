@@ -244,3 +244,17 @@ async fn when_podcast_index_fails_trending_and_categories_use_apple() {
     let cats = app.get("/api/data/proxy_categories").key(&user).send().await.ok_json();
     assert_eq!(cats["feeds"].as_array().unwrap().len(), 19, "{cats}");
 }
+
+/// The web only suggests linking podcasts to Podcast Index when the server has a key to link with.
+#[tokio::test(flavor = "multi_thread")]
+async fn unmatched_podcasts_say_whether_linking_is_possible() {
+    let app = TestApp::new().await;
+    let user = app.user("listener").await;
+    let ask = || app.post("/api/data/get_unmatched_podcasts").key(&user).json(&json!({ "user_id": user.id }));
+
+    assert_eq!(ask().send().await.ok_json()["podcast_index_configured"], false);
+    app.db().set_podcast_index_credentials(Some(("k", "s"))).await.unwrap();
+    let body = ask().send().await.ok_json();
+    assert_eq!(body["podcast_index_configured"], true, "{body}");
+    assert!(body["podcasts"].is_array(), "{body}");
+}

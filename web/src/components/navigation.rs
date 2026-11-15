@@ -156,7 +156,8 @@ pub fn navigation_handler(props: &NavigationHandlerProps) -> Html {
                                                                     }
 
                                                                     if let Ok(unmatched_response) = unmatched_result {
-                                                                        if !unmatched_response.podcasts.is_empty() {
+                                                                        // Linking needs a Podcast Index key, so only suggest it when the server has one.
+                                                                        if unmatched_response.podcast_index_configured && !unmatched_response.podcasts.is_empty() {
                                                                             Dispatch::<NotificationState>::global().reduce_mut(|state| {
                                                                                 state.info_message = Some(
                                                                                     format!("{}", i18n_unmatched_podcasts_notification.replace("{count}", &unmatched_response.podcasts.len().to_string()))

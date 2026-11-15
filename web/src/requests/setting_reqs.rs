@@ -2649,6 +2649,9 @@ pub struct UnmatchedPodcast {
 #[derive(Deserialize, Debug)]
 pub struct GetUnmatchedPodcastsResponse {
     pub podcasts: Vec<UnmatchedPodcast>,
+    /// Whether the server has a Podcast Index key (linking podcasts needs one).
+    #[serde(default)]
+    pub podcast_index_configured: bool,
 }
 
 pub async fn call_get_unmatched_podcasts(
@@ -3590,4 +3593,24 @@ pub async fn call_set_podcast_index(server_name: &str, api_key: &str, key: &str,
             .json(&serde_json::json!({ "api_key": key, "api_secret": secret })),
     )
     .await
+}
+
+#[cfg(test)]
+mod unmatched_tests {
+    use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    /// The "link your podcasts to Podcast Index" popup only shows when the server has a key.
+    #[wasm_bindgen_test]
+    fn unmatched_podcasts_carry_whether_linking_is_possible() {
+        let podcast = r#"{"podcast_id":1,"podcast_name":"Show","artwork_url":null,"author":null,"description":null,"feed_url":"https://x.invalid/f.xml"}"#;
+        let without: GetUnmatchedPodcastsResponse =
+            serde_json::from_str(&format!(r#"{{"podcasts":[{podcast}],"podcast_index_configured":false}}"#)).unwrap();
+        assert!(!without.podcast_index_configured);
+        let with: GetUnmatchedPodcastsResponse =
+            serde_json::from_str(&format!(r#"{{"podcasts":[{podcast}],"podcast_index_configured":true}}"#)).unwrap();
+        assert!(with.podcast_index_configured && with.podcasts.len() == 1);
+        let older: GetUnmatchedPodcastsResponse = serde_json::from_str(r#"{"podcasts":[]}"#).unwrap();
+        assert!(!older.podcast_index_configured, "a server that doesn't say: no popup");
+    }
 }
