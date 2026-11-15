@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:castaway_mobile/core/extensions.dart';
 
 /// This class represents a person of interest to the podcast.
 ///
@@ -21,11 +20,10 @@ class Person {
     required this.name,
     this.role = '',
     this.group = '',
-    String? image = '',
-    String? link = '',
+    this.image = '',
+    this.link = '',
     this.personId,
-  })  : image = image?.forceHttps,
-        link = link?.forceHttps;
+  });
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'package:castaway_mobile/core/annotations.dart';
-import 'package:castaway_mobile/core/extensions.dart';
 import 'package:castaway_mobile/entities/chapter.dart';
 import 'package:castaway_mobile/entities/downloadable.dart';
 import 'package:castaway_mobile/entities/person.dart';
@@ -161,11 +160,11 @@ class Episode {
     this.description,
     this.content,
     this.link,
-    String? imageUrl,
-    String? thumbImageUrl,
+    this.imageUrl,
+    this.thumbImageUrl,
     this.localImagePath,
     this.publicationDate,
-    String? contentUrl,
+    this.contentUrl,
     this.author,
     this.season = 0,
     this.episode = 0,
@@ -174,16 +173,13 @@ class Episode {
     this.downloadPercentage = 0,
     this.played = false,
     this.highlight = false,
-    String? chaptersUrl,
+    this.chaptersUrl,
     this.chapters = const <Chapter>[],
     this.transcriptUrls = const <TranscriptUrl>[],
     this.persons = const <Person>[],
     this.transcriptId = 0,
     this.lastUpdated,
-  })  : imageUrl = imageUrl?.forceHttps,
-        thumbImageUrl = thumbImageUrl?.forceHttps,
-        contentUrl = contentUrl?.forceHttps,
-        chaptersUrl = chaptersUrl?.forceHttps;
+  });
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

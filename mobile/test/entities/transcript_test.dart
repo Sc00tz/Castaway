@@ -3,11 +3,6 @@ import 'package:castaway_mobile/entities/transcript.dart';
 
 void main() {
   group('TranscriptUrl', () {
-    test('upgrades an http url to https on construction', () {
-      final url = TranscriptUrl(url: 'http://example.com/t.json', type: TranscriptFormat.json);
-      expect(url.url, 'https://example.com/t.json');
-    });
-
     test('every format round-trips through its stored numeric code', () {
       for (final format in TranscriptFormat.values) {
         final original = TranscriptUrl(url: 'https://example.com/t', type: format);

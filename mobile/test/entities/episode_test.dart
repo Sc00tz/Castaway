@@ -33,16 +33,6 @@ Episode _episode({
 
 void main() {
   group('construction', () {
-    test('upgrades http image/content URLs to https on construction', () {
-      final episode = _episode(
-        imageUrl: 'http://example.com/art.png',
-        contentUrl: 'http://example.com/episode.mp3',
-      );
-
-      expect(episode.imageUrl, 'https://example.com/art.png');
-      expect(episode.contentUrl, 'https://example.com/episode.mp3');
-    });
-
     test('leaves a local-network content URL over http unchanged', () {
       final episode = _episode(contentUrl: 'http://192.168.1.10:8040/episode.mp3');
 

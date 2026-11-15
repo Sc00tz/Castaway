@@ -35,6 +35,11 @@ REMOVED = [
             "rust-api/tests/integration/directory.rs",
         },
     },
+    {
+        "what": "Rewriting http:// addresses to https:// on the phone (removed 2026-11-15: it broke podcasts served only over http)",
+        "patterns": [r"forceHttps", r"replace\(scheme: 'https'\)"],
+        "allowed": set(),
+    },
 ]
 
 # Where app code lives; everything a user or admin can reach is in here.

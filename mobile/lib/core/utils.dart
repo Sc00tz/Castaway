@@ -108,9 +108,9 @@ String? safeFile(String? s) {
 /// When every hop of the redirect chain is https the starting URL is kept, so
 /// the downloader follows the redirects itself: signed CDN URLs can be tied to
 /// the network that requested them (#1035). An http URL is tried as https
-/// first. A chain that still goes through plain http is resolved and upgraded
-/// to https instead, since the native downloaders refuse an https -> http
-/// redirect.
+/// first, and used only if it works. A chain that still goes through plain
+/// http is resolved to its final address, kept as it is, since the native
+/// downloaders refuse an https -> http redirect.
 Future<String> resolveDownloadUrl(String url) async {
   final original = Uri.parse(url);
   if (original.scheme == 'http') {
@@ -145,12 +145,9 @@ String pickDownloadUrl(List<Uri> chain) {
     return chain.first.toString();
   }
 
-  var last = chain.last;
-  if (last.scheme == 'http') {
-    last = last.replace(scheme: 'https');
-  }
-
-  return last.toString();
+  // Resolved to the final address, as it is: a host that only serves plain
+  // http has no https version to switch to.
+  return chain.last.toString();
 }
 
 /// [url] followed by each redirect target (up to 10), and the status code of

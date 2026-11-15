@@ -3,18 +3,6 @@ import 'package:castaway_mobile/entities/podcast.dart';
 
 void main() {
   group('construction', () {
-    test('upgrades http feed/artwork URLs to https', () {
-      final podcast = Podcast(
-        guid: 'guid-1',
-        url: 'http://example.com/feed.xml',
-        link: 'https://example.com',
-        title: 'Some Podcast',
-        imageUrl: 'http://example.com/art.png',
-      );
-
-      expect(podcast.url, 'https://example.com/feed.xml');
-      expect(podcast.imageUrl, 'https://example.com/art.png');
-    });
   });
 
   group('subscribed', () {

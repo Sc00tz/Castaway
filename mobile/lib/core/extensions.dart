@@ -27,31 +27,6 @@ extension IterableExtensions<E> on Iterable<E> {
   }
 }
 
-extension ExtString on String? {
-  String get forceHttps {
-    if (this != null) {
-      final url = Uri.tryParse(this!);
-
-      if (url == null || !url.isScheme('http')) return this!;
-      
-      // Don't force HTTPS for localhost or local IP addresses to support self-hosted development
-      final host = url.host.toLowerCase();
-      if (host == 'localhost' || 
-          host == '127.0.0.1' || 
-          host.startsWith('10.') || 
-          host.startsWith('192.168.') || 
-          host.startsWith('172.') ||
-          host.endsWith('.local')) {
-        return this!;
-      }
-
-      return url.replace(scheme: 'https').toString();
-    }
-
-    return this ?? '';
-  }
-}
-
 extension ExtDouble on double {
   double get toTenth {
     var mod = pow(10.0, 1).toDouble();

@@ -3,13 +3,6 @@ import 'package:castaway_mobile/entities/person.dart';
 
 void main() {
   group('construction', () {
-    test('upgrades http image/link to https', () {
-      final person = Person(name: 'Host', image: 'http://example.com/host.png', link: 'http://example.com');
-
-      expect(person.image, 'https://example.com/host.png');
-      expect(person.link, 'https://example.com');
-    });
-
     test('role and group default to an empty string', () {
       final person = Person(name: 'Host');
 

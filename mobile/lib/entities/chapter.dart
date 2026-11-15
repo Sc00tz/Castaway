@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:castaway_mobile/core/extensions.dart';
 
 /// A class that represents an individual chapter within an [Episode].
 ///
@@ -31,13 +30,12 @@ class Chapter {
 
   Chapter({
     required this.title,
-    required String? imageUrl,
+    required this.imageUrl,
     required this.startTime,
-    String? url,
+    this.url,
     this.toc = true,
     this.endTime,
-  })  : imageUrl = imageUrl?.forceHttps,
-        url = url?.forceHttps;
+  });
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

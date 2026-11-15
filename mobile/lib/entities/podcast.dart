@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:castaway_mobile/core/extensions.dart';
 import 'package:castaway_mobile/entities/funding.dart';
 import 'package:castaway_mobile/entities/person.dart';
 import 'package:podcast_search/podcast_search.dart' as search;
@@ -91,13 +90,13 @@ class Podcast {
 
   Podcast({
     required this.guid,
-    required String url,
+    required this.url,
     required this.link,
     required this.title,
     this.id,
     this.description,
-    String? imageUrl,
-    String? thumbImageUrl,
+    this.imageUrl,
+    this.thumbImageUrl,
     this.copyright,
     this.subscribedDate,
     this.funding,
@@ -108,9 +107,7 @@ class Podcast {
     this.persons,
     this.isFavorite = false,
     DateTime? lastUpdated,
-  })  : url = url.forceHttps,
-        imageUrl = imageUrl?.forceHttps,
-        thumbImageUrl = thumbImageUrl?.forceHttps {
+  }) {
     _lastUpdated = lastUpdated;
   }
 

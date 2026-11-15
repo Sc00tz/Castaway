@@ -38,53 +38,6 @@ void main() {
     });
   });
 
-  group('ExtString.forceHttps', () {
-    test('upgrades a plain http URL to https', () {
-      expect('http://example.com/feed.xml'.forceHttps, 'https://example.com/feed.xml');
-    });
-
-    test('leaves an already-https URL unchanged', () {
-      expect('https://example.com/feed.xml'.forceHttps, 'https://example.com/feed.xml');
-    });
-
-    test('leaves localhost over http unchanged, to support self-hosted development', () {
-      expect('http://localhost:8040/api'.forceHttps, 'http://localhost:8040/api');
-    });
-
-    test('leaves 127.0.0.1 over http unchanged', () {
-      expect('http://127.0.0.1:8040/api'.forceHttps, 'http://127.0.0.1:8040/api');
-    });
-
-    test('leaves private 10.x addresses over http unchanged', () {
-      expect('http://10.0.1.5:8040/api'.forceHttps, 'http://10.0.1.5:8040/api');
-    });
-
-    test('leaves private 192.168.x addresses over http unchanged', () {
-      expect('http://192.168.1.50/api'.forceHttps, 'http://192.168.1.50/api');
-    });
-
-    test('leaves private 172.x addresses over http unchanged', () {
-      expect('http://172.16.0.5/api'.forceHttps, 'http://172.16.0.5/api');
-    });
-
-    test('leaves .local hostnames over http unchanged', () {
-      expect('http://castaway.local/api'.forceHttps, 'http://castaway.local/api');
-    });
-
-    test('is case-insensitive when matching the local-network exceptions', () {
-      expect('http://CASTAWAY.LOCAL/api'.forceHttps, 'http://CASTAWAY.LOCAL/api');
-    });
-
-    test('returns an empty string for null', () {
-      String? value;
-      expect(value.forceHttps, '');
-    });
-
-    test('leaves a non-http scheme (e.g. a relative path) unchanged', () {
-      expect('/relative/path'.forceHttps, '/relative/path');
-    });
-  });
-
   group('ExtDouble.toTenth', () {
     test('rounds to one decimal place', () {
       expect(1.23.toTenth, 1.2);

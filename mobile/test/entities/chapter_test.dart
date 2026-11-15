@@ -3,17 +3,6 @@ import 'package:castaway_mobile/entities/chapter.dart';
 
 void main() {
   group('construction', () {
-    test('upgrades http image/url to https', () {
-      final chapter = Chapter(
-        title: 'Intro',
-        imageUrl: 'http://example.com/chapter.png',
-        url: 'http://example.com',
-        startTime: 0,
-      );
-
-      expect(chapter.imageUrl, 'https://example.com/chapter.png');
-      expect(chapter.url, 'https://example.com');
-    });
   });
 
   group('toMap/fromMap', () {

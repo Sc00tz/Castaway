@@ -41,11 +41,12 @@ void main() {
 
     expect(await service.addPodcast(show, userId!), isTrue, reason: 'subscribe');
     final subscribed = await service.getUserPodcasts(userId);
-    // By title: the app's Podcast entity rewrites http:// feed addresses to https://.
+    // The recorded feed is served over plain http; the app must keep that address.
     final podcast = subscribed.firstWhere(
-      (p) => p.title == show.title,
-      orElse: () => fail('not in subscriptions: ${show.title}; got ${subscribed.map((p) => p.title).toList()}'),
+      (p) => p.url == show.url,
+      orElse: () => fail('not in subscriptions: ${show.url}; got ${subscribed.map((p) => '${p.title} <${p.url}>').toList()}'),
     );
+    expect(show.url, startsWith('http://'));
 
     // The server imports the feed's episodes in the background.
     var episodes = await service.getPodcastEpisodes(userId, podcast.id!);

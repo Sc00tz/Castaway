@@ -47,10 +47,10 @@ void main() {
       );
     });
 
-    test('resolves and upgrades a chain through http', () {
+    test('resolves a chain through http to its final address, kept as it is', () {
       expect(
         pickDownloadUrl(chain(['https://feed.example/ep.mp3', 'http://cdn.example/ep.mp3'])),
-        'https://cdn.example/ep.mp3',
+        'http://cdn.example/ep.mp3',
       );
       expect(
         pickDownloadUrl(chain(['http://feed.example/ep.mp3', 'https://cdn.example/ep.mp3'])),
@@ -58,8 +58,8 @@ void main() {
       );
     });
 
-    test('upgrades an http URL without redirects', () {
-      expect(pickDownloadUrl(chain(['http://feed.example/ep.mp3'])), 'https://feed.example/ep.mp3');
+    test('keeps an http-only URL as it is (the host may have no https)', () {
+      expect(pickDownloadUrl(chain(['http://feed.example/ep.mp3'])), 'http://feed.example/ep.mp3');
     });
   });
 
@@ -81,6 +81,27 @@ void main() {
       final result = await redirectChain('$base/a');
       expect(result.chain.map((u) => u.toString()), ['$base/a', '$base/b', '$base/c']);
       expect(result.status, 200);
+    });
+  });
+
+  group('resolveDownloadUrl', () {
+    // A host that only serves plain http (nothing answers https on its port): the download
+    // must use the http address, not an https one nobody serves.
+    test('keeps a plain-http host\'s address, through its redirects', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) {
+        if (request.uri.path == '/ep.mp3') {
+          request.response.redirect(Uri.parse('/media/ep.mp3'));
+        } else {
+          request.response.write('audio');
+          request.response.close();
+        }
+      });
+      addTearDown(() => server.close(force: true));
+
+      final base = 'http://127.0.0.1:${server.port}';
+      expect(await resolveDownloadUrl('$base/ep.mp3'), '$base/media/ep.mp3');
+      expect(await resolveDownloadUrl('$base/media/ep.mp3'), '$base/media/ep.mp3');
     });
   });
 

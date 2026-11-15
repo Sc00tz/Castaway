@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:castaway_mobile/core/extensions.dart';
 
 /// part of a [Podcast].
 ///
@@ -15,9 +14,9 @@ class Funding {
   final String value;
 
   Funding({
-    required String url,
+    required this.url,
     required this.value,
-  }) : url = url.forceHttps;
+  });
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

@@ -2,11 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:castaway_mobile/entities/funding.dart';
 
 void main() {
-  test('upgrades an http funding URL to https on construction', () {
-    final funding = Funding(url: 'http://example.com/donate', value: 'Support the show');
-    expect(funding.url, 'https://example.com/donate');
-  });
-
   group('toMap/fromMap', () {
     test('round-trips url and value', () {
       final original = Funding(url: 'https://example.com/donate', value: 'Support the show');
