@@ -4050,7 +4050,8 @@ pub struct ProxyTrendingParams {
     pub since: Option<i64>,
 }
 
-// Podcast Index trending (needs this server's key). Powers the Discover page's trending rows.
+// Trending podcasts for the Discover page: Podcast Index's when this server has a key, otherwise
+// Apple's top chart.
 #[utoipa::path(
     get,
     path = "/proxy_trending",
@@ -4092,11 +4093,12 @@ pub async fn proxy_trending(
         query_params.push(("since", v.to_string()));
     }
 
-    let body = crate::services::directory::podcast_index(&state.db_pool, &state.config.api, "/podcasts/trending", &query_params).await?;
+    let body = crate::services::directory::trending(&state.db_pool, &state.config.api, &query_params).await?;
     Ok(Json(body))
 }
 
-// Podcast Index's category list (needs this server's key). Powers "Browse by category".
+// Categories for "Browse by category": Podcast Index's when this server has a key, otherwise
+// Apple's main genres.
 #[utoipa::path(
     get,
     path = "/proxy_categories",
@@ -4119,7 +4121,7 @@ pub async fn proxy_categories(
         return Err(AppError::unauthorized("Invalid API key"));
     }
 
-    let body = crate::services::directory::podcast_index(&state.db_pool, &state.config.api, "/categories/list", &[]).await?;
+    let body = crate::services::directory::categories(&state.db_pool, &state.config.api).await?;
     Ok(Json(body))
 }
 

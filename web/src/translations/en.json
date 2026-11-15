@@ -56,7 +56,7 @@
   "discover": {
     "title": "Discover",
     "empty_title": "Nothing to discover yet",
-    "empty_message": "Trending podcasts come from Podcast Index. If this stays empty, an admin can add a free Podcast Index key in Settings → Podcast Index.",
+    "empty_message": "Trending podcasts come from Podcast Index, or from Apple Podcasts' charts when this server has no Podcast Index key. If this stays empty, the server couldn't reach either one right now.",
     "for_you": "For You",
     "for_you_empty": "Subscribe to a few podcasts and we'll suggest shows you might like here.",
     "trending": "Trending Now",

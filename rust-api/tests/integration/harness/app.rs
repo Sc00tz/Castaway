@@ -130,6 +130,8 @@ impl TestApp {
             api: ApiConfig {
                 itunes_search_url: fixtures.url("itunes/search"),
                 podcast_index_url: fixtures.url("podcastindex/api/1.0"),
+                apple_charts_url: fixtures.url("itunes/charts"),
+                itunes_lookup_url: fixtures.url("itunes/lookup"),
                 youtube_feed_url: fixtures.url("youtube/{channel_id}.xml"),
             },
         };

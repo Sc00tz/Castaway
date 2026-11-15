@@ -200,3 +200,34 @@ pub async fn call_get_categories(
     let result: CategoriesResponse = response.json().await?;
     Ok(result.feeds)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    /// Without a Podcast Index key the server sends Apple's chart in Podcast Index's shape, with
+    /// no Podcast Index id. A real answer (trimmed) must give cards that add by feed address.
+    #[wasm_bindgen_test]
+    fn apples_chart_from_the_server_parses_into_cards() {
+        let body = r#"{"status":"true","count":1,"feeds":[{"artwork":"https://is1-ssl.mzstatic.com/x/600x600bb.jpg",
+            "author":"audiochuck","categories":{"1488":"True Crime"},"description":"If you can never get enough true crime...",
+            "episodeCount":530,"image":"https://is1-ssl.mzstatic.com/x/600x600bb.jpg","itunesId":1322200189,
+            "newestItemPublishTime":1794600000,"title":"Crime Junkie","url":"https://feeds.simplecast.com/qm_9xx0g"}]}"#;
+        let parsed: TrendingResponse = serde_json::from_str(body).expect("parses");
+        let card = parsed.feeds.into_iter().next().unwrap().to_unified();
+        assert_eq!(card.index_id, 0, "an Apple show has no Podcast Index id");
+        assert_eq!(card.title, "Crime Junkie");
+        assert_eq!(card.url, "https://feeds.simplecast.com/qm_9xx0g");
+        assert_eq!(card.image, "https://is1-ssl.mzstatic.com/x/600x600bb.jpg");
+        assert_eq!(card.categories.unwrap().get("1488").map(String::as_str), Some("True Crime"));
+    }
+
+    /// Apple's genres as categories.
+    #[wasm_bindgen_test]
+    fn apples_genres_parse_as_categories() {
+        let body = r#"{"status":"true","count":2,"feeds":[{"id":1301,"name":"Arts"},{"id":1324,"name":"Society & Culture"}]}"#;
+        let parsed: CategoriesResponse = serde_json::from_str(body).expect("parses");
+        assert_eq!(parsed.feeds[1], PodcastCategory { id: 1324, name: "Society & Culture".into() });
+    }
+}

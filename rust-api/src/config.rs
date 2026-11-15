@@ -38,6 +38,10 @@ pub struct ApiConfig {
     pub itunes_search_url: String,
     /// Podcast Index API base, e.g. https://api.podcastindex.org/api/1.0.
     pub podcast_index_url: String,
+    /// Apple's top-podcasts chart, used for trending when there's no Podcast Index key.
+    pub apple_charts_url: String,
+    /// Apple's lookup by ID (feed addresses for charted shows).
+    pub itunes_lookup_url: String,
     /// A YouTube channel's RSS feed, with `{channel_id}` in place of the channel.
     pub youtube_feed_url: String,
 }
@@ -292,6 +296,8 @@ impl Config {
         let api = ApiConfig {
             itunes_search_url: crate::services::directory::DEFAULT_ITUNES_SEARCH_URL.to_string(),
             podcast_index_url: crate::services::directory::DEFAULT_PODCAST_INDEX_URL.to_string(),
+            apple_charts_url: crate::services::directory::DEFAULT_APPLE_CHARTS_URL.to_string(),
+            itunes_lookup_url: crate::services::directory::DEFAULT_ITUNES_LOOKUP_URL.to_string(),
             youtube_feed_url: YOUTUBE_FEED_URL.to_string(),
         };
 

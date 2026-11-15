@@ -68,11 +68,11 @@ struct Candidate {
     tf: HashMap<String, f64>,
 }
 
-// Fetch category-filtered trending feeds from Podcast Index. Degrades to an empty list on any
-// failure (including no API key) so recommendations never hard-fail on an upstream hiccup.
+// Fetch category-filtered trending feeds (Podcast Index, or Apple's chart without a key).
+// Degrades to an empty list on any failure so recommendations never hard-fail on an upstream hiccup.
 async fn fetch_trending(db: &DatabasePool, api: &crate::config::ApiConfig, cat: &str) -> Vec<serde_json::Value> {
     let params = [("cat", cat.to_string()), ("max", CANDIDATES_PER_CATEGORY.to_string())];
-    match crate::services::directory::podcast_index(db, api, "/podcasts/trending", &params).await {
+    match crate::services::directory::trending(db, api, &params).await {
         Ok(v) => v.get("feeds").and_then(|f| f.as_array()).cloned().unwrap_or_default(),
         Err(e) => {
             tracing::warn!("Trending request for '{}' failed: {:?}", cat, e);

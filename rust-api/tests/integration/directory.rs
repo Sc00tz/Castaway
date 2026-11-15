@@ -119,3 +119,128 @@ async fn trending_and_categories_come_from_podcast_index() {
     let cats = app.get("/api/data/proxy_categories").key(&user).send().await.ok_json();
     assert_eq!(cats["feeds"][0]["name"], "Arts");
 }
+
+/// One show on Apple's chart, the way Apple's chart and lookup describe it.
+fn apple_chart(ids: &[(i64, &str)]) -> String {
+    let entries: Vec<_> = ids
+        .iter()
+        .map(|(id, name)| {
+            json!({
+                "im:name": { "label": name },
+                "im:artist": { "label": "Chart Artist" },
+                "summary": { "label": format!("About {name}") },
+                "id": { "label": format!("https://podcasts.apple.com/us/podcast/id{id}"), "attributes": { "im:id": id.to_string() } },
+            })
+        })
+        .collect();
+    json!({ "feed": { "entry": entries } }).to_string()
+}
+
+fn apple_lookup(ids: &[(i64, &str)]) -> String {
+    let results: Vec<_> = ids
+        .iter()
+        .map(|(id, name)| {
+            json!({
+                "collectionId": id,
+                "collectionName": name,
+                "artistName": "Show Maker",
+                "feedUrl": format!("https://feeds.example.invalid/{id}.xml"),
+                "artworkUrl600": format!("https://art.example.invalid/{id}/600x600bb.jpg"),
+                "releaseDate": "2026-11-14T02:35:00Z",
+                "trackCount": 42,
+                "genres": ["Technology", "Podcasts", "Tech News"],
+                "genreIds": ["1318", "26", "1528"],
+            })
+        })
+        .collect();
+    json!({ "resultCount": results.len(), "results": results }).to_string()
+}
+
+/// No Podcast Index key: trending is Apple's chart, in the shape the apps already read.
+#[tokio::test(flavor = "multi_thread")]
+async fn without_a_key_trending_is_apples_chart() {
+    let app = TestApp::new().await;
+    let user = app.user("browser").await;
+    let shows = [(111, "First Show"), (222, "Second Show")];
+    app.fixtures().serve("itunes/charts/limit=24/json", Fixture::new("application/json", apple_chart(&shows)));
+    app.fixtures().serve("itunes/lookup", Fixture::new("application/json", apple_lookup(&shows)));
+
+    let body = app.get("/api/data/proxy_trending?max=24").key(&user).send().await.ok_json();
+    let feeds = body["feeds"].as_array().expect("feeds");
+    assert_eq!(feeds.len(), 2, "{body}");
+    assert_eq!(feeds[0]["title"], "First Show", "chart order is kept");
+    assert_eq!(feeds[0]["url"], "https://feeds.example.invalid/111.xml");
+    assert_eq!(feeds[0]["author"], "Show Maker");
+    assert_eq!(feeds[0]["description"], "About First Show");
+    assert_eq!(feeds[0]["image"], "https://art.example.invalid/111/600x600bb.jpg");
+    assert_eq!(feeds[0]["itunesId"], 111);
+    assert_eq!(feeds[0]["newestItemPublishTime"], 1794623700);
+    assert_eq!(feeds[0]["categories"], json!({ "1318": "Technology", "1528": "Tech News" }));
+    assert!(feeds[0].get("id").is_none(), "an Apple show has no Podcast Index id: {body}");
+
+    let query = app.fixtures().hits("itunes/lookup").pop().expect("lookup").query.unwrap_or_default();
+    assert!(query.contains("id=111%2C222") || query.contains("id=111,222"), "{query}");
+    assert!(app.fixtures().hits("podcastindex/api/1.0/podcasts/trending").is_empty());
+}
+
+/// A category picks Apple's chart for that genre; one Apple doesn't have gives nothing.
+#[tokio::test(flavor = "multi_thread")]
+async fn without_a_key_a_category_uses_apples_genre_chart() {
+    let app = TestApp::new().await;
+    let user = app.user("browser").await;
+    let shows = [(333, "Culture Show")];
+    app.fixtures().serve("itunes/charts/limit=10/genre=1324/json", Fixture::new("application/json", apple_chart(&shows)));
+    app.fixtures().serve("itunes/lookup", Fixture::new("application/json", apple_lookup(&shows)));
+
+    let body = app.get("/api/data/proxy_trending?cat=Society%20%26%20Culture").key(&user).send().await.ok_json();
+    assert_eq!(body["feeds"][0]["title"], "Culture Show", "{body}");
+
+    let none = app.get("/api/data/proxy_trending?cat=Not%20A%20Genre").key(&user).send().await.ok_json();
+    assert_eq!(none["feeds"], json!([]), "{none}");
+}
+
+/// Shows Apple gives no feed address for can't be added, so they're left out.
+#[tokio::test(flavor = "multi_thread")]
+async fn charted_shows_without_a_feed_are_left_out() {
+    let app = TestApp::new().await;
+    let user = app.user("browser").await;
+    app.fixtures().serve("itunes/charts/limit=10/json", Fixture::new("application/json", apple_chart(&[(1, "Has Feed"), (2, "No Feed")])));
+    app.fixtures().serve("itunes/lookup", Fixture::new("application/json", apple_lookup(&[(1, "Has Feed")])));
+
+    let body = app.get("/api/data/proxy_trending").key(&user).send().await.ok_json();
+    let titles: Vec<_> = body["feeds"].as_array().unwrap().iter().map(|f| f["title"].clone()).collect();
+    assert_eq!(titles, vec![json!("Has Feed")]);
+}
+
+/// No Podcast Index key: categories are Apple's 19 main genres.
+#[tokio::test(flavor = "multi_thread")]
+async fn without_a_key_categories_are_apples_genres() {
+    let app = TestApp::new().await;
+    let user = app.user("browser").await;
+    let body = app.get("/api/data/proxy_categories").key(&user).send().await.ok_json();
+    let names: Vec<_> = body["feeds"].as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap().to_string()).collect();
+    assert_eq!(names.len(), 19, "{names:?}");
+    for name in ["Arts", "Society & Culture", "Technology", "True Crime"] {
+        assert!(names.contains(&name.to_string()), "{name} in {names:?}");
+    }
+    assert!(app.fixtures().hits("podcastindex/api/1.0/categories/list").is_empty());
+}
+
+/// A key Podcast Index turns down (or Podcast Index being down) falls back to Apple too.
+#[tokio::test(flavor = "multi_thread")]
+async fn when_podcast_index_fails_trending_and_categories_use_apple() {
+    let app = TestApp::new().await;
+    let user = app.user("browser").await;
+    app.db().set_podcast_index_credentials(Some(("k", "s"))).await.unwrap();
+    app.fixtures().serve("podcastindex/api/1.0/podcasts/trending", Fixture::new("application/json", "{}").status(401));
+    app.fixtures().serve("podcastindex/api/1.0/categories/list", Fixture::new("application/json", "{}").status(500));
+    let shows = [(444, "Apple Show")];
+    app.fixtures().serve("itunes/charts/limit=10/json", Fixture::new("application/json", apple_chart(&shows)));
+    app.fixtures().serve("itunes/lookup", Fixture::new("application/json", apple_lookup(&shows)));
+
+    let trending = app.get("/api/data/proxy_trending").key(&user).send().await.ok_json();
+    assert_eq!(trending["feeds"][0]["title"], "Apple Show", "{trending}");
+    assert_eq!(app.fixtures().hits("podcastindex/api/1.0/podcasts/trending").len(), 1, "Podcast Index was tried first");
+    let cats = app.get("/api/data/proxy_categories").key(&user).send().await.ok_json();
+    assert_eq!(cats["feeds"].as_array().unwrap().len(), 19, "{cats}");
+}
