@@ -212,6 +212,25 @@ jobs:
             ./web/src-tauri/target/release/bundle/msi/${{ env.ARTIFACT_NAME2 }}
         if: ${{ matrix.os == 'windows-latest' }}
 
+      # The release page is created by the Android build, with the APK, so it never appears
+      # without it. Wait for it rather than letting the upload below create it.
+      - name: Wait for the release (created with the APK)
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          for i in $(seq 1 60); do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release $TAG exists."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::No release for $TAG after 30 minutes. The Android build creates it with the APK: re-run that, then re-run this."
+          exit 1
+
       - name: Upload release assets (Linux x86_64)
         if: (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')) && matrix.os == 'ubuntu-latest'
         uses: softprops/action-gh-release@v3
