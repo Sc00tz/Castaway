@@ -54,6 +54,8 @@ RULES = [
             ".github/scripts/check_removed.py",
             # On the cleanup list: the iOS project links the system SQLite library (from AnyTime).
             "mobile/ios/Runner.xcodeproj/project.pbxproj",
+            # The README's comparison with PinePods says what Castaway dropped.
+            "README.md",
         ],
     },
     {
@@ -72,6 +74,8 @@ RULES = [
             ".github/scripts/check_removed.py",
             # Migrations that dropped them (they run on old databases and are never shown).
             "rust-api/migrations/*",
+            # The README's comparison with PinePods says what Castaway doesn't use.
+            "README.md",
             "rust-api/src/database/migrate.rs",
         ],
     },
