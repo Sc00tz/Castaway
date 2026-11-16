@@ -55,7 +55,7 @@ November 2026 code):
 | **Database** | PostgreSQL or MySQL/MariaDB (SQLite is also supported) | PostgreSQL only |
 | **What you run** | The app plus separate database and Valkey/Redis containers (a single container with SQLite) | One container, with PostgreSQL inside it, and one data folder; the database password is generated for you |
 | **Valkey / Redis** | Required (except with SQLite) | Not needed |
-| **Database setup** | A Python setup tool in the image | The server applies its own migrations; no Python in the image |
+| **Database setup** | A separate setup program (written in Python, compiled to a standalone binary, so the image has no Python) | Built into the server, which applies its own migrations |
 | **Podcast search** | Through PinePods' search service (`search.pinepods.online` by default; can be self-hosted) | Your server asks Apple Podcasts and Podcast Index directly. Apple needs no key; Podcast Index uses your own free key, stored on your server |
 | **Trending and categories** | Podcast Index, through the search service | Podcast Index with your key, otherwise Apple's charts (works without a key) |
 | **Hosts and guests** | Feed tags plus PodPeople DB (`people.pinepods.online`) | Feed tags plus Podcast Index's person search |
