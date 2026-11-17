@@ -200,7 +200,14 @@ def start_services(job, label):
             cmd += ["-e", f"{k}={v}"]
         cmd += shlex.split(svc.get("options") or "")
         cmd.append(svc["image"])
-        sh(cmd, check=True, capture_output=True)
+        started = sh(cmd, capture_output=True)
+        if started.returncode != 0:
+            stop_services(names)
+            raise SystemExit(
+                f"Couldn't start the {name} service for '{label}': {started.stderr.strip()}\n"
+                "If a port is in use, stop what holds it (for example the server tests' own databases: "
+                "docker compose -f rust-api/tests/docker-compose.yml down -v)."
+            )
         names.append(container)
     for container in names:
         for _ in range(120):
