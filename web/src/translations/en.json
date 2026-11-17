@@ -998,7 +998,14 @@
     "unexpected_error": "An unexpected error occurred during login.",
     "username_conflict": "Unable to create account - username already exists",
     "date_format_iso8601": "ISO 8601",
-    "date_format_julian": "YY/DDD (Julian)"
+    "date_format_julian": "YY/DDD (Julian)",
+    "provider_error": "Your login provider refused the sign-in.",
+    "invalid_state": "The sign-in expired or was started somewhere else. Please try again.",
+    "internal_error": "The server ran into a problem during sign-in. Please try again.",
+    "token_exchange_failed": "The server couldn't finish signing in with your login provider. Ask an admin to check the provider settings.",
+    "userinfo_failed": "The server couldn't read your details from your login provider.",
+    "email_required": "Your login provider didn't share an email address, which this server needs.",
+    "user_creation_failed": "Your account couldn't be created. Ask an admin for help."
   },
   "oidc": {
     "add_oidc_provider": "Add OIDC Provider",

@@ -212,8 +212,9 @@ class _CastawayStartupLoginState extends State<CastawayStartupLogin> {
         await _completeOidcLogin(callback.apiKey!, serverUrl);
       } else {
         setState(() {
-          _errorMessage =
-              L.of(context)!.authentication_failed(callback.error ?? L.of(context)!.no_api_key_returned);
+          _errorMessage = callback.error == null
+              ? L.of(context)!.authentication_failed(L.of(context)!.no_api_key_returned)
+              : oidcErrorMessage(L.of(context)!, callback.error, callback.errorDescription);
           _isLoading = false;
         });
       }

@@ -519,7 +519,10 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
         print('OIDC Callback: Authentication failed: ${callbackResult.error}');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(L.of(context)!.oidc_authentication_failed(callbackResult.error ?? '')), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(oidcErrorMessage(L.of(context)!, callbackResult.error, callbackResult.errorDescription)),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;

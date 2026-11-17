@@ -35,7 +35,8 @@ import time
 import yaml
 
 REPO = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
-CACHE = os.path.expanduser("~/Library/Caches/castaway-ci")
+# Not ~/Library/Caches: macOS empties that by itself when it wants space.
+CACHE = os.path.expanduser("~/.cache/castaway-ci")
 EXTRA_PATH = ["/opt/homebrew/opt/libpq/bin", "/opt/homebrew/opt/rustup/bin", os.path.expanduser("~/.cargo/bin")]
 PUBLISHED_IMAGE = "ghcr.io/sc00tz/castaway:main"
 
