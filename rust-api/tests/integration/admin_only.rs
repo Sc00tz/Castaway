@@ -64,6 +64,9 @@ pub const SYSTEM_ONLY: &[&str] = &[
 #[tokio::test(flavor = "multi_thread")]
 async fn regular_users_cannot_use_admin_endpoints() {
     let app = TestApp::new().await;
+    // The admin's calls include making a backup, which writes into the backup folder the backup
+    // tests check; take turns with them.
+    let _backups = crate::harness::files::BackupEnv::claim(&app).await;
     let admin = app.admin().await.clone();
     let user = app.user("regular").await;
     // A third account so "delete user {id}" targets someone other than the caller.
