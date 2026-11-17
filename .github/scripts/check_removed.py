@@ -45,6 +45,25 @@ RULES = [
         "where": ["mobile/lib/**", "mobile/test/**"],
     },
     {
+        "what": "Inline script or eval in the web app (the server's Content-Security-Policy blocks them, "
+        "so the feature would silently break; 2026-11-17)",
+        "patterns": [
+            r"js_sys::eval",
+            r"Function::new_",
+            r"set_attribute\(\s*\"on[a-z]+\"",
+            r"<script>",
+            r"<script\s+type=\"module\">",
+            r"\bon(click|load|error|submit|change|input|mouseover)=\\?\"",
+        ],
+        "where": ["web/src/**", "web/index.html", "web/static/**"],
+        "allowed_files": [
+            # Tests install stand-ins with eval and check that feed HTML with handlers is cleaned.
+            "web/src/tests/**",
+            # Third-party icon font stylesheet and service worker: no handlers or eval, but kept out.
+            "web/static/assets/**",
+        ],
+    },
+    {
         "what": "MySQL, MariaDB or SQLite (2026-11-13: \"Lets go with Postgres only\" / \"GET IT THE FUCK OUT OF THERE\")",
         "patterns": [r"(?i)mysql", r"(?i)mariadb", r"(?i)sqlite"],
         "where": ["**"],

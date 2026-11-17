@@ -23,12 +23,14 @@ RUN WASM_BINDGEN_VERSION=$(grep -A2 'name = "wasm-bindgen"' /app/Cargo.lock | gr
     chmod +x /root/.cache/trunk/wasm-bindgen-${WASM_BINDGEN_VERSION}/wasm-bindgen && \
     rm -rf /tmp/wb-dl
 # Add application files to the builder stage
-COPY ./web/Cargo.toml ./web/index.html ./web/tailwind.config.js ./web/Trunk.toml /app/
+COPY ./web/Cargo.toml ./web/index.html ./web/tailwind.config.js ./web/Trunk.toml ./web/externalize-loader.sh /app/
 COPY ./web/src /app/src
 COPY ./web/static /app/static
 WORKDIR /app
 # Build the Yew application in release mode
 RUN RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg getrandom_backend=\"wasm_js\"" trunk build --features server_build --release
+# No inline script in the page, so nginx can send script-src 'self' (see startup/nginx.conf).
+RUN sh /app/externalize-loader.sh /app/dist
 
 # Rust API builder stage
 FROM rust:alpine AS rust-api-builder

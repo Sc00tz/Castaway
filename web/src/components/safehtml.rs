@@ -5,9 +5,12 @@ use crate::requests::episode::Episode;
 use i18nrs::yew::use_translation;
 use regex::Regex;
 use std::sync::OnceLock;
+
+/// The document-level timecode listeners are added once (without inline script or eval).
+static TIMECODE_LISTENER_ADDED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{Element, HtmlElement, Node};
+use web_sys::{Element, Node};
 use yew::prelude::*;
 use yewdux::prelude::*;
 
@@ -311,6 +314,7 @@ fn process_node(
                         if let Some(dur) = &episode_props.episode_duration {
                             let _ = span.set_attribute("data-episode-duration", &dur.to_string());
                         }
+                        let _ = span.set_attribute("data-episode-id", &episode_props.episode_id.unwrap_or(-1).to_string());
                         let _ = span.set_attribute("data-is-youtube", &episode_props.is_youtube.unwrap_or(false).to_string());
                         let _ = span.set_attribute("data-is-video", &episode_props.is_video.unwrap_or(false).to_string());
 
@@ -337,72 +341,10 @@ fn process_node(
 
                         // Create click handler
                         let dispatch = audio_dispatch.clone();
-                        let start_time = *seconds;
 
-                        // Copy all episode props for the closure
-                        let episode_id = episode_props.episode_id;
-
-                        // Add inline handler — passes the element so JS can read data-* attrs
-                        let onclick_handler = if let Some(ep_id) = episode_id {
-                            format!(
-                                "event.preventDefault(); \
-                                 event.stopPropagation(); \
-                                 window.handleTimecodeClick && window.handleTimecodeClick(event.currentTarget, {}, {}); \
-                                 return false;",
-                                seconds, ep_id
-                            )
-                        } else {
-                            format!(
-                                "event.preventDefault(); \
-                                 event.stopPropagation(); \
-                                 window.handleTimecodeClick && window.handleTimecodeClick(event.currentTarget, {}, -1); \
-                                 return false;",
-                                seconds
-                            )
-                        };
-
-                        match span.set_attribute("onclick", &onclick_handler) {
-                            Ok(_) => {}
-                            Err(e) => log_error(
-                                format!("Failed to set onclick attribute: {:?}", e).as_str(),
-                            ),
-                        }
-
-                        // Always overwrite handleTimecodeClick so it carries episode data
-                        let function_text = r#"
-                            window.handleTimecodeClick = function(element, seconds, episodeId) {
-                                var url      = element ? element.getAttribute('data-episode-url')     : null;
-                                var title    = element ? element.getAttribute('data-episode-title')   : '';
-                                var artwork  = element ? element.getAttribute('data-episode-artwork') : '';
-                                var duration = element ? parseInt(element.getAttribute('data-episode-duration') || '0', 10) : 0;
-                                var isYt     = element ? element.getAttribute('data-is-youtube') === 'true' : false;
-                                var isVid    = element ? element.getAttribute('data-is-video')   === 'true' : false;
-                                document.dispatchEvent(new CustomEvent('timecode-click', {
-                                    detail: {
-                                        seconds: seconds, episodeId: episodeId,
-                                        episodeUrl: url, episodeTitle: title, episodeArtwork: artwork,
-                                        episodeDuration: duration, isYoutube: isYt, isVideo: isVid
-                                    },
-                                    bubbles: true,
-                                    cancelable: true
-                                }));
-                                return false;
-                            };
-                        "#;
-
-                        match js_sys::eval(function_text) {
-                            Ok(_) => {}
-                            Err(e) => log_error(
-                                format!("Failed to register handleTimecodeClick: {:?}", e).as_str(),
-                            ),
-                        }
 
                         // Register a document-level event listener for 'timecode-click' custom events
-                        if js_sys::eval("typeof window.timecodeV2DelegationAdded === 'undefined'")
-                            .unwrap()
-                            .as_bool()
-                            .unwrap_or(true)
-                        {
+                        if !TIMECODE_LISTENER_ADDED.swap(true, std::sync::atomic::Ordering::SeqCst) {
                             let dispatch_clone = dispatch.clone();
                             let start_episode_first_msg_delegation = start_episode_first_msg.clone();
                             let start_episode_first_audio_msg_delegation = start_episode_first_audio_msg.clone();
@@ -549,169 +491,20 @@ fn process_node(
                                 ) {
                                     Ok(_) => {
                                         delegation_handler.forget();
-
-                                        // Mark as added so we don't add it multiple times
-                                        let _ =
-                                            js_sys::eval("window.timecodeV2DelegationAdded = true;");
+                                        add_timecode_click_delegation(&document);
                                     }
-                                    Err(e) => log_error(
+                                    Err(e) => {
+                                        TIMECODE_LISTENER_ADDED.store(false, std::sync::atomic::Ordering::SeqCst);
+                                        log_error(
                                         format!(
                                             "Failed to add document-level event handler: {:?}",
                                             e
                                         )
                                         .as_str(),
-                                    ),
-                                }
-                            }
-                        }
-
-                        // Create the standard click handler
-                        let current_playing_id = currently_playing_id.clone(); // Clone for the closure
-                        let start_episode_first_msg_click = start_episode_first_msg.clone();
-                        let click_handler = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
-                            web_sys::console::log_1(
-                                &"TIMECODE SPAN CLICKED - HANDLER STARTED".into(),
-                            );
-
-                            // Critical - prevent default before doing anything else
-                            e.prevent_default();
-                            e.stop_propagation();
-
-                            // Check if this episode is currently playing by comparing IDs
-                            let is_current_episode = match (episode_id, current_playing_id) {
-                                (Some(ep_id), Some(current_id)) => {
-                                    let is_match = ep_id == current_id;
-                                    web_sys::console::log_1(
-                                        &format!(
-                                            "Comparing episode IDs: {} vs {}, match: {}",
-                                            ep_id, current_id, is_match
-                                        )
-                                        .into(),
                                     );
-                                    is_match
-                                }
-                                _ => {
-                                    web_sys::console::log_1(
-                                        &"Missing episode ID for comparison".into(),
-                                    );
-                                    false
-                                }
-                            };
-
-                            if is_current_episode {
-                                // Episode IS currently playing - seek to the timecode
-                                dispatch.reduce_mut(|state| {
-                                    let time = start_time as f64;
-                                    if let Some(media) = &state.media_element {
-                                        media.set_current_time(time);
-                                        state.current_time_seconds = time;
-                                        if !state.audio_playing.unwrap_or(false) {
-                                            let _ = media.play();
-                                            state.audio_playing = Some(true);
-                                        }
-                                    } else if let Some(audio) = &state.audio_element {
-                                        audio.set_current_time(time);
-                                        state.current_time_seconds = time;
-                                        if !state.audio_playing.unwrap_or(false) {
-                                            let _ = audio.play();
-                                            state.audio_playing = Some(true);
-                                        }
                                     }
-                                });
-                            } else {
-                                let msg = start_episode_first_msg_click.clone();
-                                Dispatch::<NotificationState>::global().reduce_mut(move |ns| {
-                                    ns.info_message = Some(msg);
-                                });
-                            }
-
-                            // Provide visual feedback on click
-                            if let Some(element) = e.current_target() {
-                                if let Some(element) = element.dyn_ref::<HtmlElement>() {
-                                    match element
-                                        .style()
-                                        .set_property("text-decoration", "underline")
-                                    {
-                                        Ok(_) => {}
-                                        Err(e) => web_sys::console::error_1(
-                                            &format!("Failed to add visual feedback: {:?}", e)
-                                                .into(),
-                                        ),
-                                    }
-
-                                    // Reset after delay
-                                    let element_clone = element.clone();
-                                    let timeout_callback = Closure::wrap(Box::new(move || {
-                                        match element_clone
-                                            .style()
-                                            .set_property("text-decoration", "none")
-                                        {
-                                            Ok(_) => {}
-                                            Err(e) => web_sys::console::error_1(
-                                                &format!(
-                                                    "Failed to reset visual feedback: {:?}",
-                                                    e
-                                                )
-                                                .into(),
-                                            ),
-                                        }
-                                    })
-                                        as Box<dyn FnMut()>);
-
-                                    match web_sys::window()
-                                        .unwrap()
-                                        .set_timeout_with_callback_and_timeout_and_arguments_0(
-                                            timeout_callback.as_ref().unchecked_ref(),
-                                            500,
-                                        ) {
-                                        Ok(_) => {}
-                                        Err(e) => web_sys::console::error_1(
-                                            &format!(
-                                                "Failed to set visual feedback timeout: {:?}",
-                                                e
-                                            )
-                                            .into(),
-                                        ),
-                                    }
-
-                                    timeout_callback.forget();
                                 }
                             }
-                        })
-                            as Box<dyn FnMut(_)>);
-
-                        // Attach the click handler
-                        match span.add_event_listener_with_callback(
-                            "click",
-                            click_handler.as_ref().unchecked_ref(),
-                        ) {
-                            Ok(_) => {
-                                click_handler.forget();
-                            }
-                            Err(e) => {
-                                web_sys::console::error_1(
-                                    &format!("Failed to add click handler: {:?}", e).into(),
-                                );
-                            }
-                        }
-
-                        // Also add mousedown handler for better coverage
-                        let mousedown_handler =
-                            Closure::wrap(Box::new(move |_e: web_sys::MouseEvent| {
-                                web_sys::console::log_1(
-                                    &format!("MOUSEDOWN detected on timecode {}s", start_time)
-                                        .into(),
-                                );
-                            }) as Box<dyn FnMut(_)>);
-
-                        match span.add_event_listener_with_callback(
-                            "mousedown",
-                            mousedown_handler.as_ref().unchecked_ref(),
-                        ) {
-                            Ok(_) => {
-                                mousedown_handler.forget();
-                            }
-                            Err(_) => {}
                         }
 
                         // Add the span to the fragment
@@ -859,3 +652,47 @@ pub fn safe_html(props: &Props) -> Html {
     // Return the VRef just like the original implementation
     Html::VRef(div.into())
 }
+
+/// Clicks on a show-note timestamp. The processed notes become an HTML string, so a listener
+/// attached to each timestamp would be lost; one listener on the page reads the timestamp's
+/// data attributes instead and asks the player to play it (the `timecode-click` event). This
+/// replaces an inline onclick, so the page needs no inline script.
+fn add_timecode_click_delegation(document: &web_sys::Document) {
+    let doc = document.clone();
+    let on_click = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |e: web_sys::MouseEvent| {
+        let Some(link) = e
+            .target()
+            .and_then(|t| t.dyn_into::<Element>().ok())
+            .and_then(|el| el.closest(".timecode-link").ok().flatten())
+        else {
+            return;
+        };
+        e.prevent_default();
+        e.stop_propagation();
+        let attr = |name: &str| link.get_attribute(name);
+        let number = |name: &str| attr(name).and_then(|v| v.parse::<f64>().ok());
+        let detail = js_sys::Object::new();
+        let set = |k: &str, v: JsValue| {
+            let _ = js_sys::Reflect::set(&detail, &JsValue::from_str(k), &v);
+        };
+        set("seconds", JsValue::from(number("data-timecode").unwrap_or(0.0)));
+        set("episodeId", JsValue::from(number("data-episode-id").unwrap_or(-1.0)));
+        set("episodeUrl", attr("data-episode-url").map(|u| JsValue::from_str(&u)).unwrap_or(JsValue::NULL));
+        set("episodeTitle", JsValue::from_str(&attr("data-episode-title").unwrap_or_default()));
+        set("episodeArtwork", JsValue::from_str(&attr("data-episode-artwork").unwrap_or_default()));
+        set("episodeDuration", JsValue::from(number("data-episode-duration").unwrap_or(0.0)));
+        set("isYoutube", JsValue::from(attr("data-is-youtube").as_deref() == Some("true")));
+        set("isVideo", JsValue::from(attr("data-is-video").as_deref() == Some("true")));
+        let init = web_sys::CustomEventInit::new();
+        init.set_detail(&detail);
+        init.set_bubbles(true);
+        init.set_cancelable(true);
+        if let Ok(event) = web_sys::CustomEvent::new_with_event_init_dict("timecode-click", &init) {
+            let _ = doc.dispatch_event(&event);
+        }
+    });
+    if document.add_event_listener_with_callback("click", on_click.as_ref().unchecked_ref()).is_ok() {
+        on_click.forget();
+    }
+}
+

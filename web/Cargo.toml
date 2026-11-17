@@ -54,6 +54,7 @@ web-sys = { version = "0.3.107", features = [
     "MouseEvent",
     "MouseEventInit",
     "CustomEvent",
+    "CustomEventInit",
     "IntersectionObserver",
     "IntersectionObserverInit",
     "IntersectionObserverEntry",

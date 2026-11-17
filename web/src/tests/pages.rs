@@ -431,3 +431,64 @@ fn feed_html_keeps_formatting_and_opens_links_in_new_tab() {
     assert!(clean.contains(r#"target="_blank""#));
     assert!(clean.contains("noopener"));
 }
+
+#[derive(Properties, PartialEq)]
+struct NotesProps {
+    html: String,
+}
+
+#[function_component(NotesHarness)]
+fn notes_harness(props: &NotesProps) -> Html {
+    let translations = HashMap::from([("en", include_str!("../translations/en.json"))]);
+    let config = I18nProviderConfig { translations, default_language: "en".to_string(), ..Default::default() };
+    html! {
+        <I18nProvider ..config>
+            <crate::components::safehtml::SafeHtml
+                html={props.html.clone()}
+                episode_id={Some(7)}
+                episode_url={Some("https://media.example.test/ep7.mp3".to_string())}
+                episode_title={Some("Episode Seven".to_string())}
+                episode_duration={Some(3600)} />
+        </I18nProvider>
+    }
+}
+
+/// Timestamps in show notes are clickable without inline script or eval (so the page can run
+/// under a strict Content-Security-Policy): no onclick attribute, and a click tells the player
+/// which episode and second to play.
+#[wasm_bindgen_test]
+async fn show_note_timestamps_work_without_inline_script() {
+    use std::{cell::RefCell, rc::Rc};
+    use wasm_bindgen::closure::Closure;
+    sign_in();
+    let document = web_sys::window().unwrap().document().unwrap();
+    let root = document.create_element("div").unwrap();
+    document.body().unwrap().append_child(&root).unwrap();
+    let app = yew::Renderer::<NotesHarness>::with_root_and_props(root.clone(), NotesProps { html: "<p>The good part starts at 1:30.</p>".into() })
+        .render();
+    TimeoutFuture::new(300).await;
+
+    let link = root.query_selector(".timecode-link").unwrap().expect("the timestamp is a link");
+    assert!(!link.has_attribute("onclick"), "no inline handler: {}", link.outer_html());
+
+    let seen: Rc<RefCell<Option<js_sys::Object>>> = Rc::new(RefCell::new(None));
+    let seen_in = seen.clone();
+    let listener = Closure::<dyn FnMut(web_sys::CustomEvent)>::new(move |e: web_sys::CustomEvent| {
+        *seen_in.borrow_mut() = e.detail().dyn_into::<js_sys::Object>().ok();
+    });
+    document.add_event_listener_with_callback("timecode-click", listener.as_ref().unchecked_ref()).unwrap();
+    link.dyn_ref::<web_sys::HtmlElement>().unwrap().click();
+    TimeoutFuture::new(50).await;
+    document.remove_event_listener_with_callback("timecode-click", listener.as_ref().unchecked_ref()).unwrap();
+
+    let detail = seen.borrow().clone().expect("clicking the timestamp asks the player to play it");
+    let get = |k: &str| js_sys::Reflect::get(&detail, &k.into()).unwrap();
+    assert_eq!(get("seconds").as_f64(), Some(90.0));
+    assert_eq!(get("episodeId").as_f64(), Some(7.0));
+    assert_eq!(get("episodeUrl").as_string().as_deref(), Some("https://media.example.test/ep7.mp3"));
+    assert_eq!(get("episodeTitle").as_string().as_deref(), Some("Episode Seven"));
+
+    app.destroy();
+    root.remove();
+    sign_out();
+}
