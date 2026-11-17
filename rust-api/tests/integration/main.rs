@@ -19,6 +19,7 @@ mod feeds;
 mod foreign_resources;
 mod gpodder;
 mod gpodder_server;
+mod image_proxy;
 mod in_app_notifications;
 mod library;
 mod migrations;
