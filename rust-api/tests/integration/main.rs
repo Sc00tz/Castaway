@@ -14,6 +14,7 @@ mod directory;
 mod downloads;
 mod email;
 mod feed_health;
+mod feed_corpus;
 mod feeds;
 mod foreign_resources;
 mod gpodder;

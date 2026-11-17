@@ -65,12 +65,15 @@ qrcode = "0.14.1"
 fernet = "0.2.2"
 
 # RSS/Feed Processing
-# Pinned: 3.0.0 drops an item's <enclosure> whenever it also has <media:content>, losing the audio URL.
-feed-rs = "=2.3.1"
+# Pinned to 2.4.0 (quick-xml 0.41, which fixes RUSTSEC-2026-0194/0195). Checked on 79 real feeds
+# (65,704 episodes, tests/integration/feed_corpus.rs): 2.4.0 stores exactly what 2.3.1 did. 3.0.0
+# doesn't: it replaces an item's <enclosure> with its <media:content> (1,328 episodes got another
+# audio address) and one feed failed to import at all.
+feed-rs = "=2.4.0"
 url = "2.5.8"
 regex = "1.13.1"
 # Sanitizes feed HTML (descriptions, show notes) before it's stored; same library as the web app.
-ammonia = "4.2.4"
+ammonia = "4.2.5"
 
 # Audio metadata tagging
 id3 = "1.17.2"

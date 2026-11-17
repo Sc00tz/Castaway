@@ -12,3 +12,8 @@ updates:
     directory: "/rust-api"
     schedule:
       interval: "weekly"
+    ignore:
+      # feed-rs 3.0.x changes which audio address episodes get and fails on some real feeds
+      # (see the comment on feed-rs in rust-api/Cargo.toml). A later 3.x is still proposed.
+      - dependency-name: "feed-rs"
+        versions: ["3.0.x"]
