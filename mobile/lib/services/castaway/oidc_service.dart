@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:castaway_mobile/l10n/L.dart';
+import 'package:castaway_mobile/l10n/app_localizations.dart';
 
 class OidcService {
   static const String userAgent = 'Castaway Mobile/1.0'; // i18n-ignore
@@ -168,7 +169,8 @@ class OidcService {
       if (queryParams.containsKey('error')) {
         return OidcCallbackResult.error(
           error: queryParams['error'] ?? L.current.unknown_error_occurred,
-          errorDescription: queryParams['error_description'],
+          // Castaway's server sends the provider's explanation as `description`.
+          errorDescription: queryParams['description'] ?? queryParams['error_description'],
         );
       }
       
@@ -413,3 +415,27 @@ class OidcAuthResult {
     );
   }
 }
+
+/// What a sign-in error code from the server means, in words. [description] is the login
+/// provider's own explanation, when the server passed one on.
+String oidcErrorMessage(AppLocalizations l, String? code, String? description) {
+  final message = switch (code) {
+    'provider_error' => l.oidc_error_provider_error,
+    'invalid_state' => l.oidc_error_invalid_state,
+    'internal_error' => l.oidc_error_internal_error,
+    'invalid_provider' => l.oidc_error_invalid_provider,
+    'token_exchange_failed' => l.oidc_error_token_exchange_failed,
+    'userinfo_failed' => l.oidc_error_userinfo_failed,
+    'email_required' => l.oidc_error_email_required,
+    'no_access' => l.oidc_error_no_access,
+    'user_creation_failed' => l.oidc_error_user_creation_failed,
+    'username_conflict' => l.oidc_error_username_conflict,
+    'email_not_verified' => l.oidc_error_email_not_verified,
+    'registration_disabled' => l.oidc_error_registration_disabled,
+    'account_linked_elsewhere' => l.oidc_error_account_linked_elsewhere,
+    _ => l.oidc_error_unknown(code ?? ''),
+  };
+  final detail = description?.trim() ?? '';
+  return detail.isEmpty ? message : l.oidc_error_with_detail(message, detail);
+}
+

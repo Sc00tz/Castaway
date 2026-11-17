@@ -75,6 +75,13 @@ pub fn oauth_callback() -> Html {
     let i18n_registration_disabled = i18n.t("oauth_callback.registration_disabled").to_string();
     let i18n_account_linked_elsewhere = i18n.t("oauth_callback.account_linked_elsewhere").to_string();
     let i18n_unexpected_error = i18n.t("oauth_callback.unexpected_error").to_string();
+    let i18n_provider_error = i18n.t("oauth_callback.provider_error").to_string();
+    let i18n_invalid_state = i18n.t("oauth_callback.invalid_state").to_string();
+    let i18n_internal_error = i18n.t("oauth_callback.internal_error").to_string();
+    let i18n_token_exchange_failed = i18n.t("oauth_callback.token_exchange_failed").to_string();
+    let i18n_userinfo_failed = i18n.t("oauth_callback.userinfo_failed").to_string();
+    let i18n_email_required = i18n.t("oauth_callback.email_required").to_string();
+    let i18n_user_creation_failed = i18n.t("oauth_callback.user_creation_failed").to_string();
     let i18n_no_auth_info = i18n
         .t("oauth_callback.no_authentication_information")
         .to_string();
@@ -237,6 +244,13 @@ pub fn oauth_callback() -> Html {
         let i18n_email_not_verified_effect = i18n_email_not_verified.clone();
         let i18n_registration_disabled_effect = i18n_registration_disabled.clone();
         let i18n_account_linked_elsewhere_effect = i18n_account_linked_elsewhere.clone();
+        let i18n_provider_error_effect = i18n_provider_error.clone();
+        let i18n_invalid_state_effect = i18n_invalid_state.clone();
+        let i18n_internal_error_effect = i18n_internal_error.clone();
+        let i18n_token_exchange_failed_effect = i18n_token_exchange_failed.clone();
+        let i18n_userinfo_failed_effect = i18n_userinfo_failed.clone();
+        let i18n_email_required_effect = i18n_email_required.clone();
+        let i18n_user_creation_failed_effect = i18n_user_creation_failed.clone();
         let i18n_unexpected_error_effect = i18n_unexpected_error.clone();
         let i18n_no_auth_info_effect = i18n_no_auth_info.clone();
 
@@ -253,6 +267,13 @@ pub fn oauth_callback() -> Html {
             let i18n_email_not_verified = i18n_email_not_verified_effect.clone();
             let i18n_registration_disabled = i18n_registration_disabled_effect.clone();
             let i18n_account_linked_elsewhere = i18n_account_linked_elsewhere_effect.clone();
+            let i18n_provider_error = i18n_provider_error_effect.clone();
+            let i18n_invalid_state = i18n_invalid_state_effect.clone();
+            let i18n_internal_error = i18n_internal_error_effect.clone();
+            let i18n_token_exchange_failed = i18n_token_exchange_failed_effect.clone();
+            let i18n_userinfo_failed = i18n_userinfo_failed_effect.clone();
+            let i18n_email_required = i18n_email_required_effect.clone();
+            let i18n_user_creation_failed = i18n_user_creation_failed_effect.clone();
             let i18n_unexpected_error = i18n_unexpected_error_effect.clone();
             let i18n_no_auth_info = i18n_no_auth_info_effect.clone();
 
@@ -422,6 +443,13 @@ pub fn oauth_callback() -> Html {
                         "email_not_verified" => i18n_email_not_verified.clone(),
                         "registration_disabled" => i18n_registration_disabled.clone(),
                         "account_linked_elsewhere" => i18n_account_linked_elsewhere.clone(),
+                        "provider_error" => i18n_provider_error.clone(),
+                        "invalid_state" => i18n_invalid_state.clone(),
+                        "internal_error" => i18n_internal_error.clone(),
+                        "token_exchange_failed" => i18n_token_exchange_failed.clone(),
+                        "userinfo_failed" => i18n_userinfo_failed.clone(),
+                        "email_required" => i18n_email_required.clone(),
+                        "user_creation_failed" => i18n_user_creation_failed.clone(),
                         _ => i18n_unexpected_error.clone(),
                     };
                     page_state.set(PageState::Error(error_message));

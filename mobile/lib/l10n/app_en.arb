@@ -2304,5 +2304,78 @@
   "download_waiting_short": "Waiting",
   "@download_waiting_short": {
     "description": "Short label under the download button while it waits for another download"
+  },
+  "oidc_error_provider_error": "Your login provider refused the sign-in.",
+  "@oidc_error_provider_error": {
+    "description": "Single sign-on error: The provider reported an error"
+  },
+  "oidc_error_invalid_state": "The sign-in expired or was started somewhere else. Please try again.",
+  "@oidc_error_invalid_state": {
+    "description": "Single sign-on error: State check failed"
+  },
+  "oidc_error_internal_error": "The server ran into a problem during sign-in. Please try again.",
+  "@oidc_error_internal_error": {
+    "description": "Single sign-on error: Server error"
+  },
+  "oidc_error_invalid_provider": "This login provider isn't set up on the server.",
+  "@oidc_error_invalid_provider": {
+    "description": "Single sign-on error: Unknown provider"
+  },
+  "oidc_error_token_exchange_failed": "The server couldn't finish signing in with your login provider. Ask an admin to check the provider settings.",
+  "@oidc_error_token_exchange_failed": {
+    "description": "Single sign-on error: Token exchange failed"
+  },
+  "oidc_error_userinfo_failed": "The server couldn't read your details from your login provider.",
+  "@oidc_error_userinfo_failed": {
+    "description": "Single sign-on error: User info failed"
+  },
+  "oidc_error_email_required": "Your login provider didn't share an email address, which this server needs.",
+  "@oidc_error_email_required": {
+    "description": "Single sign-on error: No email from provider"
+  },
+  "oidc_error_no_access": "Access denied. Your account at the login provider isn't allowed to use this server.",
+  "@oidc_error_no_access": {
+    "description": "Single sign-on error: Role check failed"
+  },
+  "oidc_error_user_creation_failed": "Your account couldn't be created. Ask an admin for help.",
+  "@oidc_error_user_creation_failed": {
+    "description": "Single sign-on error: Account creation failed"
+  },
+  "oidc_error_username_conflict": "Your account couldn't be created: that username is already taken.",
+  "@oidc_error_username_conflict": {
+    "description": "Single sign-on error: Username exists"
+  },
+  "oidc_error_email_not_verified": "Your login provider hasn't verified your email address, so it can't be linked to an existing account. Verify the address with your provider, or ask an admin for help.",
+  "@oidc_error_email_not_verified": {
+    "description": "Single sign-on error: Email not verified"
+  },
+  "oidc_error_registration_disabled": "This server doesn't create new accounts through single sign-on. Ask an admin to create your account first.",
+  "@oidc_error_registration_disabled": {
+    "description": "Single sign-on error: Registration disabled"
+  },
+  "oidc_error_account_linked_elsewhere": "The account with this email address is already linked to a different login at this provider.",
+  "@oidc_error_account_linked_elsewhere": {
+    "description": "Single sign-on error: Linked elsewhere"
+  },
+  "oidc_error_unknown": "Sign-in failed ({code}).",
+  "@oidc_error_unknown": {
+    "description": "Single sign-on error: Unrecognised error code",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "oidc_error_with_detail": "{message} ({detail})",
+  "@oidc_error_with_detail": {
+    "description": "Single sign-on error: A sign-in error followed by the provider's explanation",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      }
+    }
   }
 }
