@@ -16,10 +16,24 @@ const hms = (s) => [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].m
 const browser = await chromium.launch();
 const page = await browser.newPage();
 page.on("pageerror", (e) => console.log("page error:", e.message));
+// The server's Content-Security-Policy allows only script files from itself: anything the
+// web app needs that the policy blocks shows up here and fails the step.
+const violations = [];
+await page.exposeFunction("reportViolation", (v) => violations.push(v));
+await page.addInitScript(() =>
+  document.addEventListener("securitypolicyviolation", (e) =>
+    window.reportViolation(`${e.violatedDirective} blocked ${e.blockedURI || "inline"} ${e.sample || ""}`),
+  ),
+);
 const shot = async (name) => page.screenshot({ path: `real-flow-${name}.png`, fullPage: true }).catch(() => {});
 
 try {
-  await page.goto(server);
+  const response = await page.goto(server);
+  const csp = response.headers()["content-security-policy"] || "";
+  // scripts/ci-local runs this against the last published image, which may predate the policy.
+  if (process.env.CASTAWAY_EXPECT_CSP !== "0" && !csp.includes("script-src 'self'")) {
+    throw new Error(`the page has no script-src policy: "${csp}"`);
+  }
   if (mode === "setup") {
     // A new server asks for its first admin.
     // The first-run form sits over the login form; both have a "username" field.
@@ -56,6 +70,8 @@ try {
   } else {
     throw new Error(`unknown mode ${mode}`);
   }
+  if (violations.length) throw new Error(`Content-Security-Policy violations: ${violations.join("; ")}`);
+  console.log("web: no Content-Security-Policy violations");
 } catch (e) {
   await shot(mode);
   console.error(`web ${mode} failed: ${e.message}`);

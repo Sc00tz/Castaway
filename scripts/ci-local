@@ -334,8 +334,10 @@ def run_job(worktree, name, wf, job_id, job, matrix, events, log_dir):
             run_env["CARGO_TARGET_DIR"] = os.path.join(REPO, target, "target")
         if name == "docker.yml" and job_id == "real-flow":
             run_env["IMAGE"] = PUBLISHED_IMAGE
+            run_env["CASTAWAY_EXPECT_CSP"] = "0"
             script = script.replace("npx playwright install --with-deps chromium", "npx playwright install chromium")
-            note = f"ran against the published image {PUBLISHED_IMAGE}; GitHub runs it against the image it builds from your commit"
+            note = (f"ran against the published image {PUBLISHED_IMAGE} (its security header isn't checked: it may "
+                    "predate your change); GitHub runs it against the image it builds from your commit")
             if note not in result.notes:
                 result.notes.append(note)
         log.write(f"\n===== {step_name}\n$ {script}\n")
