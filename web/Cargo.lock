@@ -686,7 +686,7 @@ dependencies = [
  "gloo-render 0.3.0",
  "gloo-storage 0.4.0",
  "gloo-timers 0.4.0",
- "gloo-utils 0.3.0",
+ "gloo-utils 0.3.1",
  "gloo-worker 0.6.0",
 ]
 
@@ -709,7 +709,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8b39f7a21b04d982b709667625a20c7669890270ad77a40b74c0ad02bd61822"
 dependencies = [
- "gloo-utils 0.3.0",
+ "gloo-utils 0.3.1",
  "js-sys",
  "serde",
  "wasm-bindgen",
@@ -806,7 +806,7 @@ checksum = "f07f3d446931414cc92f4a1b6e631dfa233db2f96c887d5f72beeecd1b5db39c"
 dependencies = [
  "getrandom 0.2.17",
  "gloo-events 0.3.0",
- "gloo-utils 0.3.0",
+ "gloo-utils 0.3.1",
  "serde",
  "serde-wasm-bindgen",
  "serde_urlencoded",
@@ -845,7 +845,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-sink",
- "gloo-utils 0.3.0",
+ "gloo-utils 0.3.1",
  "http 1.5.0",
  "js-sys",
  "pin-project",
@@ -898,7 +898,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e82ce7d41c6d821640a43726f6ff33c924795cc151b62e5a84d0c988c151c980"
 dependencies = [
- "gloo-utils 0.3.0",
+ "gloo-utils 0.3.1",
  "js-sys",
  "serde",
  "serde_json",
@@ -946,9 +946,9 @@ dependencies = [
 
 [[package]]
 name = "gloo-utils"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4202275d95a142fa209a1e35e91c250a710c5600731372cd3464a39ed01573d6"
+checksum = "b49e445aecd7ad851e4a3704f370f53ae7b267ace62d17be3ec4fac5024eec0e"
 dependencies = [
  "js-sys",
  "serde",
@@ -2312,7 +2312,7 @@ dependencies = [
  "gloo-events 0.3.0",
  "gloo-net 0.7.0",
  "gloo-timers 0.4.0",
- "gloo-utils 0.3.0",
+ "gloo-utils 0.3.1",
  "htmlentity",
  "i18nrs",
  "js-sys",
