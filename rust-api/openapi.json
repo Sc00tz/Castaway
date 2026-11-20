@@ -16216,6 +16216,11 @@
           "play_count": {
             "type": "integer",
             "format": "int64"
+          },
+          "new_episode_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Episodes released in the last 7 days that the user hasn't started or\nfinished (the badge on the phone's Podcasts grid)."
           }
         }
       },
