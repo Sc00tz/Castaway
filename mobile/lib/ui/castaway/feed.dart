@@ -926,7 +926,7 @@ class _CastawayFeedState extends State<CastawayFeed> with WidgetsBindingObserver
       children: [
         SliverToBoxAdapter(
           child: SoftSectionHeader(
-            title: L.of(context)!.feed,
+            title: L.of(context)!.list_new_releases,
             trailing: [
               IconButton(
                 tooltip: L.of(context)!.refresh,

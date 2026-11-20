@@ -8,6 +8,9 @@ pub struct UserAutoComplete {
     pub auto_complete_seconds: i32,
 }
 
+/// The theme new accounts get, and the answer when an account has none stored.
+pub const DEFAULT_THEME: &str = "Castaway Dark";
+
 impl DatabasePool {
     // Get theme - matches Python get_theme function
     pub async fn get_theme(&self, user_id: i32) -> AppResult<String> {
@@ -19,8 +22,12 @@ impl DatabasePool {
                     .await?;
                 
                 match row {
-                    Some(row) => Ok(row.try_get("theme").unwrap_or_else(|_| "Nordic".to_string())),
-                    None => Ok("Nordic".to_string()),
+                    Some(row) => Ok(row
+                        .try_get::<Option<String>, _>("theme")
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| DEFAULT_THEME.to_string())),
+                    None => Ok(DEFAULT_THEME.to_string()),
                 }
             },
         })

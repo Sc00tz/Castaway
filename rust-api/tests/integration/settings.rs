@@ -13,6 +13,7 @@ async fn display_preferences_round_trip_and_stay_per_user() {
     let bob = app.user("bob").await;
     let theme = |u: &TestUser| app.get(&format!("/api/data/get_theme/{}", u.id)).key(u);
     let bob_theme = theme(&bob).send().await.ok_json();
+    assert_eq!(bob_theme["theme"], "Castaway Dark", "new accounts start on Castaway's own theme");
 
     app.put("/api/data/user/set_theme")
         .key(&alice)

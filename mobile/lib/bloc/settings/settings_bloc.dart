@@ -37,7 +37,6 @@ class SettingsBloc extends Bloc {
   final BehaviorSubject<int?> _castawayUserId = BehaviorSubject<int?>();
   final BehaviorSubject<String?> _castawayUsername = BehaviorSubject<String?>();
   final BehaviorSubject<String?> _castawayEmail = BehaviorSubject<String?>();
-  final BehaviorSubject<List<String>> _bottomBarOrder = BehaviorSubject<List<String>>();
   final BehaviorSubject<bool> _autoDownloadWifiOnly = BehaviorSubject<bool>();
   final BehaviorSubject<bool> _preferServerDownloadSource = BehaviorSubject<bool>();
   final BehaviorSubject<bool> _castawayUseGravatar = BehaviorSubject<bool>();
@@ -112,7 +111,6 @@ class SettingsBloc extends Bloc {
       castawayUserId: _settingsService.castawayUserId,
       castawayUsername: _settingsService.castawayUsername,
       castawayEmail: _settingsService.castawayEmail,
-      bottomBarOrder: _settingsService.bottomBarOrder,
       autoDownloadWifiOnly: _settingsService.autoDownloadWifiOnly,
       preferServerDownloadSource: _settingsService.preferServerDownloadSource,
       castawayUseGravatar: _settingsService.castawayUseGravatar,
@@ -263,12 +261,6 @@ class SettingsBloc extends Bloc {
       _settingsService.layoutMode = mode;
     });
 
-    _bottomBarOrder.listen((order) {
-      _currentSettings = _currentSettings.copyWith(bottomBarOrder: order);
-      _settings.add(_currentSettings);
-      _settingsService.bottomBarOrder = order;
-    });
-
     _autoDownloadWifiOnly.listen((value) {
       _currentSettings = _currentSettings.copyWith(autoDownloadWifiOnly: value);
       _settings.add(_currentSettings);
@@ -366,7 +358,6 @@ class SettingsBloc extends Bloc {
 
   void Function(String?) get setCastawayEmail => _castawayEmail.add;
 
-  void Function(List<String>) get setBottomBarOrder => _bottomBarOrder.add;
 
   void Function(bool) get setAutoDownloadWifiOnly => _autoDownloadWifiOnly.add;
 
@@ -464,7 +455,6 @@ class SettingsBloc extends Bloc {
     _castawayUserId.close();
     _castawayUsername.close();
     _castawayEmail.close();
-    _bottomBarOrder.close();
     _autoDownloadWifiOnly.close();
     _preferServerDownloadSource.close();
     _castawayUseGravatar.close();

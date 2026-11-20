@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
 import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/entities/app_settings.dart';
@@ -34,6 +35,10 @@ class CastawayEpisodeCard extends StatefulWidget {
   /// Optional widget before the artwork, e.g. a drag handle.
   final Widget? leading;
 
+  /// Flat row without artwork or podcast name (date, title, time, play), as
+  /// on a podcast's own page.
+  final bool compact;
+
   const CastawayEpisodeCard({
     Key? key,
     required this.episode,
@@ -43,6 +48,7 @@ class CastawayEpisodeCard extends StatefulWidget {
     this.isLocalDownload = false,
     this.margin = const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
     this.leading,
+    this.compact = false,
   }) : super(key: key);
 
   @override
@@ -244,6 +250,8 @@ class _CastawayEpisodeCardState extends State<CastawayEpisodeCard> {
       if (widget.episode.queued) Icon(PhosphorIconsRegular.queue, size: 14, color: Colors.blue[400]),
     ];
 
+    if (widget.compact) return _compactRow(accent, statusIcons, ringStyle);
+
     return Card(
       margin: widget.margin,
       child: InkWell(
@@ -321,6 +329,77 @@ class _CastawayEpisodeCardState extends State<CastawayEpisodeCard> {
                   valueColor: AlwaysStoppedAnimation<Color>(accent),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _compactRow(Color accent, List<Widget> statusIcons, bool ringStyle) {
+    final style = CastawayStyle.of(context);
+    final titleColour = _isCurrentEpisode ? readableOn(accent, style.background) : style.text;
+    return InkWell(
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 14, 12),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: style.divider))),
+        child: Row(
+          children: [
+            if (widget.leading != null) widget.leading!,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.episode.formattedPubDate.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 0.4, color: style.muted),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    widget.episode.episodeTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 15, height: 1.3, fontWeight: FontWeight.w600, color: titleColour),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (_showProgress && !ringStyle) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: SizedBox(
+                            width: 48,
+                            height: 4,
+                            child: LinearProgressIndicator(
+                              value: (_displayProgressPercentage / 100).clamp(0.0, 1.0),
+                              backgroundColor: style.surfaceHigh,
+                              valueColor: AlwaysStoppedAnimation<Color>(style.accent),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          _timeLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: style.muted),
+                        ),
+                      ),
+                      for (final icon in statusIcons) Padding(padding: const EdgeInsets.only(left: 6), child: icon),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (widget.onPlayPressed != null) ...[
+              const SizedBox(width: 10),
+              _playButton(accent),
+            ],
           ],
         ),
       ),

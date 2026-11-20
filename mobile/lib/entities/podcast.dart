@@ -88,6 +88,10 @@ class Podcast {
   /// (from the Castaway `isfavorite` column); not persisted to local disk.
   bool isFavorite;
 
+  /// Episodes from the last 7 days the user hasn't started or finished.
+  /// Server-derived (`new_episode_count`); not persisted to local disk.
+  int newEpisodeCount;
+
   Podcast({
     required this.guid,
     required this.url,
@@ -106,6 +110,7 @@ class Podcast {
     this.newEpisodes = false,
     this.persons,
     this.isFavorite = false,
+    this.newEpisodeCount = 0,
     DateTime? lastUpdated,
   }) {
     _lastUpdated = lastUpdated;

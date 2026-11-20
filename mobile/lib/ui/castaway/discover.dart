@@ -5,13 +5,16 @@
 // charts, so this works without a key. Matches the web app's Discover page.
 
 import 'package:flutter/material.dart';
+import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
+import 'package:castaway_mobile/ui/castaway/search.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
+import 'package:castaway_mobile/ui/widgets/lazy_network_image.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/entities/castaway_search.dart';
 import 'package:castaway_mobile/entities/discover.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
-import 'package:castaway_mobile/ui/widgets/podcast_result_card.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:sliver_tools/sliver_tools.dart';
@@ -166,29 +169,57 @@ class _CastawayDiscoverState extends State<CastawayDiscover> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
   }
 
-  Widget _card(UnifiedCastawayPodcast podcast) => PodcastResultCard(
-        podcast: podcast,
-        isAdded: _following.contains(podcast.url),
-        onToggle: () => _toggle(podcast),
-        onFollowChanged: (following) => _setFollowing(podcast, following),
-      );
+  void _openPodcast(UnifiedCastawayPodcast podcast) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => CastawayPodcastDetails(
+          podcast: podcast,
+          isFollowing: _following.contains(podcast.url),
+          onFollowChanged: (following) => _setFollowing(podcast, following),
+        ),
+      ),
+    );
+  }
+
+  void _openSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'castaway_search'),
+        builder: (context) => const CastawaySearch(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = L.of(context)!;
-    final theme = Theme.of(context);
-    final header = SliverToBoxAdapter(
-      child: SoftSectionHeader(
-        title: l.nav_discover,
-        trailing: [
-          IconButton(
-            tooltip: l.refresh,
-            icon: const Icon(PhosphorIconsRegular.arrowClockwise),
-            onPressed: _loading ? null : () => _load(refresh: true),
-          ),
-        ],
+    final style = CastawayStyle.of(context);
+    final header = MultiSliver(children: [
+      SliverToBoxAdapter(
+        child: TabHeader(
+          title: l.nav_discover,
+          actions: [
+            IconButton(
+              tooltip: l.refresh,
+              icon: const Icon(PhosphorIconsRegular.arrowClockwise),
+              onPressed: _loading ? null : () => _load(refresh: true),
+            ),
+          ],
+        ),
       ),
-    );
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+          child: SearchBoxButton(
+            key: const ValueKey('discover-search'),
+            hint: l.search_for_podcasts_hint,
+            onTap: _openSearch,
+          ),
+        ),
+      ),
+    ]);
 
     if (_loading) {
       return MultiSliver(children: [
@@ -214,27 +245,47 @@ class _CastawayDiscoverState extends State<CastawayDiscover> {
 
     return MultiSliver(children: [
       header,
-      // --- For You ---
-      SliverToBoxAdapter(child: _sectionTitle(l.discover_for_you, theme)),
+      // --- For You: one row of artwork per reason ---
+      SliverToBoxAdapter(child: _sectionTitle(l.discover_for_you, style)),
       if (_forYou.isEmpty)
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(l.discover_for_you_empty, style: TextStyle(color: theme.hintColor)),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(l.discover_for_you_empty, style: TextStyle(color: style.muted)),
           ),
         )
       else
         for (final (reason, podcasts) in _forYou) ...[
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text(reason, style: theme.textTheme.titleSmall?.copyWith(color: theme.hintColor)),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text(reason, style: TextStyle(fontSize: 13, color: style.muted)),
             ),
           ),
-          SliverList.list(children: [for (final p in podcasts.take(_perReason)) _card(p)]),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 172,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: podcasts.take(_perReason).length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final podcast = podcasts[index];
+                  return _DiscoverTile(
+                    podcast: podcast,
+                    following: _following.contains(podcast.url),
+                    onOpen: () => _openPodcast(podcast),
+                    onToggle: () => _toggle(podcast),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
         ],
-      // --- Trending ---
-      SliverToBoxAdapter(child: _sectionTitle(l.discover_trending, theme)),
+      // --- Trending: numbered list, filterable by category ---
+      SliverToBoxAdapter(child: _sectionTitle(l.discover_trending, style)),
       if (_categories.isNotEmpty) SliverToBoxAdapter(child: _categoryChips()),
       if (_trendingLoading)
         const SliverToBoxAdapter(
@@ -244,18 +295,34 @@ class _CastawayDiscoverState extends State<CastawayDiscover> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(32),
-            child: Text(l.discover_nothing_trending, textAlign: TextAlign.center, style: TextStyle(color: theme.hintColor)),
+            child: Text(l.discover_nothing_trending, textAlign: TextAlign.center, style: TextStyle(color: style.muted)),
           ),
         )
       else
-        SliverList.list(children: [for (final p in _trending) _card(p)]),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverList.list(children: [
+            for (final (i, p) in _trending.indexed)
+              _TrendingRow(
+                key: ValueKey('trending-${p.title}'),
+                rank: i + 1,
+                podcast: p,
+                following: _following.contains(p.url),
+                onOpen: () => _openPodcast(p),
+                onToggle: () => _toggle(p),
+              ),
+          ]),
+        ),
       const SliverToBoxAdapter(child: SizedBox(height: 16)),
     ]);
   }
 
-  Widget _sectionTitle(String text, ThemeData theme) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text(text, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+  Widget _sectionTitle(String text, CastawayStyle style) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+        child: Semantics(
+          header: true,
+          child: Text(text, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: style.text)),
+        ),
       );
 
   Widget _categoryChips() {
@@ -264,7 +331,7 @@ class _CastawayDiscoverState extends State<CastawayDiscover> {
       height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
         children: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -276,6 +343,182 @@ class _CastawayDiscoverState extends State<CastawayDiscover> {
               child: FilterPill(label: c.name, selected: _category == c.name, onTap: () => _selectCategory(c.name)),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// For You: artwork with a follow button on it, then the name and author.
+class _DiscoverTile extends StatelessWidget {
+  final UnifiedCastawayPodcast podcast;
+  final bool following;
+  final VoidCallback onOpen;
+  final VoidCallback onToggle;
+
+  const _DiscoverTile({required this.podcast, required this.following, required this.onOpen, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CastawayStyle.of(context);
+    return SizedBox(
+      width: 116,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              Semantics(
+                button: true,
+                label: podcast.title,
+                excludeSemantics: true,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: onOpen,
+                  child: LazyNetworkImage(
+                    imageUrl: podcast.artwork,
+                    width: 116,
+                    height: 116,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              Positioned(top: 4, right: 4, child: _FollowButton(following: following, onPressed: onToggle, size: 36, filled: true)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ExcludeSemantics(
+            child: Text(
+              podcast.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: style.text),
+            ),
+          ),
+          Text(
+            podcast.author,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: style.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Trending: rank, artwork, name and author, follow button.
+class _TrendingRow extends StatelessWidget {
+  final int rank;
+  final UnifiedCastawayPodcast podcast;
+  final bool following;
+  final VoidCallback onOpen;
+  final VoidCallback onToggle;
+
+  const _TrendingRow({
+    super.key,
+    required this.rank,
+    required this.podcast,
+    required this.following,
+    required this.onOpen,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CastawayStyle.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 26,
+              child: Text(
+                '$rank',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: style.muted),
+              ),
+            ),
+            const SizedBox(width: 10),
+            LazyNetworkImage(
+              imageUrl: podcast.artwork,
+              width: 54,
+              height: 54,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    podcast.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: style.text),
+                  ),
+                  if (podcast.author.isNotEmpty)
+                    Text(
+                      podcast.author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: style.muted),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _FollowButton(following: following, onPressed: onToggle),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Round follow button: a plus to follow, a check once followed.
+class _FollowButton extends StatelessWidget {
+  final bool following;
+  final VoidCallback onPressed;
+  final double size;
+
+  /// Solid background (drawn over artwork).
+  final bool filled;
+
+  const _FollowButton({required this.following, required this.onPressed, this.size = 44, this.filled = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CastawayStyle.of(context);
+    final l = L.of(context)!;
+    final Color bg = following ? style.accent : (filled ? castawayNavy : Colors.transparent);
+    final Color fg = following ? style.onAccent : (filled ? Colors.white : style.text);
+    return Tooltip(
+      message: following ? l.unfollow : l.follow,
+      child: Semantics(
+        button: true,
+        label: following ? l.unfollow : l.follow,
+        excludeSemantics: true,
+        child: InkResponse(
+          onTap: onPressed,
+          radius: size / 2 + 4,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+              border: following || filled ? null : Border.all(color: style.surfaceHigh, width: 2),
+            ),
+            child: Icon(
+              following ? PhosphorIconsBold.check : PhosphorIconsBold.plus,
+              size: size * 0.42,
+              color: fg,
+            ),
+          ),
+        ),
       ),
     );
   }

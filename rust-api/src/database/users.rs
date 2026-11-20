@@ -162,7 +162,7 @@ impl DatabasePool {
                        ON CONFLICT (userid) DO NOTHING"#
                 )
                 .bind(user_id)
-                .bind("Nordic")
+                .bind(super::user_settings::DEFAULT_THEME)
                 .execute(&mut *tx)
                 .await?;
                 
@@ -296,7 +296,7 @@ impl DatabasePool {
                 // Add user settings like Python version
                 q::query(r#"INSERT INTO "UserSettings" (userid, theme) VALUES ($1, $2)"#)
                     .bind(user_id)
-                    .bind("Nordic")
+                    .bind(super::user_settings::DEFAULT_THEME)
                     .execute(pool)
                     .await?;
 

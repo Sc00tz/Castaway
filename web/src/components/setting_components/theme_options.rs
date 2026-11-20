@@ -21,6 +21,8 @@ struct ThemeData {
 }
 
 const THEMES: &[ThemeData] = &[
+    ThemeData { name: "Castaway Dark",           bg: "#18273A", text: "#FFFFFF", swatch1: "#EE6747", swatch2: "#169DCA" },
+    ThemeData { name: "Castaway Light",          bg: "#FBF8F4", text: "#18273A", swatch1: "#EE6747", swatch2: "#127EA2" },
     ThemeData { name: "Light",                  bg: "#F9F9F9", text: "#4A4A4A", swatch1: "#0099E1", swatch2: "#4A4A4A" },
     ThemeData { name: "Soft Lavender",           bg: "#F5F0FF", text: "#50456E", swatch1: "#9371D9", swatch2: "#50456E" },
     ThemeData { name: "Minty Fresh",             bg: "#F1F9F6", text: "#2D6E5B", swatch1: "#3D9D82", swatch2: "#2D6E5B" },
@@ -252,15 +254,15 @@ pub fn theme(props: &ThemeOptionsProps) -> Html {
             let prev = (*custom_themes).clone();
             custom_themes.set(prev.iter().filter(|t| t.themeid != theme_id).cloned().collect());
 
-            // If this was the active theme, switch to Nordic
+            // If this was the active theme, switch to the default (Castaway Dark)
             if *selected_theme == theme_name {
-                changeTheme("Nordic");
+                changeTheme("Castaway Dark");
                 if let Some(window) = web_sys::window() {
                     if let Ok(Some(storage)) = window.local_storage() {
-                        let _ = storage.set_item("selected_theme", "Nordic");
+                        let _ = storage.set_item("selected_theme", "Castaway Dark");
                     }
                 }
-                selected_theme.set("Nordic".to_string());
+                selected_theme.set("Castaway Dark".to_string());
             }
 
             if let (Some(api_key), Some(user_id), Some(server_name)) = (
@@ -490,6 +492,50 @@ fn custom_theme_card(
     export function changeTheme(theme) {
         const root = document.documentElement;
         switch (theme) {
+            case 'Castaway Dark':
+                root.style.setProperty('--background-color', '#18273a');
+                root.style.setProperty('--button-color', '#263a54');
+                root.style.setProperty('--container-button-color', 'transparent');
+                root.style.setProperty('--button-text-color', '#ffffff');
+                root.style.setProperty('--text-color', '#ffffff');
+                root.style.setProperty('--text-secondary-color', '#a9b8c9');
+                root.style.setProperty('--border-color', '#0f1a28');
+                root.style.setProperty('--accent-color', '#6f86a3');
+                root.style.setProperty('--prog-bar-color', '#ee6747');
+                root.style.setProperty('--error-color', '#ff8a7a');
+                root.style.setProperty('--bonus-color', '#0f1a28');
+                root.style.setProperty('--secondary-background', '#213349');
+                root.style.setProperty('--container-background', '#1c2d42');
+                root.style.setProperty('--standout-color', '#169dca');
+                root.style.setProperty('--hover-color', '#169dca');
+                root.style.setProperty('--link-color', '#4fb8dd');
+                root.style.setProperty('--thumb-color', '#ee6747');
+                root.style.setProperty('--unfilled-color', '#3a5170');
+                root.style.setProperty('--check-box-color', '#ffffff');
+                break;
+
+            case 'Castaway Light':
+                root.style.setProperty('--background-color', '#fbf8f4');
+                root.style.setProperty('--button-color', '#e7d8c5');
+                root.style.setProperty('--container-button-color', 'transparent');
+                root.style.setProperty('--button-text-color', '#18273a');
+                root.style.setProperty('--text-color', '#18273a');
+                root.style.setProperty('--text-secondary-color', '#4f6077');
+                root.style.setProperty('--border-color', '#d9cbb8');
+                root.style.setProperty('--accent-color', '#9a8b78');
+                root.style.setProperty('--prog-bar-color', '#ee6747');
+                root.style.setProperty('--error-color', '#b3261e');
+                root.style.setProperty('--bonus-color', '#169dca');
+                root.style.setProperty('--secondary-background', '#f2ebe2');
+                root.style.setProperty('--container-background', '#ece2d5');
+                root.style.setProperty('--standout-color', '#127ea2');
+                root.style.setProperty('--hover-color', '#127ea2');
+                root.style.setProperty('--link-color', '#127ea2');
+                root.style.setProperty('--thumb-color', '#ee6747');
+                root.style.setProperty('--unfilled-color', '#d9cbb8');
+                root.style.setProperty('--check-box-color', '#18273a');
+                break;
+
             case 'Light':
                 root.style.setProperty('--background-color', '#f9f9f9');
                 root.style.setProperty('--button-color', '#0099e1');

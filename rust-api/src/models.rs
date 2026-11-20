@@ -132,6 +132,10 @@ pub struct PodcastResponse {
     pub oldest_episode_date: Option<String>,
     pub newest_episode_date: Option<String>,
     pub play_count: i64,
+    /// Episodes released in the last 7 days that the user hasn't started or
+    /// finished (the badge on the phone's Podcasts grid).
+    #[serde(default)]
+    pub new_episode_count: i64,
 }
 
 // Lean per-subscription inputs for the recommendation taste profile (#103). Deliberately

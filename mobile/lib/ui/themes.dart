@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+final ThemeData _castawayDarkTheme = _buildCastawayTheme(dark: true);
+final ThemeData _castawayLightTheme = _buildCastawayTheme(dark: false);
 final ThemeData _lightTheme = _buildLightTheme();
 final ThemeData _darkTheme = _buildDarkTheme();
 final ThemeData _nordTheme = _buildNordTheme();
@@ -48,7 +50,24 @@ class ThemeDefinition {
 }
 
 class ThemeRegistry {
+  /// What new installs use, and the answer for a name this app doesn't know.
+  static const String defaultKey = 'Castaway Dark';
+
   static final Map<String, ThemeDefinition> _themes = {
+    'Castaway Dark': ThemeDefinition(
+      key: 'Castaway Dark',
+      name: 'Castaway Dark',
+      description: 'Navy with Castaway blue and orange',
+      themeData: _castawayDarkTheme,
+      isDark: true,
+    ),
+    'Castaway Light': ThemeDefinition(
+      key: 'Castaway Light',
+      name: 'Castaway Light',
+      description: 'Warm light background with navy text',
+      themeData: _castawayLightTheme,
+      isDark: false,
+    ),
     'Light': ThemeDefinition(
       key: 'Light',
       name: 'Light',
@@ -232,14 +251,14 @@ class ThemeRegistry {
   
   /// Maps a stored or server-provided theme name to a registry key. Names can
   /// differ in case or be unknown here (e.g. web custom themes); unknown names
-  /// fall back to Dark.
+  /// fall back to [defaultKey].
   static String normalizeKey(String key) {
     if (_themes.containsKey(key)) return key;
     final lower = key.toLowerCase();
     for (final candidate in _themes.keys) {
       if (candidate.toLowerCase() == lower) return candidate;
     }
-    return 'Dark';
+    return defaultKey;
   }
 
   static ThemeDefinition getTheme(String key) {
@@ -255,6 +274,106 @@ class ThemeRegistry {
   static bool isValidTheme(String key) {
     return _themes.containsKey(key);
   }
+}
+
+/// Castaway's own palette, light and dark (brand: blue #169dca, orange
+/// #ee6747, navy #18273a, sand #e7d8c5). Text colours meet WCAG AA.
+ThemeData _buildCastawayTheme({required bool dark}) {
+  const navy = Color(0xff18273a);
+  const blue = Color(0xff169dca);
+  const orange = Color(0xffee6747);
+
+  final base = dark ? ThemeData.dark(useMaterial3: false) : ThemeData.light(useMaterial3: false);
+  final bg = dark ? navy : const Color(0xfffbf8f4);
+  final surface = dark ? const Color(0xff213349) : const Color(0xfff2ebe2);
+  final raised = dark ? const Color(0xff263a54) : const Color(0xffe7d8c5);
+  final text = dark ? Colors.white : navy;
+  final muted = dark ? const Color(0xffa9b8c9) : const Color(0xff4f6077);
+  // Blue as text: brand blue on navy (4.8:1), the darker #127ea2 on light.
+  final link = dark ? const Color(0xff4fb8dd) : const Color(0xff127ea2);
+  final divider = dark ? const Color(0xff2f4562) : const Color(0xffe2d6c6);
+  final typography = Typography.material2021(platform: TargetPlatform.android);
+  final textTheme = (dark ? typography.white : typography.black).apply(bodyColor: text, displayColor: text);
+  final overlay = (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+    systemNavigationBarColor: bg,
+    systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+  );
+
+  return base.copyWith(
+    colorScheme: (dark ? const ColorScheme.dark() : const ColorScheme.light()).copyWith(
+      primary: dark ? blue : link,
+      onPrimary: dark ? navy : Colors.white,
+      secondary: orange,
+      onSecondary: navy,
+      surface: surface,
+      onSurface: text,
+      error: dark ? const Color(0xffff8a7a) : const Color(0xffb3261e),
+      primaryContainer: raised,
+      onPrimaryContainer: text,
+      surfaceContainerHighest: raised,
+    ),
+    brightness: dark ? Brightness.dark : Brightness.light,
+    primaryColor: dark ? blue : link,
+    primaryColorLight: raised,
+    primaryColorDark: navy,
+    canvasColor: bg,
+    scaffoldBackgroundColor: bg,
+    cardColor: surface,
+    dividerColor: divider,
+    highlightColor: text.withOpacity(0.06),
+    splashColor: text.withOpacity(0.10),
+    unselectedWidgetColor: muted,
+    disabledColor: text.withOpacity(0.38),
+    secondaryHeaderColor: surface,
+    dialogBackgroundColor: surface,
+    indicatorColor: orange,
+    hintColor: muted,
+    textTheme: textTheme,
+    primaryTextTheme: textTheme,
+    iconTheme: base.iconTheme.copyWith(color: text),
+    primaryIconTheme: IconThemeData(color: text),
+    dividerTheme: base.dividerTheme.copyWith(color: divider),
+    bottomAppBarTheme: const BottomAppBarThemeData().copyWith(color: bg),
+    cardTheme: const CardThemeData().copyWith(color: surface, shadowColor: Colors.black26),
+    appBarTheme: base.appBarTheme.copyWith(
+      backgroundColor: bg,
+      foregroundColor: text,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      systemOverlayStyle: overlay,
+    ),
+    sliderTheme: const SliderThemeData().copyWith(
+      activeTrackColor: orange,
+      thumbColor: orange,
+      inactiveTrackColor: raised,
+      valueIndicatorColor: orange,
+      trackHeight: 3.0,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.0, disabledThumbRadius: 7.0),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: orange, linearTrackColor: raised),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? orange : null),
+      trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? orange.withOpacity(0.45) : null),
+    ),
+    snackBarTheme: base.snackBarTheme.copyWith(actionTextColor: dark ? orange : const Color(0xffffb4a3)),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: link)),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(backgroundColor: orange, foregroundColor: navy),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(backgroundColor: orange, foregroundColor: navy),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: text, side: BorderSide(color: raised, width: 1.5)),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(backgroundColor: orange, foregroundColor: navy),
+    bottomSheetTheme: base.bottomSheetTheme.copyWith(backgroundColor: surface, modalBackgroundColor: surface),
+    popupMenuTheme: base.popupMenuTheme.copyWith(color: surface),
+    dialogTheme: base.dialogTheme.copyWith(backgroundColor: surface),
+  );
 }
 
 ThemeData _buildLightTheme() {

@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
-import 'package:castaway_mobile/bloc/ui/pager_bloc.dart';
 import 'package:castaway_mobile/services/network/connectivity_service.dart';
 import 'package:castaway_mobile/services/podcast/podcast_service.dart';
 import 'package:castaway_mobile/ui/utils/local_download_utils.dart';
@@ -15,12 +14,7 @@ import 'package:castaway_mobile/services/offline/offline_action_queue.dart';
 import 'package:castaway_mobile/entities/home_data.dart';
 import 'package:castaway_mobile/entities/castaway_episode.dart';
 import 'package:castaway_mobile/entities/episode.dart';
-import 'package:castaway_mobile/ui/castaway/feed.dart';
-import 'package:castaway_mobile/ui/castaway/saved.dart';
-import 'package:castaway_mobile/ui/castaway/downloads.dart';
-import 'package:castaway_mobile/ui/castaway/queue.dart';
-import 'package:castaway_mobile/ui/castaway/history.dart';
-import 'package:castaway_mobile/ui/castaway/playlists.dart';
+import 'package:castaway_mobile/ui/castaway/lists.dart';
 import 'package:castaway_mobile/ui/castaway/playlist_episodes.dart';
 import 'package:castaway_mobile/ui/castaway/episode_details.dart';
 import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
@@ -36,7 +30,6 @@ import 'package:castaway_mobile/services/auto_download/mirror_download_service.d
 import 'package:castaway_mobile/services/auto_download/download_cleanup_service.dart';
 import 'package:castaway_mobile/ui/widgets/castaway_episode_card.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 import 'package:castaway_mobile/ui/widgets/lazy_network_image.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
@@ -251,13 +244,6 @@ class _CastawayHomeState extends State<CastawayHome> with WidgetsBindingObserver
         _castawayService.getPlaylists(settings.castawayUserId!),
       ]);
 
-      // TEMP-SCREENSHOT-HOOK
-      final _tmp = (futures[0] as HomeOverview).inProgressEpisodes;
-      if (_tmp.isNotEmpty && const String.fromEnvironment('SHOT_EP').isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => Navigator.push(context, MaterialPageRoute(
-            builder: (context) => CastawayEpisodeDetails(initialEpisode: _tmp[int.parse(const String.fromEnvironment('SHOT_EP'))].toCastawayEpisode()))));
-      }
-      // END-TEMP-SCREENSHOT-HOOK
       final homeData = await _withPendingPositions(futures[0] as HomeOverview);
       if (!mounted) return;
       setState(() {
@@ -668,18 +654,8 @@ class _CastawayHomeState extends State<CastawayHome> with WidgetsBindingObserver
     }
   }
 
-  /// Switch the bottom-nav selection to the Downloads tab (the full offline
-  /// library). No-op if the user has removed Downloads from their tab bar.
-  void _goToDownloads() {
-    final pager = Provider.of<PagerBloc>(context, listen: false);
-    final order = Provider.of<SettingsBloc>(context, listen: false)
-        .currentSettings
-        .bottomBarOrder;
-    final idx = order.indexOf('Downloads');
-    if (idx >= 0) {
-      pager.changePage(idx);
-    }
-  }
+  /// Open the Downloads list (the full offline library).
+  void _goToDownloads() => openListPage(context, CastawayListPage.downloads);
 
   Future<void> _playLocalDownload(Episode episode) async {
     final audioService = GlobalServices.castawayAudioService;

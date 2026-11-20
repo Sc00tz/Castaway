@@ -448,7 +448,7 @@ impl DatabasePool {
                 // Add default user settings
                 q::query(r#"INSERT INTO "UserSettings" (userid, theme) VALUES ($1, $2)"#)
                     .bind(user_id)
-                    .bind("Nordic")
+                    .bind(super::user_settings::DEFAULT_THEME)
                     .execute(pool)
                     .await?;
 

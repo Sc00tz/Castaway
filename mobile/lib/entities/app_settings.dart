@@ -4,19 +4,6 @@
 
 import 'package:castaway_mobile/entities/search_providers.dart';
 
-/// Every bottom-bar page, in the default order.
-/// These are page ids, not display text; see bottomNavLabel.
-const List<String> defaultBottomBarOrder = [
-  'Home', 'Feed', 'Saved', 'Podcasts', 'Discover', 'People', 'Downloads', 'History', 'Playlists', 'Search', // i18n-ignore
-];
-
-/// A saved bar order made usable: pages it doesn't know are dropped, and pages
-/// added since it was saved are appended, so updates don't hide new tabs.
-List<String> normalizeBottomBarOrder(List<String> saved) {
-  final known = saved.where(defaultBottomBarOrder.contains).toSet().toList();
-  return [...known, ...defaultBottomBarOrder.where((p) => !known.contains(p))];
-}
-
 class AppSettings {
   /// The current theme name.
   final String theme;
@@ -76,8 +63,6 @@ class AppSettings {
 
   final String? castawayEmail;
 
-  /// Custom order for bottom navigation bar items
-  final List<String> bottomBarOrder;
 
   /// Only run automatic downloads while connected to WiFi/ethernet.
   final bool autoDownloadWifiOnly;
@@ -129,7 +114,6 @@ class AppSettings {
     this.castawayUserId,
     this.castawayUsername,
     this.castawayEmail,
-    required this.bottomBarOrder,
     this.autoDownloadWifiOnly = true,
     this.preferServerDownloadSource = true,
     this.castawayUseGravatar = false,
@@ -142,7 +126,7 @@ class AppSettings {
   });
 
   AppSettings.sensibleDefaults()
-      : theme = 'Dark', // i18n-ignore
+      : theme = 'Castaway Dark', // i18n-ignore
         markDeletedEpisodesAsPlayed = false,
         deleteDownloadedPlayedEpisodes = false,
         storeDownloadsSDCard = false,
@@ -157,13 +141,12 @@ class AppSettings {
         volumeBoost = false,
         fastForwardInterval = 30,
         rewindInterval = 10,
-        layout = 0,
+        layout = 2,
         castawayServer = null,
         castawayApiKey = null,
         castawayUserId = null,
         castawayUsername = null,
         castawayEmail = null,
-        bottomBarOrder = defaultBottomBarOrder,
         autoDownloadWifiOnly = true,
         preferServerDownloadSource = true,
         castawayUseGravatar = false,
@@ -196,7 +179,6 @@ class AppSettings {
     int? castawayUserId,
     String? castawayUsername,
     String? castawayEmail,
-    List<String>? bottomBarOrder,
     bool? autoDownloadWifiOnly,
     bool? preferServerDownloadSource,
     bool? castawayUseGravatar,
@@ -229,7 +211,6 @@ class AppSettings {
         castawayUserId: castawayUserId ?? this.castawayUserId,
         castawayUsername: castawayUsername ?? this.castawayUsername,
         castawayEmail: castawayEmail ?? this.castawayEmail,
-        bottomBarOrder: bottomBarOrder ?? this.bottomBarOrder,
         autoDownloadWifiOnly: autoDownloadWifiOnly ?? this.autoDownloadWifiOnly,
         preferServerDownloadSource: preferServerDownloadSource ?? this.preferServerDownloadSource,
         castawayUseGravatar: castawayUseGravatar ?? this.castawayUseGravatar,

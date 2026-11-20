@@ -1,5 +1,6 @@
 // lib/ui/podcast/castaway_up_next_view.dart
 import 'package:flutter/material.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/entities/castaway_episode.dart';
 import 'package:castaway_mobile/services/global_services.dart';
@@ -291,33 +292,24 @@ class _CastawayUpNextViewState extends State<CastawayUpNextView> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Header with title and clear button
-        Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 24.0, 8.0),
-              child: Text(
-                L.of(context)!.up_next_queue_label,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 0.0, 24.0, 8.0),
-              child: TextButton(
-                onPressed: _queuedEpisodes.isEmpty ? null : _clearQueue,
+        // Episode count and Clear queue (the sheet's tab names the list).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
                 child: Text(
-                  L.of(context)!.clear,
-                  style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                        fontSize: 12.0,
-                        color: _queuedEpisodes.isEmpty
-                            ? Theme.of(context).disabledColor
-                            : Theme.of(context).primaryColor,
-                      ),
+                  _isLoading ? '' : L.of(context)!.episodes_count(_queuedEpisodes.length),
+                  style: TextStyle(fontSize: 13, color: CastawayStyle.of(context).muted),
                 ),
               ),
-            ),
-          ],
+              TextButton(
+                onPressed: _queuedEpisodes.isEmpty ? null : _clearQueue,
+                style: TextButton.styleFrom(foregroundColor: CastawayStyle.of(context).accentText),
+                child: Text(L.of(context)!.clear_queue, style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
         ),
 
         // Content area

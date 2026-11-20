@@ -15,6 +15,9 @@ import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:castaway_mobile/ui/widgets/server_error_page.dart';
 import 'package:castaway_mobile/services/error_handling_service.dart';
 import 'package:flutter/material.dart';
+import 'package:castaway_mobile/ui/castaway/episode_search.dart';
+import 'package:castaway_mobile/ui/podcast/remote_devices_button.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sliver_tools/sliver_tools.dart';
@@ -263,10 +266,26 @@ class _CastawayPodcastsState extends State<CastawayPodcasts> {
   List<Widget> _buildHeaderSlivers() {
     return [
       SliverToBoxAdapter(
-        child: SoftSectionHeader(
+        child: TabHeader(
           title: L.of(context)!.podcasts,
-          count: _filteredPodcasts?.length,
-          trailing: [
+          actions: [
+            // Only takes space once another device is online.
+            const RemoteDevicesButton(hideWhenEmpty: true),
+            IconButton(
+              key: const ValueKey('podcasts-episode-search'),
+              tooltip: L.of(context)!.search_episodes,
+              icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  settings: const RouteSettings(name: 'episode-search'),
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(title: Text(L.of(context)!.search_episodes)),
+                    body: const CustomScrollView(slivers: [EpisodeSearchPage()]),
+                  ),
+                ),
+              ),
+            ),
             IconButton(
               tooltip: L.of(context)!.layout_label,
               icon: const Icon(PhosphorIconsRegular.squaresFour),
@@ -328,7 +347,7 @@ class _CastawayPodcastsState extends State<CastawayPodcasts> {
     }
 
     var mode = settings.layout;
-    var size = mode == 1 ? 100.0 : 160.0;
+    var size = mode == 1 ? 96.0 : 130.0;
 
     if (mode == 0) {
       // List view
@@ -343,18 +362,21 @@ class _CastawayPodcastsState extends State<CastawayPodcasts> {
       );
     }
 
-    // Grid view
-    return SliverGrid(
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: size,
-        mainAxisSpacing: 10.0,
-        crossAxisSpacing: 10.0,
-      ),
-      delegate: SliverChildBuilderDelegate(
-        (BuildContext context, int index) {
-          return CastawayPodcastGridTile(podcast: podcasts[index]);
-        },
-        childCount: podcasts.length,
+    // Grid view: three across on a phone (four in the compact grid).
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: size,
+          mainAxisSpacing: 12.0,
+          crossAxisSpacing: 12.0,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (BuildContext context, int index) {
+            return CastawayPodcastGridTile(podcast: podcasts[index]);
+          },
+          childCount: podcasts.length,
+        ),
       ),
     );
   }
