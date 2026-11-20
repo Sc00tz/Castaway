@@ -1383,6 +1383,22 @@ pub fn login() -> Html {
                                         let startpage_history = history.clone();
 
                                         wasm_bindgen_futures::spawn_local(async move {
+                                            // Apply the account's theme (the first-login path
+                                            // skipped this, so a new account kept the built-in colours).
+                                            if let Ok(theme) = call_get_theme(
+                                                startpage_server.clone(),
+                                                startpage_api.clone(),
+                                                &startpage_user_id,
+                                            )
+                                            .await
+                                            {
+                                                crate::components::setting_components::theme_options::changeTheme(&theme);
+                                                if let Some(window) = web_sys::window() {
+                                                    if let Ok(Some(storage)) = window.local_storage() {
+                                                        let _ = storage.set_item("selected_theme", &theme);
+                                                    }
+                                                }
+                                            }
                                             // Try to get the user's configured start page
                                             match call_get_startpage(
                                                 &startpage_server,
