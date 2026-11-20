@@ -136,7 +136,7 @@ class MobileSettingsService extends SettingsService {
   }
 
   String get theme {
-    return _sharedPreferences.getString('theme') ?? 'Dark';
+    return _sharedPreferences.getString('theme') ?? 'Castaway Dark'; // i18n-ignore (ThemeRegistry.defaultKey)
   }
 
   set theme(String value) {
@@ -273,22 +273,7 @@ class MobileSettingsService extends SettingsService {
 
   @override
   int get layoutMode {
-    return _sharedPreferences.getInt('layout') ?? 0;
-  }
-
-  @override
-  List<String> get bottomBarOrder {
-    final orderString = _sharedPreferences.getString('bottom_bar_order');
-    if (orderString != null) {
-      return normalizeBottomBarOrder(orderString.split(','));
-    }
-    return defaultBottomBarOrder;
-  }
-
-  @override
-  set bottomBarOrder(List<String> value) {
-    _sharedPreferences.setString('bottom_bar_order', value.join(','));
-    settingsNotifier.sink.add('bottom_bar_order');
+    return _sharedPreferences.getInt('layout') ?? 2; // grid (2026-11 redesign)
   }
 
   @override

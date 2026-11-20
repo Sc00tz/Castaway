@@ -175,3 +175,49 @@ async fn an_older_pinepods_database_is_refused() {
     assert_eq!(tables, 0, "nothing is recorded");
     db.drop().await;
 }
+
+#[tokio::test]
+async fn accounts_on_the_old_default_theme_move_to_castaway_dark() {
+    let db = ScratchDb::new("theme").await;
+    sqlx::raw_sql(BASELINE).execute(&db.pool).await.unwrap();
+    // One account left on the inherited default, one that chose another theme.
+    sqlx::raw_sql(
+        r#"CREATE TABLE schema_migrations (version VARCHAR(10) PRIMARY KEY, name TEXT, checksum VARCHAR(64));
+           INSERT INTO schema_migrations (version, name, checksum) VALUES ('118', 'y', 'y');
+           INSERT INTO "Users" (fullname, username, email, hashed_pw, isadmin) VALUES
+             ('Kept Default', 'kept', 'k@b.c', 'x', TRUE), ('Chose Dracula', 'chose', 'c@b.c', 'x', FALSE);
+           INSERT INTO "UserSettings" (userid, theme) SELECT userid, 'Nordic' FROM "Users" WHERE username = 'kept';
+           INSERT INTO "UserSettings" (userid, theme) SELECT userid, 'Dracula' FROM "Users" WHERE username = 'chose';"#,
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+
+    castaway_api::database::migrate::run(&db.pool).await.unwrap();
+    let theme = |name: &'static str| {
+        let pool = db.pool.clone();
+        async move {
+            let t: String = sqlx::query_scalar(
+                r#"SELECT s.theme FROM "UserSettings" s JOIN "Users" u ON u.userid = s.userid WHERE u.username = $1"#,
+            )
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            t
+        }
+    };
+    assert_eq!(theme("kept").await, "Castaway Dark");
+    assert_eq!(theme("chose").await, "Dracula", "a theme someone picked is kept");
+
+    // A settings row created without a theme gets the new default.
+    sqlx::raw_sql(
+        r#"INSERT INTO "Users" (fullname, username, email, hashed_pw, isadmin) VALUES ('New', 'new', 'n@b.c', 'x', FALSE);
+           INSERT INTO "UserSettings" (userid) SELECT userid FROM "Users" WHERE username = 'new';"#,
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(theme("new").await, "Castaway Dark");
+    db.drop().await;
+}

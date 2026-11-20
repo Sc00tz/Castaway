@@ -1174,9 +1174,6 @@
   "play_button_tinted": "Tinted",
   "artwork_colours": "Artwork colours",
   "artwork_colours_description": "Tint episode cards with a colour from each podcast's artwork",
-  "settings_navigation": "Navigation",
-  "reorganize_bottom_bar": "Reorganize Bottom Bar",
-  "reorganize_bottom_bar_description": "Customize the order of bottom navigation items",
   "fast_forward_interval": "Fast-forward interval",
   "rewind_interval": "Rewind interval",
   "download_management": "Download Management",
@@ -1684,17 +1681,6 @@
   "add_to_queue_position_description": "Where Add to Queue puts an episode. The arrow beside it picks the other end.",
   "queue_bottom": "Bottom",
   "queue_top": "Top",
-  "bottom_bar_order_description": "Drag to reorder. The first {count} appear in the bottom bar; the rest are under More (everything shows when the screen is wide enough).",
-  "@bottom_bar_order_description": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "bottom_bar_order_saved": "Bottom bar order saved!",
-  "in_bottom_bar": "In bottom bar",
-  "under_more": "Under More",
   "reset_to_default": "Reset to Default",
   "delete_server_downloads_when_finished_description": "Remove an episode's server download about an hour after you finish it. With server auto-download, the server keeps only what you haven't heard.",
   "delete_server_downloads_when_finished": "Delete server downloads when finished",
@@ -1795,7 +1781,6 @@
   "server_unavailable": "Server Unavailable",
   "error_details": "Error Details",
   "troubleshooting_tips": "Troubleshooting Tips",
-  "reorder_tabs": "Reorder tabs",
   "episode_filter": "Episode Filter",
   "could_not_follow": "Could not follow",
   "could_not_unfollow": "Could not unfollow",
@@ -2377,5 +2362,22 @@
         "type": "String"
       }
     }
-  }
+  },
+  "nav_lists": "Lists",
+  "nav_profile": "Profile",
+  "list_new_releases": "New Releases",
+  "list_in_progress": "In Progress",
+  "your_playlists": "Your playlists",
+  "new_playlist": "New playlist",
+  "chapter_x_of_y": "Chapter {current} of {total}",
+  "@chapter_x_of_y": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "list_unavailable": "Couldn’t load this list. Try again in a moment.",
+  "add_podcast_by_address": "Add a podcast by feed address",
+  "mini_player_failed": "Couldn’t play this episode · tap ↻ to retry",
+  "podcast_new_episodes_semantics": "{title}, {count} new",
+  "@podcast_new_episodes_semantics": {"placeholders": {"title": {"type": "String"}, "count": {"type": "int"}}},
+  "website_label": "Website",
+  "episodes_played_summary": "{played} played",
+  "@episodes_played_summary": {"placeholders": {"played": {"type": "int"}}},
+  "subscribed": "Subscribed"
 }

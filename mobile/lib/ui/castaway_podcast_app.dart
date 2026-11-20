@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:castaway_mobile/ui/podcast/remote_devices_button.dart';
 import 'package:castaway_mobile/api/podcast/mobile_podcast_api.dart';
 import 'package:castaway_mobile/api/podcast/podcast_api.dart';
 import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
@@ -14,7 +13,6 @@ import 'package:castaway_mobile/bloc/podcast/queue_bloc.dart';
 import 'package:castaway_mobile/bloc/search/search_bloc.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/bloc/ui/pager_bloc.dart';
-import 'package:castaway_mobile/core/environment.dart';
 import 'package:castaway_mobile/entities/app_settings.dart';
 import 'package:castaway_mobile/entities/feed.dart';
 import 'package:castaway_mobile/entities/podcast.dart';
@@ -44,50 +42,28 @@ import 'package:castaway_mobile/services/castaway/login_service.dart';
 import 'package:castaway_mobile/services/auth_notifier.dart';
 import 'package:castaway_mobile/services/carplay/carplay_service.dart';
 import 'package:castaway_mobile/services/settings/mobile_settings_service.dart';
-import 'package:castaway_mobile/ui/library/downloads.dart';
-import 'package:castaway_mobile/ui/library/library.dart';
 import 'package:castaway_mobile/ui/podcast/mini_player.dart';
 import 'package:castaway_mobile/ui/podcast/podcast_details.dart';
 import 'package:castaway_mobile/ui/tab_navigator.dart';
-import 'package:castaway_mobile/ui/search/search.dart';
-import 'package:castaway_mobile/ui/castaway/people/followed_people.dart';
-import 'package:castaway_mobile/ui/castaway/search.dart';
-import 'package:castaway_mobile/ui/settings/settings.dart';
 import 'package:castaway_mobile/ui/themes.dart';
-import 'package:castaway_mobile/ui/widgets/action_text.dart';
-import 'package:castaway_mobile/ui/widgets/layout_selector.dart';
 import 'package:castaway_mobile/ui/widgets/castaway_bottom_nav.dart';
-import 'package:castaway_mobile/ui/widgets/search_slide_route.dart';
-import 'package:castaway_mobile/ui/castaway/home.dart';
-import 'package:castaway_mobile/ui/castaway/feed.dart';
-import 'package:castaway_mobile/ui/castaway/saved.dart';
-import 'package:castaway_mobile/ui/castaway/queue.dart';
-import 'package:castaway_mobile/ui/castaway/history.dart';
-import 'package:castaway_mobile/ui/castaway/playlists.dart';
 import 'package:castaway_mobile/ui/auth/auth_wrapper.dart';
-import 'package:castaway_mobile/ui/castaway/user_stats.dart';
 import 'package:castaway_mobile/ui/castaway/podcasts.dart';
-import 'package:castaway_mobile/ui/castaway/episode_search.dart';
 import 'package:castaway_mobile/ui/castaway/discover.dart';
-import 'package:castaway_mobile/ui/castaway/podcast_details.dart';
-import 'package:castaway_mobile/entities/castaway_search.dart';
+import 'package:castaway_mobile/ui/castaway/lists.dart';
+import 'package:castaway_mobile/ui/castaway/profile.dart';
 import 'package:castaway_mobile/services/castaway/castaway_service.dart';
 import 'package:castaway_mobile/services/podcast/mobile_podcast_service.dart';
 import 'package:castaway_mobile/api/podcast/mobile_podcast_api.dart';
 import 'package:app_links/app_links.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dialogs/flutter_dialogs.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:castaway_mobile/services/auto_download/download_cleanup_service.dart';
 import 'package:castaway_mobile/services/global_services.dart';
-import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
 
 var theme = Themes.lightTheme().themeData;
 
@@ -403,15 +379,14 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
     });
   }
 
-  /// Switch the bottom-nav selection to the Downloads tab, if the user has it
-  /// enabled. No-op when Downloads has been removed from [bottomBarOrder].
+  /// Open Lists > Downloads so on-device episodes are browsable offline.
   void _openDownloadsTab() {
-    final pager = Provider.of<PagerBloc>(context, listen: false);
-    final order = Provider.of<SettingsBloc>(context, listen: false).currentSettings.bottomBarOrder;
-    final idx = order.indexOf('Downloads');
-    if (idx >= 0) {
-      pager.changePage(idx);
-    }
+    Provider.of<PagerBloc>(context, listen: false).changePage(CastawayTab.lists.index);
+    // After the tab switch has popped the tab's pages (see didChangeDependencies).
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      final navContext = _tabNavigatorKey.currentContext;
+      if (navContext != null) openListPage(navContext, CastawayListPage.downloads);
+    });
   }
 
   /// We listen to external links from outside the app. For example, someone may navigate
@@ -701,7 +676,6 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
   @override
   Widget build(BuildContext context) {
     final pager = Provider.of<PagerBloc>(context);
-    final searchBloc = Provider.of<EpisodeBloc>(context);
     final backgroundColour = Theme.of(context).scaffoldBackgroundColor;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -721,110 +695,20 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
                 settings: settings,
                 builder: (context) => CustomScrollView(
                   slivers: <Widget>[
-                    SliverVisibility(
-                      visible: widget.topBarVisible,
-                      sliver: SliverAppBar(
-                        title: ExcludeSemantics(child: TitleWidget()),
-                        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                        floating: false,
-                        pinned: true,
-                        snap: false,
-                        actions: <Widget>[
-                          // Only takes space once another device is online.
-                          const RemoteDevicesButton(hideWhenEmpty: true),
-                          IconButton(
-                            tooltip: L.of(context)!.queue,
-                            icon: const Icon(PhosphorIconsRegular.queue),
-                            onPressed: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute<void>(
-                                  fullscreenDialog: false,
-                                  settings: const RouteSettings(name: 'queue'),
-                                  builder: (context) => Scaffold(
-                                    appBar: AppBar(title: Text(L.of(context)!.queue)),
-                                    body: const CustomScrollView(slivers: [CastawayQueue()]),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            tooltip: L.of(context)!.search_for_podcasts_hint,
-                            icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                            onPressed: () async {
-                              await Navigator.push(
-                                context,
-                                defaultTargetPlatform == TargetPlatform.iOS
-                                    ? MaterialPageRoute<void>(
-                                        fullscreenDialog: false,
-                                        settings: const RouteSettings(name: 'castaway_search'),
-                                        builder: (context) => const CastawaySearch(),
-                                      )
-                                    : SlideRightRoute(
-                                        widget: const CastawaySearch(),
-                                        settings: const RouteSettings(name: 'castaway_search'),
-                                      ),
-                              );
-                            },
-                          ),
-                          PopupMenuButton<String>(
-                            onSelected: _menuSelect,
-                            icon: const Icon(PhosphorIconsRegular.dotsThreeVertical),
-                            itemBuilder: (BuildContext context) {
-                              return <PopupMenuEntry<String>>[
-                                if (feedbackUrl.isNotEmpty)
-                                  PopupMenuItem<String>(
-                                    textStyle: Theme.of(context).textTheme.titleMedium,
-                                    value: 'feedback',
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        const Padding(
-                                          padding: EdgeInsets.only(right: 8.0),
-                                          child: Icon(PhosphorIconsRegular.chatCircleText, size: 18.0),
-                                        ),
-                                        Text(L.of(context)!.feedback_menu_item_label),
-                                      ],
-                                    ),
-                                  ),
-                                PopupMenuItem<String>(
-                                  textStyle: Theme.of(context).textTheme.titleMedium,
-                                  value: 'rss',
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      const Padding(
-                                        padding: EdgeInsets.only(right: 8.0),
-                                        child: Icon(PhosphorIconsRegular.rss, size: 18.0),
-                                      ),
-                                      Text(L.of(context)!.add_rss_feed_option),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  textStyle: Theme.of(context).textTheme.titleMedium,
-                                  value: 'settings',
-                                  child: Row(
-                                    children: [
-                                      const Padding(
-                                        padding: EdgeInsets.only(right: 8.0),
-                                        child: Icon(PhosphorIconsFill.gear, size: 18.0),
-                                      ),
-                                      Text(L.of(context)!.settings_label),
-                                    ],
-                                  ),
-                                ),
-                              ];
-                            },
-                          ),
-                        ],
+                    // Each tab draws its own title; a solid strip keeps content
+                    // from scrolling under the status bar.
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _StatusBarStrip(
+                        height: MediaQuery.paddingOf(context).top,
+                        // From this context, so a theme change repaints it.
+                        color: Theme.of(context).scaffoldBackgroundColor,
                       ),
                     ),
                     StreamBuilder<int>(
                       stream: pager.currentPage,
                       builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-                        return _fragment(snapshot.data, searchBloc);
+                        return _fragment(snapshot.data);
                       },
                     ),
                   ],
@@ -862,13 +746,9 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
                 stream: pager.currentPage,
                 initialData: 0,
                 builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-                  return StreamBuilder<AppSettings>(
-                    stream: Provider.of<SettingsBloc>(context).settings,
-                    builder: (context, settingsSnapshot) => CastawayBottomNav(
-                      order: settingsSnapshot.data?.bottomBarOrder ?? defaultBottomBarOrder,
-                      selectedIndex: snapshot.data ?? 0,
-                      onSelect: pager.changePage,
-                    ),
+                  return CastawayBottomNav(
+                    selectedIndex: snapshot.data ?? 0,
+                    onSelect: pager.changePage,
                   );
                 },
               ),
@@ -879,192 +759,38 @@ class _CastawayHomePageState extends State<CastawayHomePage> with WidgetsBinding
     );
   }
 
-  Widget _fragment(int? index, EpisodeBloc searchBloc) {
-    final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
-    final bottomBarOrder = settingsBloc.currentSettings.bottomBarOrder;
-
-    if (index == null || index < 0 || index >= bottomBarOrder.length) {
-      return const CastawayHome(); // Default to Home
-    }
-
-    final pageLabel = bottomBarOrder[index];
-
-    switch (pageLabel) {
-      case 'Home':
-        return const CastawayHome();
-      case 'Feed':
-        return const CastawayFeed();
-      case 'Saved':
-        return const CastawaySaved();
-      case 'Podcasts':
-        return const CastawayPodcasts();
-      case 'People':
-        return const CastawayPeople();
-      case 'Downloads':
-        return const Downloads();
-      case 'History':
-        return const CastawayHistory();
-      case 'Playlists':
-        return const CastawayPlaylists();
-      case 'Search':
-        return const EpisodeSearchPage();
-      case 'Discover':
-        return const CastawayDiscover();
-      default:
-        return const CastawayHome(); // Default to Home
-    }
+  Widget _fragment(int? index) {
+    final tab = index != null && index >= 0 && index < CastawayTab.values.length
+        ? CastawayTab.values[index]
+        : CastawayTab.podcasts;
+    return switch (tab) {
+      CastawayTab.podcasts => const CastawayPodcasts(),
+      CastawayTab.lists => const CastawayLists(),
+      CastawayTab.discover => const CastawayDiscover(),
+      CastawayTab.profile => const CastawayProfile(),
+    };
   }
+}
 
-  void _menuSelect(String choice) async {
-    var textFieldController = TextEditingController();
-    var podcastBloc = Provider.of<PodcastBloc>(context, listen: false);
-    final theme = Theme.of(context);
-    var url = '';
+/// Background behind the status bar on the tab pages.
+class _StatusBarStrip extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Color color;
 
-    switch (choice) {
-      case 'settings':
-        await Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            fullscreenDialog: true,
-            settings: const RouteSettings(name: 'settings'),
-            builder: (context) => const Settings(),
-          ),
-        );
-        break;
-      case 'feedback':
-        _launchFeedback();
-        break;
-      case 'rss':
-        await showPlatformDialog<void>(
-          context: context,
-          useRootNavigator: false,
-          builder: (_) => BasicDialogAlert(
-            title: Text(L.of(context)!.add_rss_feed_option),
-            content: Material(
-              color: Colors.transparent,
-              child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    url = value;
-                  });
-                },
-                controller: textFieldController,
-                decoration: const InputDecoration(hintText: 'https://'),
-              ),
-            ),
-            actions: <Widget>[
-              BasicDialogAction(
-                title: ActionText(L.of(context)!.cancel_button_label),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-              BasicDialogAction(
-                title: ActionText(L.of(context)!.ok_button_label),
-                iosIsDefaultAction: true,
-                onPressed: () async {
-                  Navigator.of(context).pop(); // Close the dialog first
+  _StatusBarStrip({required this.height, required this.color});
 
-                  // Show loading indicator
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(child: CircularProgressIndicator()),
-                  );
+  @override
+  double get minExtent => height;
 
-                  try {
-                    await _handleRssUrl(url);
-                  } catch (e) {
-                    if (mounted) {
-                      Navigator.of(context).pop(); // Close loading dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(L.of(context)!.failed_to_load_podcast(e.toString())), backgroundColor: Colors.red),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-        );
-        break;
-    }
-  }
+  @override
+  double get maxExtent => height;
 
-  Future<void> _handleRssUrl(String url) async {
-    try {
-      // Get services
-      final podcastApi = MobilePodcastApi();
-      final castawayService = CastawayService();
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      SizedBox(height: height, child: ColoredBox(color: color));
 
-      // Load podcast feed from RSS
-      final podcast = await podcastApi.loadFeed(url);
-
-      // Create UnifiedCastawayPodcast from the loaded feed
-      final unifiedPodcast = UnifiedCastawayPodcast(
-        id: 0,
-        indexId: 0,
-        title: podcast.title ?? L.current.unknown_podcast,
-        url: url,
-        originalUrl: url,
-        link: podcast.link ?? url,
-        description: podcast.description ?? '',
-        author: podcast.copyright ?? '',
-        ownerName: podcast.copyright ?? '',
-        image: podcast.image ?? '',
-        artwork: podcast.image ?? '',
-        lastUpdateTime: 0,
-        categories: null,
-        explicit: false,
-        episodeCount: podcast.episodes?.length ?? 0,
-      );
-
-      // Check if podcast is already followed
-      bool isFollowing = false;
-      final settingsBloc = Provider.of<SettingsBloc>(context, listen: false);
-      final settings = settingsBloc.currentSettings;
-      final userId = settings.castawayUserId;
-
-      if (userId != null) {
-        try {
-          isFollowing = await castawayService.checkPodcastExists(podcast.title ?? L.current.unknown_podcast, url, userId);
-        } catch (e) {
-          print('Failed to check if podcast exists: $e');
-        }
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading dialog
-
-        // Navigate to podcast details page
-        Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            settings: const RouteSettings(name: 'castawaypodcastdetails'),
-            builder: (context) => CastawayPodcastDetails(
-              podcast: unifiedPodcast,
-              isFollowing: isFollowing,
-              onFollowChanged: (following) {
-                // Handle follow state change if needed
-              },
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  void _launchFeedback() async {
-    final uri = Uri.parse(feedbackUrl);
-
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw Exception('Could not launch $uri');
-    }
-  }
-
+  @override
+  bool shouldRebuild(_StatusBarStrip old) => old.height != height || old.color != color;
 }
 
 /// Tracks whether the tab navigator is showing its root page. Dialogs and
@@ -1088,100 +814,4 @@ class _TabDepthObserver extends NavigatorObserver {
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) => _update(route, -1);
-}
-
-class TitleWidget extends StatelessWidget {
-  TitleWidget({super.key});
-
-  String _generateGravatarUrl(String email, {int size = 40}) {
-    final hash = md5.convert(utf8.encode(email.toLowerCase().trim())).toString();
-    return 'https://www.gravatar.com/avatar/$hash?s=$size&d=identicon';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<SettingsBloc>(
-      builder: (context, settingsBloc, child) {
-        final settings = settingsBloc.currentSettings;
-        final username = settings.castawayUsername;
-        final email = settings.castawayUseGravatar ? settings.castawayEmail : null;
-
-        if (username == null || username.isEmpty) {
-          // Fallback to Castaway logo if no user is logged in - make it clickable
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const CastawayUserStats()));
-            },
-            child: Padding(
-              padding: const EdgeInsets.only(left: 2.0),
-              child: Row(
-                children: <Widget>[
-                  Image.asset('assets/images/castaway-logo.png', width: 26, height: 26),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Castaway', // i18n-ignore
-                    style: TextStyle(
-                      color: Color(0xFF169DCA), // Castaway blue
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'MontserratRegular',
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const CastawayUserStats()));
-          },
-          child: Padding(
-            padding: const EdgeInsets.only(left: 2.0),
-            child: Row(
-              children: [
-                // User Avatar
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.grey[300],
-                  child: email != null && email.isNotEmpty
-                      ? ClipOval(
-                          child: Image.network(
-                            _generateGravatarUrl(email),
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Image.asset(
-                                'assets/images/castaway-logo.png',
-                                width: 36,
-                                height: 36,
-                                fit: BoxFit.cover,
-                              );
-                            },
-                          ),
-                        )
-                      : Image.asset('assets/images/castaway-logo.png', width: 36, height: 36, fit: BoxFit.cover),
-                ),
-                const SizedBox(width: 12),
-                // Username
-                Flexible(
-                  child: Text(
-                    username,
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.light ? Colors.black : Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

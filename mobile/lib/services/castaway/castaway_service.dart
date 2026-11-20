@@ -200,6 +200,7 @@ class CastawayService {
               copyright: podData['author'] ?? '',
               guid: podData['feedurl'] ?? '',
               isFavorite: podData['is_favorite'] ?? false,
+              newEpisodeCount: (podData['new_episode_count'] as num?)?.toInt() ?? 0,
               // Empty episodes list - episodes are loaded separately when needed
               episodes: [],
               // Store episode count for display (if Podcast model supports it)
@@ -270,6 +271,7 @@ class CastawayService {
               copyright: podData['author'] ?? '',
               guid: podData['feedurl'] ?? '',
               isFavorite: podData['is_favorite'] ?? false,
+              newEpisodeCount: (podData['new_episode_count'] as num?)?.toInt() ?? 0,
               episodes: [],
             ),
           );

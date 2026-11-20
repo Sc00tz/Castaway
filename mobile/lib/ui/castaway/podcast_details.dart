@@ -30,6 +30,8 @@ import 'package:castaway_mobile/ui/utils/artwork_colors.dart';
 import 'package:castaway_mobile/ui/utils/local_download_utils.dart';
 import 'package:castaway_mobile/ui/widgets/lazy_network_image.dart';
 import 'package:castaway_mobile/ui/widgets/soft_ui.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:castaway_mobile/ui/icons/phosphor_icons.dart';
@@ -1960,147 +1962,175 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with Li
   }
 
   Widget _buildHeader(ThemeData theme, Color accent, Color headerTint, Color bg) {
-    final muted = theme.hintColor;
-    final count = _episodes.isNotEmpty ? _episodes.length : _podcast.episodeCount;
-    final meta = [
-      if (count > 0) _isYoutube ? L.of(context)!.videos_count(count) : L.of(context)!.episodes_count(count),
-      if (_podcast.explicit) L.of(context)!.explicit,
-    ].join('  ·  ');
+    final style = CastawayStyle.of(context);
+    final l = L.of(context)!;
+    final website = _podcast.link.trim();
+    final hasWebsite = website.startsWith('http') && website != _podcast.url;
+    final categories = (_podcast.categories?.values ?? const <String>[])
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .take(2)
+        .toList();
+    final metaStyle = TextStyle(fontSize: 13, color: style.muted);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [headerTint, bg],
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 18, offset: const Offset(0, 6)),
-                    ],
-                  ),
-                  child: LazyNetworkImage(
-                    imageUrl: _podcast.artwork,
-                    width: 116,
-                    height: 116,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Coloured band: artwork, title, author and the follow controls.
+        Container(
+          color: headerTint,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 24, offset: const Offset(0, 10)),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _podcast.title,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleLarge!.copyWith(fontWeight: FontWeight.bold, height: 1.2),
-                      ),
-                      if (_podcast.author.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          _podcast.author,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall!.copyWith(color: accent, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                      if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(meta, style: theme.textTheme.bodySmall!.copyWith(color: muted, fontSize: 12.5)),
-                      ],
-                    ],
+                child: LazyNetworkImage(
+                  imageUrl: _podcast.artwork,
+                  width: 148,
+                  height: 148,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _podcast.title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, color: style.text),
+              ),
+              if (_podcast.author.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _podcast.author,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: readableOn(accent, headerTint),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            _buildActionRow(theme, accent),
-            if (_podcast.description.isNotEmpty) ...[
               const SizedBox(height: 14),
-              _ExpandableDescription(description: _podcast.description, accent: accent),
+              _buildActionRow(theme, accent),
             ],
-            if (_credits.people.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              PeopleStrip(title: L.of(context)!.hosts, people: _credits.people),
-            ],
-            if (_credits.guests.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              PeopleStrip(title: L.of(context)!.guests, people: _credits.guests, showEpisodeCount: true),
-            ],
-          ],
+          ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (categories.isNotEmpty || hasWebsite || _podcast.explicit)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final (i, c) in categories.indexed) ...[
+                      if (i > 0) Text('·', style: metaStyle),
+                      Text(c, style: metaStyle),
+                    ],
+                    if (_podcast.explicit) ...[
+                      if (categories.isNotEmpty) Text('·', style: metaStyle),
+                      Text(l.explicit, style: metaStyle),
+                    ],
+                    if (hasWebsite) ...[
+                      if (categories.isNotEmpty || _podcast.explicit) Text('·', style: metaStyle),
+                      InkWell(
+                        onTap: () => launchUrl(Uri.parse(website), mode: LaunchMode.externalApplication),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            l.website_label,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: style.link),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              if (_podcast.description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _ExpandableDescription(description: _podcast.description, accent: style.link),
+              ],
+              if (_credits.people.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                PeopleStrip(title: l.hosts, people: _credits.people),
+              ],
+              if (_credits.guests.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                PeopleStrip(title: l.guests, people: _credits.guests, showEpisodeCount: true),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
+  /// Follow (or Following), favourite and the options menu, centred under the
+  /// title.
   Widget _buildActionRow(ThemeData theme, Color accent) {
-    final onAccent = onColor(accent);
-    final pillStyle = FilledButton.styleFrom(
-      backgroundColor: accent,
-      foregroundColor: onAccent,
-      disabledBackgroundColor: accent.withOpacity(0.5),
-      disabledForegroundColor: onAccent.withOpacity(0.7),
-      shape: const StadiumBorder(),
-      minimumSize: const Size(0, 46),
-      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    final style = CastawayStyle.of(context);
+    final l = L.of(context)!;
+    final followLabel = _isYoutube
+        ? (_isFollowing ? l.subscribed : l.subscribe)
+        : (_isFollowing ? l.following : l.follow);
+    final spinner = SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(strokeWidth: 2.2, color: _isFollowing ? style.text : style.onAccent),
     );
 
-    final Widget primary;
-    if (!_isFollowing) {
-      primary = FilledButton.icon(
-        style: pillStyle,
-        onPressed: _isFollowButtonLoading ? null : _toggleFollow,
-        icon: _isFollowButtonLoading
-            ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: onAccent))
-            : const Icon(PhosphorIconsBold.plus, size: 18),
-        label: Text(_isYoutube ? L.of(context)!.subscribe : L.of(context)!.follow),
-      );
-    } else {
-      final latest = _latestUnplayed;
-      final starting = latest != null && _pendingEpisode == latest;
-      primary = FilledButton.icon(
-        style: pillStyle,
-        onPressed: latest == null || starting ? null : () => _playEpisode(latest),
-        icon: starting
-            ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: onAccent))
-            : const Icon(PhosphorIconsFill.play, size: 18),
-        label: Text(latest != null && latest.isStarted ? L.of(context)!.resume_latest : L.of(context)!.play_latest),
-      );
-    }
+    final Widget follow = _isFollowing
+        ? OutlinedButton.icon(
+            key: const ValueKey('podcast-follow'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: style.text,
+              side: BorderSide(color: style.text, width: 2),
+              shape: const StadiumBorder(),
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            onPressed: _isFollowButtonLoading ? null : _toggleFollow,
+            icon: _isFollowButtonLoading ? spinner : const Icon(PhosphorIconsBold.check, size: 18),
+            label: Text(followLabel),
+          )
+        : FilledButton.icon(
+            key: const ValueKey('podcast-follow'),
+            style: FilledButton.styleFrom(
+              backgroundColor: style.accent,
+              foregroundColor: style.onAccent,
+              shape: const StadiumBorder(),
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            onPressed: _isFollowButtonLoading ? null : _toggleFollow,
+            icon: _isFollowButtonLoading ? spinner : const Icon(PhosphorIconsBold.plus, size: 18),
+            label: Text(followLabel),
+          );
 
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Expanded(child: primary),
-        if (_isFollowing) ...[
-          const SizedBox(width: 10),
-          CircleAction(
-            tooltip: _isYoutube ? L.of(context)!.unsubscribe : L.of(context)!.unfollow,
-            icon: _isFollowButtonLoading
-                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: accent))
-                : Icon(PhosphorIconsBold.check, color: accent, size: 20),
-            onTap: _isFollowButtonLoading ? null : _toggleFollow,
-          ),
-        ],
+        Flexible(child: follow),
         if (_podcast.id > 0) ...[
           const SizedBox(width: 10),
           CircleAction(
-            tooltip: _isFavorite ? L.of(context)!.remove_from_favorites : L.of(context)!.add_to_favorites,
+            tooltip: _isFavorite ? l.remove_from_favorites : l.add_to_favorites,
             icon: Icon(
               _isFavorite ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
-              color: _isFavorite ? Colors.amber : softNeutral(theme).withOpacity(0.8),
+              color: _isFavorite ? const Color(0xffee6747) : style.text,
               size: 20,
             ),
             onTap: _isFavoriteLoading ? null : _toggleFavorite,
@@ -2141,9 +2171,22 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with Li
           case 'youtube':
             _showYouTubeSettingsSheet();
             break;
+          case 'play_latest':
+            final latest = _latestUnplayed;
+            if (latest != null) _playEpisode(latest);
+            break;
         }
       },
       itemBuilder: (context) => [
+        if (_isFollowing && _latestUnplayed != null)
+          PopupMenuItem<String>(
+            value: 'play_latest',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(PhosphorIconsRegular.play),
+              title: Text(_latestUnplayed!.isStarted ? L.of(context)!.resume_latest : L.of(context)!.play_latest),
+            ),
+          ),
         if (_isFollowing && _podcast.id > 0) ...[
           PopupMenuItem<String>(
             value: 'device_downloads',
@@ -2215,7 +2258,7 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with Li
       ],
       child: CircleAction(
         tooltip: null,
-        icon: Icon(PhosphorIconsBold.dotsThree, color: softNeutral(theme).withOpacity(0.8), size: 20),
+        icon: Icon(PhosphorIconsBold.dotsThree, color: CastawayStyle.of(context).text, size: 20),
         onTap: null,
       ),
     );
@@ -2261,8 +2304,19 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with Li
       ];
     }
 
+    final played = _episodes.where((e) => e.completed).length;
+    final countLine = [
+      _isYoutube ? L.of(context)!.videos_count(_episodes.length) : L.of(context)!.episodes_count(_episodes.length),
+      if (played > 0) L.of(context)!.episodes_played_summary(played),
+    ].join(' · ');
     return [
       ListToolbar.sliver(context, _buildEpisodeToolbar(accent)),
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 2, 20, 4),
+          child: Text(countLine, style: TextStyle(fontSize: 13, color: CastawayStyle.of(context).muted)),
+        ),
+      ),
       if (_filteredEpisodes.isEmpty)
         message(
           PhosphorIconsRegular.magnifyingGlassMinus,
@@ -2362,6 +2416,7 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with Li
             final ticked = _selected.contains(episode.episodeId);
             return CastawayEpisodeCard(
               episode: episode,
+              compact: true,
               leading: Padding(
                 padding: const EdgeInsets.only(right: 10),
                 child: Icon(
@@ -2376,6 +2431,7 @@ class _CastawayPodcastDetailsState extends State<CastawayPodcastDetails> with Li
 
           return CastawayEpisodeCard(
             episode: episode,
+            compact: true,
             onTap: _isFollowing && hasServerId
                 ? () {
                     Navigator.push(

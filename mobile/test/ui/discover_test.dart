@@ -63,6 +63,7 @@ void main() {
     expect(find.text('Trending'), findsOneWidget);
     expect(find.text('The Ezra Klein Show'), findsOneWidget);
     expect(find.text('Society & Culture'), findsOneWidget, reason: 'category chips');
+    expect(find.text('1'), findsWidgets, reason: 'trending is numbered');
   });
 
   testWidgets('a category chip shows that category\'s trending shows', (tester) async {
@@ -77,7 +78,7 @@ void main() {
   testWidgets('the follow button subscribes to the show', (tester) async {
     when(() => service.addPodcast(any(), any())).thenAnswer((_) async => true);
     await open(tester);
-    final card = find.ancestor(of: find.text('The Ezra Klein Show'), matching: find.byType(Card));
+    final card = find.byKey(const ValueKey('trending-The Ezra Klein Show'));
     await tester.tap(find.descendant(of: card, matching: find.byTooltip('Follow')));
     await tester.pumpAndSettle();
     final added = verify(() => service.addPodcast(captureAny(), 2)).captured.single as UnifiedCastawayPodcast;

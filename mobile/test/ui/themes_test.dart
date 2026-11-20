@@ -12,8 +12,13 @@ void main() {
       expect(ThemeRegistry.normalizeKey('NORDIC'), 'Nordic');
     });
 
-    test('falls back to Dark for unknown names', () {
-      expect(ThemeRegistry.normalizeKey('My Custom Theme'), 'Dark');
+    test('falls back to Castaway Dark for unknown names', () {
+      expect(ThemeRegistry.normalizeKey('My Custom Theme'), 'Castaway Dark');
+    });
+
+    test('Castaway Dark and Castaway Light are listed first, and the web\'s names match', () {
+      expect(ThemeRegistry.themeKeys.take(2), ['Castaway Dark', 'Castaway Light']);
+      expect(ThemeRegistry.normalizeKey('castaway dark'), 'Castaway Dark');
     });
 
     test('always yields exactly one dropdown item', () {

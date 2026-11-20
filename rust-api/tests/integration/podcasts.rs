@@ -456,3 +456,43 @@ async fn show_notes_are_sanitized_before_they_are_stored() {
         assert!(!episode.contains(bad), "{bad} was stored: {episode}");
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn podcast_list_counts_new_episodes_not_yet_played() {
+    // The phone's Podcasts grid badge: episodes from the last 7 days that the
+    // user hasn't started or finished.
+    let app = TestApp::new().await;
+    let user = app.user("badges").await;
+    let day = |d: i64| chrono::Utc::now() - chrono::Duration::days(d);
+    let feed = Feed::new("Weekly")
+        .episode(Episode::new(1).title("Old").pub_date(day(30)))
+        .episode(Episode::new(2).title("Started").pub_date(day(5)))
+        .episode(Episode::new(3).title("Finished").pub_date(day(3)))
+        .episode(Episode::new(4).title("New A").pub_date(day(2)))
+        .episode(Episode::new(5).title("New B").pub_date(day(1)));
+    let pod = app.subscribe(&user, &app.feed("weekly.xml", &feed), 5).await;
+    let count = |pods: Vec<serde_json::Value>| pods.iter().find(|p| p["podcastid"] == pod).unwrap()["new_episode_count"].clone();
+    assert_eq!(count(app.podcasts(&user).await), 4, "four episodes are from the last week");
+
+    let started = app.episode_id(&user, pod, "Started").await;
+    app.post("/api/data/record_listen_duration")
+        .key(&user)
+        .json(&json!({ "episode_id": started, "user_id": user.id, "listen_duration": 60.0 }))
+        .send()
+        .await
+        .assert_ok();
+    let finished = app.episode_id(&user, pod, "Finished").await;
+    app.post("/api/data/mark_episode_completed")
+        .key(&user)
+        .json(&json!({ "episode_id": finished, "user_id": user.id, "is_youtube": false }))
+        .send()
+        .await
+        .assert_ok();
+    assert_eq!(count(app.podcasts(&user).await), 2, "started and finished episodes no longer count");
+
+    // Another user's listening doesn't change this user's count.
+    let other = app.user("other-badges").await;
+    let other_pod = app.subscribe(&other, &app.feed("weekly.xml", &feed), 5).await;
+    let other_count = app.podcasts(&other).await.iter().find(|p| p["podcastid"] == other_pod).unwrap()["new_episode_count"].clone();
+    assert_eq!(other_count, 4);
+}

@@ -457,7 +457,15 @@ impl DatabasePool {
                                          (SELECT MAX(v.publishedat) FROM "YouTubeVideos" v WHERE v.podcastid = "Podcasts".podcastid)),
                                 'YYYY-MM-DD"T"HH24:MI:SS') as newest_episode_date,
                         (SELECT COUNT(*) FROM "UserEpisodeHistory" h JOIN "Episodes" e ON e.episodeid = h.episodeid
-                         WHERE h.userid = $1 AND e.feedid = "Podcasts".feedid) as play_count
+                         WHERE h.userid = $1 AND e.feedid = "Podcasts".feedid) as play_count,
+                        (SELECT COUNT(*) FROM "Episodes" e
+                         WHERE e.feedid = "Podcasts".feedid
+                           AND e.episodepubdate > (NOW() AT TIME ZONE 'UTC') - INTERVAL '7 days'
+                           AND NOT EXISTS (SELECT 1 FROM "UserEpisodeHistory" h
+                                           WHERE h.userid = $1 AND h.episodeid = e.episodeid)
+                           AND NOT EXISTS (SELECT 1 FROM "UserEpisodeState" st
+                                           WHERE st.userid = $1 AND st.episodeid = e.episodeid AND st.completed)
+                        ) as new_episode_count
                     FROM "Podcasts"
                     WHERE userid = $1 AND COALESCE(displaypodcast, TRUE) = TRUE
                     ORDER BY podcastname"#
@@ -488,6 +496,7 @@ impl DatabasePool {
                         oldest_episode_date: row.try_get("oldest_episode_date")?,
                         newest_episode_date: row.try_get("newest_episode_date")?,
                         play_count: row.try_get("play_count")?,
+                        new_episode_count: row.try_get("new_episode_count").unwrap_or(0),
                     });
                 }
                 Ok(podcasts)

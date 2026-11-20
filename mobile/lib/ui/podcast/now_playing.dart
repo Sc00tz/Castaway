@@ -1,9 +1,11 @@
 // The full-screen player, opened from the mini player.
 //
-// One surface: artwork, title, scrub bar, transport and a row of secondary
-// actions. Up Next, chapters and show notes open as sheets above it. Each part
-// listens only to the stream it shows, so a position tick repaints the scrub
-// bar and nothing else.
+// Layout (2026-11 redesign, Pocket Casts-style): artwork, chapter navigation,
+// title and podcast, scrub bar, skip back / play / skip forward, and an action
+// bar (Up Next, speed, transcript, other devices, save, sleep). Chapters, Up
+// Next and the episode notes share one sheet with tabs. Each part listens only
+// to the stream it shows, so a position tick repaints the scrub bar and
+// nothing else.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -16,6 +18,7 @@ import 'package:castaway_mobile/bloc/podcast/audio_bloc.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/entities/chapter.dart';
 import 'package:castaway_mobile/entities/episode.dart';
+import 'package:castaway_mobile/entities/pending_action.dart';
 import 'package:castaway_mobile/entities/sleep.dart';
 import 'package:castaway_mobile/l10n/L.dart';
 import 'package:castaway_mobile/services/audio/audio_player_service.dart';
@@ -32,6 +35,7 @@ import 'package:castaway_mobile/ui/podcast/remote_devices_button.dart';
 import 'package:castaway_mobile/ui/podcast/skip_interval_icon.dart';
 import 'package:castaway_mobile/ui/tab_navigator.dart';
 import 'package:castaway_mobile/ui/utils/artwork_colors.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
 import 'package:castaway_mobile/ui/widgets/placeholder_builder.dart';
 import 'package:castaway_mobile/ui/widgets/podcast_html.dart';
 import 'package:castaway_mobile/ui/widgets/podcast_image.dart';
@@ -89,10 +93,14 @@ class _NowPlayingState extends State<NowPlaying> {
     super.dispose();
   }
 
-  /// Artwork-derived accent when that setting is on, else the theme's.
+  bool get _artworkAccent =>
+      Provider.of<SettingsBloc>(context, listen: false).currentSettings.artworkAccentColors;
+
+  /// Artwork-derived accent when that setting is on, else the theme's (orange
+  /// in the Castaway themes).
   Color _accent(ThemeData theme, Episode episode) {
-    final enabled = Provider.of<SettingsBloc>(context, listen: false).currentSettings.artworkAccentColors;
-    if (!enabled) return theme.primaryColor;
+    final themeAccent = CastawayStyle.fromTheme(theme).accent;
+    if (!_artworkAccent) return themeAccent;
 
     final url = episode.imageUrl;
     if (url != null && url.isNotEmpty && url != _artUrl) {
@@ -105,7 +113,7 @@ class _NowPlayingState extends State<NowPlaying> {
         });
       }
     }
-    return _artColor ?? theme.primaryColor;
+    return _artColor ?? themeAccent;
   }
 
   @override
@@ -125,12 +133,16 @@ class _NowPlayingState extends State<NowPlaying> {
             final episode = snapshot.data;
             if (episode == null) return const SizedBox.shrink();
 
-            // Eases the background between colours when the episode changes.
+            // Eases between colours when the episode changes.
             return TweenAnimationBuilder<Color?>(
               tween: ColorTween(end: _accent(theme, episode)),
               duration: const Duration(milliseconds: 350),
-              builder: (context, accent, _) =>
-                  _PlayerSurface(episode: episode, accent: accent!, topInset: widget.topInset),
+              builder: (context, accent, _) => _PlayerSurface(
+                episode: episode,
+                accent: accent!,
+                tinted: _artworkAccent,
+                topInset: widget.topInset,
+              ),
             );
           },
         ),
@@ -142,27 +154,31 @@ class _NowPlayingState extends State<NowPlaying> {
 class _PlayerSurface extends StatelessWidget {
   final Episode episode;
   final Color accent;
+
+  /// Wash the top of the player in [accent] (only with artwork colours on).
+  final bool tinted;
   final double topInset;
 
-  const _PlayerSurface({required this.episode, required this.accent, required this.topInset});
+  const _PlayerSurface({required this.episode, required this.accent, required this.tinted, required this.topInset});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bg = theme.scaffoldBackgroundColor;
-    final tint = Color.alphaBlend(accent.withOpacity(0.22), bg);
+    final bg = Theme.of(context).scaffoldBackgroundColor;
 
     return PlaybackErrorListener(
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [tint, bg],
-              stops: const [0.0, 0.6],
-            ),
+            color: bg,
+            gradient: tinted
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color.alphaBlend(accent.withOpacity(0.22), bg), bg],
+                    stops: const [0.0, 0.6],
+                  )
+                : null,
           ),
           child: SafeArea(
             top: false,
@@ -170,13 +186,14 @@ class _PlayerSurface extends StatelessWidget {
             child: LayoutBuilder(builder: (context, constraints) {
               final wide = constraints.maxWidth > constraints.maxHeight && constraints.maxWidth >= 600;
               final controls = <Widget>[
+                _ChapterNav(episode: episode),
                 _TitleBlock(episode: episode, accent: accent),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _ScrubBar(episode: episode, accent: accent),
                 const SizedBox(height: 4),
-                _Transport(episode: episode, accent: accent),
-                const SizedBox(height: 16),
-                _ActionRow(episode: episode, accent: accent),
+                _Transport(accent: accent),
+                const SizedBox(height: 18),
+                _ActionBar(episode: episode, accent: accent),
               ];
 
               if (wide) {
@@ -210,12 +227,12 @@ class _PlayerSurface extends StatelessWidget {
                   _Header(episode: episode),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(32, 8, 32, 24),
+                      padding: const EdgeInsets.fromLTRB(40, 12, 40, 20),
                       child: _Artwork(episode: episode),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                     child: Column(children: controls),
                   ),
                 ],
@@ -249,8 +266,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final neutral = softNeutral(theme);
+    final style = CastawayStyle.of(context);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
@@ -258,43 +274,25 @@ class _Header extends StatelessWidget {
         children: [
           IconButton(
             tooltip: L.of(context)!.minimise_player_window_button_label,
-            icon: Icon(PhosphorIconsRegular.caretDown, color: neutral, size: 26),
+            icon: Icon(PhosphorIconsRegular.caretDown, color: style.text, size: 26),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => _goToPodcast(context, episode),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      L.of(context)!.now_playing_caps,
-                      style: theme.textTheme.labelSmall!.copyWith(color: theme.hintColor, letterSpacing: 1.2),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      episode.podcast ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge!.copyWith(fontWeight: FontWeight.w600, color: neutral),
-                    ),
-                  ],
-                ),
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(color: style.surfaceHigh, borderRadius: BorderRadius.circular(2)),
               ),
             ),
           ),
-          const RemoteDevicesButton(),
           PopupMenuButton<String>(
             tooltip: L.of(context)!.more_label,
-            icon: Icon(PhosphorIconsRegular.dotsThree, color: neutral, size: 26),
+            icon: Icon(PhosphorIconsRegular.dotsThreeVertical, color: style.text, size: 26),
             onSelected: (value) {
               switch (value) {
                 case 'notes':
-                  _showNotesSheet(context, episode);
+                  _showPlayerSheet(context, _PlayerSheetTab.notes);
                 case 'podcast':
                   _goToPodcast(context, episode);
               }
@@ -329,9 +327,9 @@ class _Artwork extends StatelessWidget {
           label: L.of(context)!.semantic_podcast_artwork_label,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 28, offset: const Offset(0, 10)),
+                BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 32, offset: const Offset(0, 14)),
               ],
             ),
             child: AnimatedSwitcher(
@@ -341,7 +339,7 @@ class _Artwork extends StatelessWidget {
                       key: const ValueKey('no-art'),
                       width: size,
                       height: size,
-                      child: ClipRRect(borderRadius: BorderRadius.circular(20), child: fallback),
+                      child: ClipRRect(borderRadius: BorderRadius.circular(14), child: fallback),
                     )
                   : PodcastImage(
                       key: ValueKey('nowplaying$url'),
@@ -349,7 +347,7 @@ class _Artwork extends StatelessWidget {
                       width: size,
                       height: size,
                       fit: BoxFit.cover,
-                      borderRadius: 20,
+                      borderRadius: 14,
                       placeholder: placeholderBuilder?.builder()(context) ?? fallback,
                       errorPlaceholder: placeholderBuilder?.errorBuilder()(context) ?? fallback,
                     ),
@@ -361,6 +359,95 @@ class _Artwork extends StatelessWidget {
   }
 }
 
+/// "‹  Chapter title / Chapter 3 of 9  ›" above the episode title, when the
+/// episode has more than one chapter. Tapping the title opens the chapters.
+class _ChapterNav extends StatelessWidget {
+  final Episode episode;
+
+  const _ChapterNav({required this.episode});
+
+  /// Seek to the previous chapter, or back to the start of this one if it has
+  /// been playing for more than a few seconds.
+  void _previousChapter(AudioBloc audioBloc, List<Chapter> chapters) {
+    final position = audioBloc.playPosition?.valueOrNull?.position.inMilliseconds ?? 0;
+    final seconds = position / 1000;
+    final current = chapters.lastIndexWhere((c) => c.startTime <= seconds);
+    if (current < 0) return;
+    final target = seconds - chapters[current].startTime > 3 || current == 0 ? current : current - 1;
+    audioBloc.transitionPosition(chapters[target].startTime);
+  }
+
+  void _nextChapter(AudioBloc audioBloc, List<Chapter> chapters) {
+    final position = audioBloc.playPosition?.valueOrNull?.position.inMilliseconds ?? 0;
+    final next = chapters.indexWhere((c) => c.startTime > position / 1000);
+    if (next >= 0) audioBloc.transitionPosition(chapters[next].startTime);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final chapters = _tocChapters(episode);
+    if (chapters.length < 2) return const SizedBox(height: 4);
+
+    final audioBloc = Provider.of<AudioBloc>(context, listen: false);
+    final style = CastawayStyle.of(context);
+    final l = L.of(context)!;
+    final current = chapters.indexWhere((c) => c == episode.currentChapter);
+    final title = current >= 0 ? chapters[current].title.trim() : '';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: l.previous_chapter,
+            color: style.muted,
+            icon: const Icon(PhosphorIconsFill.skipBack, size: 20),
+            onPressed: () => _previousChapter(audioBloc, chapters),
+          ),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _showPlayerSheet(context, _PlayerSheetTab.chapters),
+              child: Semantics(
+                button: true,
+                label: '${l.semantic_current_chapter_label} $title',
+                excludeSemantics: true,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: style.text),
+                      ),
+                      if (current >= 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          l.chapter_x_of_y(current + 1, chapters.length),
+                          style: TextStyle(fontSize: 12, color: style.muted),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: l.next_chapter,
+            color: style.muted,
+            icon: const Icon(PhosphorIconsFill.skipForward, size: 20),
+            onPressed: () => _nextChapter(audioBloc, chapters),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TitleBlock extends StatelessWidget {
   final Episode episode;
   final Color accent;
@@ -369,8 +456,8 @@ class _TitleBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final chapter = episode.currentChapter;
+    final style = CastawayStyle.of(context);
+    final podcast = episode.podcast ?? '';
 
     return Column(
       children: [
@@ -381,22 +468,25 @@ class _TitleBlock extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleLarge!.copyWith(fontWeight: FontWeight.bold, height: 1.25),
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700, height: 1.25, color: style.text),
           ),
         ),
-        if (chapter != null && chapter.title.trim().isNotEmpty) ...[
-          const SizedBox(height: 6),
+        if (podcast.isNotEmpty) ...[
+          const SizedBox(height: 4),
           InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: () => _showChaptersSheet(context),
+            onTap: () => _goToPodcast(context, episode),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child: Text(
-                chapter.title.trim(),
-                semanticsLabel: '${L.of(context)!.semantic_current_chapter_label} ${chapter.title}',
+                podcast,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium!.copyWith(color: accent, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: readableOn(accent, style.background),
+                ),
               ),
             ),
           ),
@@ -439,9 +529,10 @@ class _ScrubBarState extends State<_ScrubBar> {
   Widget build(BuildContext context) {
     final audioBloc = Provider.of<AudioBloc>(context, listen: false);
     final theme = Theme.of(context);
-    final neutral = softNeutral(theme);
-    final labels = theme.textTheme.bodySmall!.copyWith(
-      color: theme.hintColor,
+    final style = CastawayStyle.of(context);
+    final labels = TextStyle(
+      fontSize: 12,
+      color: style.muted,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 
@@ -510,8 +601,9 @@ class _ScrubBarState extends State<_ScrubBar> {
                         chapterMarks: chapterMarks,
                         dragging: _dragFraction != null,
                         accent: widget.accent,
-                        track: neutral.withOpacity(0.12),
-                        bufferedColor: neutral.withOpacity(0.24),
+                        thumb: style.text,
+                        track: style.surfaceHigh,
+                        bufferedColor: Color.alphaBlend(style.text.withOpacity(0.12), style.surfaceHigh),
                         gap: theme.scaffoldBackgroundColor,
                       ),
                     ),
@@ -523,7 +615,7 @@ class _ScrubBarState extends State<_ScrubBar> {
                   Text(_formatTime(shown), style: labels),
                   const Spacer(),
                   Text(
-                    '-${_formatTime(remaining.isNegative ? Duration.zero : remaining)}',
+                    '−${_formatTime(remaining.isNegative ? Duration.zero : remaining)}',
                     semanticsLabel: '${L.of(context)!.now_playing_episode_time_remaining} ${_formatTime(remaining)}',
                     style: labels,
                   ),
@@ -544,6 +636,7 @@ class _ScrubPainter extends CustomPainter {
 
   final bool dragging;
   final Color accent;
+  final Color thumb;
   final Color track;
   final Color bufferedColor;
   final Color gap;
@@ -554,6 +647,7 @@ class _ScrubPainter extends CustomPainter {
     required this.chapterMarks,
     required this.dragging,
     required this.accent,
+    required this.thumb,
     required this.track,
     required this.bufferedColor,
     required this.gap,
@@ -580,8 +674,8 @@ class _ScrubPainter extends CustomPainter {
 
     canvas.drawCircle(
       Offset(size.width * played, size.height / 2),
-      dragging ? 9 : 6,
-      Paint()..color = accent,
+      dragging ? 10 : 8,
+      Paint()..color = thumb,
     );
   }
 
@@ -591,72 +685,39 @@ class _ScrubPainter extends CustomPainter {
       old.buffered != buffered ||
       old.dragging != dragging ||
       old.accent != accent ||
+      old.thumb != thumb ||
       old.track != track ||
       old.chapterMarks.length != chapterMarks.length;
 }
 
 class _Transport extends StatelessWidget {
-  final Episode episode;
   final Color accent;
 
-  const _Transport({required this.episode, required this.accent});
-
-  /// Seek to the previous chapter, or back to the start of this one if it has
-  /// been playing for more than a few seconds.
-  void _previousChapter(AudioBloc audioBloc, List<Chapter> chapters) {
-    final position = audioBloc.playPosition?.valueOrNull?.position.inMilliseconds ?? 0;
-    final seconds = position / 1000;
-    final current = chapters.lastIndexWhere((c) => c.startTime <= seconds);
-    if (current < 0) return;
-    final target = seconds - chapters[current].startTime > 3 || current == 0 ? current : current - 1;
-    audioBloc.transitionPosition(chapters[target].startTime);
-  }
-
-  void _nextChapter(AudioBloc audioBloc, List<Chapter> chapters) {
-    final position = audioBloc.playPosition?.valueOrNull?.position.inMilliseconds ?? 0;
-    final next = chapters.indexWhere((c) => c.startTime > position / 1000);
-    if (next >= 0) audioBloc.transitionPosition(chapters[next].startTime);
-  }
+  const _Transport({required this.accent});
 
   @override
   Widget build(BuildContext context) {
     final audioBloc = Provider.of<AudioBloc>(context, listen: false);
     final settings = Provider.of<SettingsBloc>(context, listen: false).currentSettings;
-    final neutral = softNeutral(Theme.of(context));
-    final chapters = _tocChapters(episode);
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (chapters.length > 1)
-          IconButton(
-            tooltip: L.of(context)!.previous_chapter,
-            iconSize: 28,
-            color: neutral,
-            icon: const Icon(PhosphorIconsFill.skipBack),
-            onPressed: () => _previousChapter(audioBloc, chapters),
-          ),
         _SkipButton(
           icon: PhosphorIconsRegular.arrowCounterClockwise,
           seconds: settings.rewindInterval,
           tooltip: L.of(context)!.rewind_button_label,
           onTap: () => audioBloc.transitionState(TransitionState.rewind),
         ),
+        const SizedBox(width: 28),
         _PlayButton(accent: accent),
+        const SizedBox(width: 28),
         _SkipButton(
           icon: PhosphorIconsRegular.arrowClockwise,
           seconds: settings.fastForwardInterval,
           tooltip: L.of(context)!.fast_forward_button_label,
           onTap: () => audioBloc.transitionState(TransitionState.fastforward),
         ),
-        if (chapters.length > 1)
-          IconButton(
-            tooltip: L.of(context)!.next_chapter,
-            iconSize: 28,
-            color: neutral,
-            icon: const Icon(PhosphorIconsFill.skipForward),
-            onPressed: () => _nextChapter(audioBloc, chapters),
-          ),
       ],
     );
   }
@@ -673,20 +734,20 @@ class _SkipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final neutral = softNeutral(Theme.of(context));
+    final style = CastawayStyle.of(context);
     return Tooltip(
       message: tooltip,
       child: InkResponse(
-        radius: 34,
+        radius: 36,
         onTap: () {
           HapticFeedback.lightImpact();
           onTap();
         },
         child: SizedBox(
-          width: 64,
-          height: 64,
+          width: 68,
+          height: 68,
           child: Center(
-            child: SkipIntervalIcon(icon: icon, seconds: seconds, color: neutral, semanticLabel: tooltip),
+            child: SkipIntervalIcon(icon: icon, seconds: seconds, size: 50, color: style.text, semanticLabel: tooltip),
           ),
         ),
       ),
@@ -702,7 +763,7 @@ class _PlayButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final audioBloc = Provider.of<AudioBloc>(context, listen: false);
-    final fg = onColor(accent);
+    final fg = inkOn(accent);
 
     return StreamBuilder<AudioState>(
       stream: audioBloc.playingState,
@@ -715,15 +776,15 @@ class _PlayButton extends StatelessWidget {
         final label = playing ? L.of(context)!.pause_button_label : L.of(context)!.play_button_label;
 
         return SizedBox(
-          width: 88,
-          height: 88,
+          width: 92,
+          height: 92,
           child: Stack(
             alignment: Alignment.center,
             children: [
               if (loading)
                 SizedBox(
-                  width: 86,
-                  height: 86,
+                  width: 90,
+                  height: 90,
                   child: CircularProgressIndicator(strokeWidth: 3, color: accent),
                 ),
               Material(
@@ -731,14 +792,15 @@ class _PlayButton extends StatelessWidget {
                 shape: const CircleBorder(),
                 elevation: 2,
                 child: InkWell(
+                  key: const Key('nowplaying-play'),
                   customBorder: const CircleBorder(),
                   onTap: () {
                     HapticFeedback.mediumImpact();
                     audioBloc.transitionState(playing ? TransitionState.pause : TransitionState.play);
                   },
                   child: SizedBox(
-                    width: 74,
-                    height: 74,
+                    width: 80,
+                    height: 80,
                     child: Icon(
                       failed
                           ? PhosphorIconsBold.arrowClockwise
@@ -747,7 +809,7 @@ class _PlayButton extends StatelessWidget {
                               : PhosphorIconsFill.play,
                       size: 34,
                       color: fg,
-                      semanticLabel: failed ? 'Retry' : label,
+                      semanticLabel: failed ? 'Retry' : label, // i18n-ignore
                     ),
                   ),
                 ),
@@ -760,122 +822,211 @@ class _PlayButton extends StatelessWidget {
   }
 }
 
-class _ActionRow extends StatelessWidget {
+/// Up Next, speed, transcript, other devices, save and sleep, in one bar.
+class _ActionBar extends StatelessWidget {
   final Episode episode;
   final Color accent;
 
-  const _ActionRow({required this.episode, required this.accent});
+  const _ActionBar({required this.episode, required this.accent});
 
   @override
   Widget build(BuildContext context) {
     final audioBloc = Provider.of<AudioBloc>(context, listen: false);
+    final style = CastawayStyle.of(context);
     final l = L.of(context)!;
+    final activeColour = readableOn(accent, style.surface, ratio: 3.0);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        StreamBuilder<double>(
-          stream: audioBloc.currentSpeed,
-          initialData: audioBloc.currentSpeed?.valueOrNull ?? 1.0,
-          builder: (context, snapshot) {
-            final speed = snapshot.data ?? 1.0;
-            final text = speed == speed.roundToDouble() ? '${speed.toInt()}×' : '${speed.toStringAsFixed(1)}×';
-            return _Action(
-              label: l.playback_speed_label,
-              semanticLabel: '${l.playback_speed_label} $text',
-              active: speed != 1.0,
-              accent: accent,
-              icon: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              onTap: () => _showSheet(context, const SpeedSlider()),
-            );
-          },
-        ),
-        StreamBuilder<Sleep>(
-          stream: audioBloc.sleepStream,
-          initialData: Sleep(type: SleepType.none),
-          builder: (context, snapshot) {
-            final active = (snapshot.data?.type ?? SleepType.none) != SleepType.none;
-            return _Action(
-              label: l.sleep_timer_label,
-              active: active,
-              accent: accent,
-              icon: Icon(active ? PhosphorIconsFill.moon : PhosphorIconsRegular.moon, size: 22),
-              onTap: () => _showSheet(context, const SleepSlider(), scrollControlled: true),
-            );
-          },
-        ),
-        if (_tocChapters(episode).isNotEmpty)
-          _Action(
-            label: l.chapters_label,
-            accent: accent,
-            icon: const Icon(PhosphorIconsRegular.listNumbers, size: 22),
-            onTap: () => _showChaptersSheet(context),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(color: style.surface, borderRadius: BorderRadius.circular(16)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _BarButton(
+            key: const Key('nowplaying-upnext'),
+            tooltip: l.up_next_queue_label,
+            onTap: () => _showPlayerSheet(
+              context,
+              _tocChapters(episode).isNotEmpty ? _PlayerSheetTab.chapters : _PlayerSheetTab.upNext,
+            ),
+            child: Icon(PhosphorIconsRegular.queue, size: 24, color: style.text),
           ),
-        if (episode.hasTranscripts)
-          _Action(
-            label: l.transcript_label,
-            accent: accent,
-            icon: const Icon(PhosphorIconsRegular.article, size: 22),
-            onTap: () => _showTranscriptSheet(context, episode),
+          StreamBuilder<double>(
+            stream: audioBloc.currentSpeed,
+            initialData: audioBloc.currentSpeed?.valueOrNull ?? 1.0,
+            builder: (context, snapshot) {
+              final speed = snapshot.data ?? 1.0;
+              final text = speed == speed.roundToDouble() ? '${speed.toInt()}×' : '${speed.toStringAsFixed(1)}×';
+              return _BarButton(
+                tooltip: '${l.playback_speed_label} $text',
+                onTap: () => _showSheet(context, const SpeedSlider()),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: speed != 1.0 ? activeColour : style.text,
+                  ),
+                ),
+              );
+            },
           ),
-        _Action(
-          label: l.up_next_queue_label,
-          accent: accent,
-          icon: const Icon(PhosphorIconsRegular.queue, size: 22),
-          onTap: () => _showUpNextSheet(context),
-        ),
-      ],
+          if (episode.hasTranscripts)
+            _BarButton(
+              tooltip: l.transcript_label,
+              onTap: () => _showTranscriptSheet(context, episode),
+              child: Icon(PhosphorIconsRegular.article, size: 24, color: style.text),
+            ),
+          RemoteDevicesButton(color: style.text),
+          _SaveButton(activeColour: activeColour),
+          StreamBuilder<Sleep>(
+            stream: audioBloc.sleepStream,
+            initialData: Sleep(type: SleepType.none),
+            builder: (context, snapshot) {
+              final active = (snapshot.data?.type ?? SleepType.none) != SleepType.none;
+              return _BarButton(
+                tooltip: l.sleep_timer_label,
+                onTap: () => _showSheet(context, const SleepSlider(), scrollControlled: true),
+                child: Icon(
+                  active ? PhosphorIconsFill.moon : PhosphorIconsRegular.moon,
+                  size: 24,
+                  color: active ? activeColour : style.text,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _Action extends StatelessWidget {
-  final String label;
-  final String? semanticLabel;
-  final Widget icon;
+class _BarButton extends StatelessWidget {
+  final String tooltip;
   final VoidCallback onTap;
-  final bool active;
-  final Color accent;
+  final Widget child;
 
-  const _Action({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    required this.accent,
-    this.semanticLabel,
-    this.active = false,
-  });
+  const _BarButton({super.key, required this.tooltip, required this.onTap, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = active ? accent : softNeutral(theme).withOpacity(0.85);
-
-    return Semantics(
-      button: true,
-      label: semanticLabel ?? label,
-      excludeSemantics: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: IconTheme.merge(
-            data: IconThemeData(color: color),
-            child: DefaultTextStyle.merge(
-              style: TextStyle(color: color),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 26, child: Center(child: icon)),
-                  const SizedBox(height: 4),
-                  Text(label, style: theme.textTheme.labelSmall!.copyWith(color: color, letterSpacing: 0.2)),
-                ],
-              ),
-            ),
-          ),
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        excludeSemantics: true,
+        child: InkResponse(
+          radius: 26,
+          onTap: onTap,
+          child: SizedBox(width: 52, height: 52, child: Center(child: child)),
         ),
       ),
+    );
+  }
+}
+
+/// Star that saves or unsaves the playing episode. Reads the saved state from
+/// the server when the episode changes; offline, the change is queued.
+class _SaveButton extends StatefulWidget {
+  final Color activeColour;
+
+  const _SaveButton({required this.activeColour});
+
+  @override
+  State<_SaveButton> createState() => _SaveButtonState();
+}
+
+class _SaveButtonState extends State<_SaveButton> {
+  int? _episodeId;
+  bool? _saved;
+  bool _busy = false;
+
+  CastawayService? _service() {
+    final settings = Provider.of<SettingsBloc>(context, listen: false).currentSettings;
+    if (settings.castawayServer == null || settings.castawayApiKey == null) return null;
+    return CastawayService()..setCredentials(settings.castawayServer!, settings.castawayApiKey!);
+  }
+
+  Future<void> _refresh(int episodeId) async {
+    final audio = GlobalServices.castawayAudioService;
+    final userId = Provider.of<SettingsBloc>(context, listen: false).currentSettings.castawayUserId;
+    final service = _service();
+    if (audio == null || userId == null || service == null) return;
+    try {
+      final meta = await service.getEpisodeMetadata(episodeId, userId, isYoutube: audio.isYoutube);
+      if (mounted && _episodeId == episodeId) setState(() => _saved = meta?.saved);
+    } catch (_) {
+      // Offline or the lookup failed: leave the star as unknown (outlined).
+    }
+  }
+
+  Future<void> _toggle() async {
+    final audio = GlobalServices.castawayAudioService;
+    final episodeId = audio?.currentEpisodeId;
+    final userId = Provider.of<SettingsBloc>(context, listen: false).currentSettings.castawayUserId;
+    final service = _service();
+    if (audio == null || episodeId == null || userId == null || service == null || _busy) return;
+
+    final save = _saved != true;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l = L.of(context)!;
+    setState(() {
+      _busy = true;
+      _saved = save;
+    });
+    try {
+      final ok = save
+          ? await service.saveEpisode(episodeId, userId, audio.isYoutube)
+          : await service.removeSavedEpisode(episodeId, userId, audio.isYoutube);
+      if (!ok) throw Exception('rejected'); // i18n-ignore
+      messenger?.showSnackBar(SnackBar(content: Text(save ? l.episode_saved : l.episode_removed_from_saved)));
+    } catch (_) {
+      final queue = GlobalServices.offlineActionQueue;
+      if (queue != null) {
+        await queue.enqueueSimple(
+          save ? PendingActionType.saveEpisode : PendingActionType.removeSaved,
+          episodeId,
+          userId,
+          audio.isYoutube,
+        );
+        messenger?.showSnackBar(SnackBar(content: Text(save ? l.saved_sync_when_online : l.removed_sync_when_online)));
+      } else if (mounted) {
+        setState(() => _saved = !save);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final audioBloc = Provider.of<AudioBloc>(context, listen: false);
+    final style = CastawayStyle.of(context);
+    final l = L.of(context)!;
+
+    return StreamBuilder<Episode?>(
+      stream: audioBloc.nowPlaying,
+      initialData: audioBloc.nowPlaying?.valueOrNull,
+      builder: (context, snapshot) {
+        final id = GlobalServices.castawayAudioService?.currentEpisodeId;
+        if (id != null && id != _episodeId) {
+          _episodeId = id;
+          _saved = null;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(id));
+        }
+        final saved = _saved == true;
+        return _BarButton(
+          key: const Key('nowplaying-save'),
+          tooltip: saved ? l.remove_from_saved : l.save,
+          onTap: _toggle,
+          child: Icon(
+            saved ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
+            size: 24,
+            color: saved ? widget.activeColour : style.text,
+          ),
+        );
+      },
     );
   }
 }
@@ -887,7 +1038,7 @@ Future<void> _showSheet(BuildContext context, Widget child, {bool scrollControll
     context: context,
     useRootNavigator: true,
     isScrollControlled: scrollControlled,
-    backgroundColor: Theme.of(context).secondaryHeaderColor,
+    backgroundColor: CastawayStyle.of(context).surface,
     builder: (_) => child,
   );
 }
@@ -903,7 +1054,7 @@ Future<void> _showDraggableSheet(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
-    backgroundColor: Theme.of(context).secondaryHeaderColor,
+    backgroundColor: CastawayStyle.of(context).background,
     builder: (context) => DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.6,
@@ -937,7 +1088,7 @@ class _SheetHandle extends StatelessWidget {
         width: 36,
         height: 4,
         decoration: BoxDecoration(
-          color: softNeutral(Theme.of(context)).withOpacity(0.25),
+          color: CastawayStyle.of(context).surfaceHigh,
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -945,19 +1096,133 @@ class _SheetHandle extends StatelessWidget {
   }
 }
 
-void _showChaptersSheet(BuildContext context) {
-  _showDraggableSheet(
-    context,
-    title: L.of(context)!.chapters_label,
-    builder: (context, controller) => _ChapterList(controller: controller),
+enum _PlayerSheetTab { chapters, upNext, notes }
+
+/// Chapters, Up Next and the episode notes in one sheet with tabs.
+void _showPlayerSheet(BuildContext context, _PlayerSheetTab initial) {
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    backgroundColor: CastawayStyle.of(context).background,
+    routeSettings: const RouteSettings(name: 'player-lists'),
+    builder: (context) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.94,
+      builder: (context, controller) => _PlayerSheet(initial: initial, controller: controller),
+    ),
   );
 }
 
-void _showNotesSheet(BuildContext context, Episode episode) {
-  _showDraggableSheet(
-    context,
-    title: L.of(context)!.notes_label,
-    builder: (context, controller) => SingleChildScrollView(
+class _PlayerSheet extends StatefulWidget {
+  final _PlayerSheetTab initial;
+  final ScrollController controller;
+
+  const _PlayerSheet({required this.initial, required this.controller});
+
+  @override
+  State<_PlayerSheet> createState() => _PlayerSheetState();
+}
+
+class _PlayerSheetState extends State<_PlayerSheet> {
+  late _PlayerSheetTab _tab = widget.initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final audioBloc = Provider.of<AudioBloc>(context, listen: false);
+    final style = CastawayStyle.of(context);
+    final l = L.of(context)!;
+
+    return StreamBuilder<Episode?>(
+      stream: audioBloc.nowPlaying,
+      initialData: audioBloc.nowPlaying?.valueOrNull,
+      builder: (context, snapshot) {
+        final episode = snapshot.data;
+        final hasChapters = episode != null && _tocChapters(episode).isNotEmpty;
+        final tabs = [
+          if (hasChapters) _PlayerSheetTab.chapters,
+          _PlayerSheetTab.upNext,
+          _PlayerSheetTab.notes,
+        ];
+        final tab = tabs.contains(_tab) ? _tab : tabs.first;
+        String label(_PlayerSheetTab t) => switch (t) {
+              _PlayerSheetTab.chapters => l.chapters_label,
+              _PlayerSheetTab.upNext => l.up_next_queue_label,
+              _PlayerSheetTab.notes => l.notes_label,
+            };
+
+        return Column(
+          children: [
+            const _SheetHandle(),
+            Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: style.surface, borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                children: [
+                  for (final t in tabs)
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: t == tab,
+                        label: label(t),
+                        excludeSemantics: true,
+                        child: GestureDetector(
+                          key: ValueKey('player-sheet-${t.name}'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _tab = t),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            height: 40,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: t == tab ? style.text : Colors.transparent,
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Text(
+                              label(t),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: t == tab ? style.background : style.muted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: switch (tab) {
+                _PlayerSheetTab.chapters => _ChapterList(controller: widget.controller),
+                _PlayerSheetTab.upNext => const CastawayUpNextView(),
+                _PlayerSheetTab.notes => episode == null
+                    ? const SizedBox.shrink()
+                    : _NotesView(episode: episode, controller: widget.controller),
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _NotesView extends StatelessWidget {
+  final Episode episode;
+  final ScrollController controller;
+
+  const _NotesView({required this.episode, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
       controller: controller,
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
       child: Column(
@@ -975,26 +1240,8 @@ void _showNotesSheet(BuildContext context, Episode episode) {
           PodcastHtml(content: episode.content ?? episode.description ?? ''),
         ],
       ),
-    ),
-  );
-}
-
-void _showUpNextSheet(BuildContext context) {
-  showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).secondaryHeaderColor,
-    builder: (context) => SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.7,
-      child: const Column(
-        children: [
-          _SheetHandle(),
-          Expanded(child: CastawayUpNextView()),
-        ],
-      ),
-    ),
-  );
+    );
+  }
 }
 
 class _ChapterList extends StatefulWidget {
@@ -1038,7 +1285,7 @@ class _ChapterListState extends State<_ChapterList> {
           itemBuilder: (context, index) {
             final chapter = chapters[index];
             final selected = index == current;
-            final color = selected ? theme.primaryColor : softNeutral(theme);
+            final color = selected ? CastawayStyle.of(context).link : softNeutral(theme);
             return InkWell(
               onTap: () => audioBloc.transitionPosition(chapter.startTime),
               child: Padding(
@@ -1244,7 +1491,7 @@ class _TranscriptListState extends State<_TranscriptList> {
                           cue.text,
                           style: theme.textTheme.bodyLarge!.copyWith(
                             height: 1.35,
-                            color: current ? theme.primaryColor : softNeutral(theme).withOpacity(0.8),
+                            color: current ? CastawayStyle.of(context).link : softNeutral(theme).withOpacity(0.8),
                             fontWeight: current ? FontWeight.w600 : FontWeight.normal,
                           ),
                         ),
@@ -1277,3 +1524,7 @@ class _TranscriptListState extends State<_TranscriptList> {
     );
   }
 }
+
+/// Opens the Up Next list (the player's sheet, on its Up Next tab), e.g. from
+/// the mini player.
+void showUpNextSheet(BuildContext context) => _showPlayerSheet(context, _PlayerSheetTab.upNext);

@@ -9,6 +9,7 @@ import 'package:castaway_mobile/services/audio/audio_player_service.dart';
 import 'package:castaway_mobile/bloc/settings/settings_bloc.dart';
 import 'package:castaway_mobile/ui/podcast/now_playing.dart';
 import 'package:castaway_mobile/ui/podcast/skip_interval_icon.dart';
+import 'package:castaway_mobile/ui/widgets/castaway_style.dart';
 import 'package:castaway_mobile/ui/widgets/placeholder_builder.dart';
 import 'package:castaway_mobile/ui/widgets/podcast_image.dart';
 import 'package:flutter/material.dart';
@@ -59,158 +60,210 @@ class _MiniPlayerBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
+    final style = CastawayStyle.of(context);
     final audioBloc = Provider.of<AudioBloc>(context, listen: false);
+    final settings = Provider.of<SettingsBloc>(context, listen: false).currentSettings;
     final placeholderBuilder = PlaceholderBuilder.of(context);
     final fallbackImage = const Image(image: AssetImage('assets/images/favicon.png'));
+    final l = L.of(context)!;
 
     return StreamBuilder<Episode?>(
         stream: audioBloc.nowPlaying,
         initialData: audioBloc.nowPlaying?.valueOrNull,
         builder: (context, snapshot) {
           final episode = snapshot.data;
-          return Dismissible(
-            key: ValueKey('mini-${episode?.guid}'),
-            confirmDismiss: (direction) async {
-              audioBloc.transitionState(TransitionState.stop);
-              return true;
-            },
-            direction: DismissDirection.startToEnd,
-            background: Container(color: theme.colorScheme.surface),
-            child: GestureDetector(
-              key: const Key('miniplayergesture'),
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _openNowPlaying(context),
-              child: Semantics(
-                header: true,
-                label: L.of(context)!.semantics_mini_player_header,
-                child: Container(
-                  height: 66,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(
-                      top: Divider.createBorderSide(context, width: 1.0, color: theme.dividerColor),
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+            child: Dismissible(
+              key: ValueKey('mini-${episode?.guid}'),
+              confirmDismiss: (direction) async {
+                audioBloc.transitionState(TransitionState.stop);
+                return true;
+              },
+              direction: DismissDirection.startToEnd,
+              child: GestureDetector(
+                key: const Key('miniplayergesture'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _openNowPlaying(context),
+                child: Semantics(
+                  header: true,
+                  label: l.semantics_mini_player_header,
+                  child: Container(
+                    height: 64,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: style.surfaceHigh,
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      _ProgressLine(audioBloc: audioBloc),
-                      Expanded(
-                        child: StreamBuilder<AudioState>(
-                            stream: audioBloc.playingState,
-                            initialData: audioBloc.playingState?.valueOrNull,
-                            builder: (context, stateSnapshot) {
-                              final state = stateSnapshot.data;
-                              final playing = state == AudioState.playing;
-                              final loading = state == AudioState.buffering || state == AudioState.starting;
-                              final failed = state == AudioState.error;
+                    child: Column(
+                      children: [
+                        _ProgressLine(audioBloc: audioBloc),
+                        Expanded(
+                          child: StreamBuilder<AudioState>(
+                              stream: audioBloc.playingState,
+                              initialData: audioBloc.playingState?.valueOrNull,
+                              builder: (context, stateSnapshot) {
+                                final state = stateSnapshot.data;
+                                final playing = state == AudioState.playing;
+                                final loading = state == AudioState.buffering || state == AudioState.starting;
+                                final failed = state == AudioState.error;
 
-                              return Row(
-                                children: <Widget>[
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
-                                    child: ExcludeSemantics(
-                                      child: SizedBox(
-                                        height: 46,
-                                        width: 46,
-                                        child: episode?.imageUrl != null
-                                            ? PodcastImage(
-                                                key: Key('mini${episode!.imageUrl}'),
-                                                url: episode.imageUrl!,
-                                                width: 46,
-                                                height: 46,
-                                                borderRadius: 8.0,
-                                                placeholder: placeholderBuilder?.builder()(context) ?? fallbackImage,
-                                                errorPlaceholder:
-                                                    placeholderBuilder?.errorBuilder()(context) ?? fallbackImage,
-                                              )
-                                            : const SizedBox.shrink(),
+                                return Row(
+                                  children: <Widget>[
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(8, 7, 10, 7),
+                                      child: ExcludeSemantics(
+                                        child: SizedBox(
+                                          height: 44,
+                                          width: 44,
+                                          child: episode?.imageUrl != null
+                                              ? PodcastImage(
+                                                  key: Key('mini${episode!.imageUrl}'),
+                                                  url: episode.imageUrl!,
+                                                  width: 44,
+                                                  height: 44,
+                                                  borderRadius: 8.0,
+                                                  placeholder: placeholderBuilder?.builder()(context) ?? fallbackImage,
+                                                  errorPlaceholder:
+                                                      placeholderBuilder?.errorBuilder()(context) ?? fallbackImage,
+                                                )
+                                              : const SizedBox.shrink(),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        Text(
-                                          episode?.title ?? '',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          failed ? "Couldn't play this episode · tap ↻ to retry" : episode?.author ?? '',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: textTheme.bodySmall?.copyWith(
-                                            color: failed ? theme.colorScheme.error : theme.hintColor,
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            episode?.title ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: style.text,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (!failed)
-                                    IconButton(
-                                      onPressed: playing
-                                          ? () => audioBloc.transitionState(TransitionState.fastforward)
-                                          : null,
-                                      icon: SkipIntervalIcon(
-                                        icon: PhosphorIconsRegular.arrowClockwise,
-                                        seconds: Provider.of<SettingsBloc>(context, listen: false)
-                                            .currentSettings
-                                            .fastForwardInterval,
-                                        size: 32,
-                                        semanticLabel: L.of(context)!.fast_forward_button_label,
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            failed ? l.mini_player_failed : episode?.podcast ?? episode?.author ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: failed
+                                                  ? Theme.of(context).colorScheme.error
+                                                  : readableOn(style.muted, style.surfaceHigh),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 6),
-                                    child: SizedBox(
-                                      width: 48,
-                                      height: 48,
+                                    if (!failed)
+                                      _MiniButton(
+                                        tooltip: l.rewind_button_label,
+                                        onPressed: () => audioBloc.transitionState(TransitionState.rewind),
+                                        child: SkipIntervalIcon(
+                                          icon: PhosphorIconsRegular.arrowCounterClockwise,
+                                          seconds: settings.rewindInterval,
+                                          size: 28,
+                                          color: style.text,
+                                        ),
+                                      ),
+                                    SizedBox(
+                                      width: 44,
+                                      height: 44,
                                       child: AnimatedSwitcher(
                                         duration: const Duration(milliseconds: 180),
                                         child: loading
-                                            ? const Padding(
-                                                key: ValueKey('loading'),
-                                                padding: EdgeInsets.all(13),
-                                                child: CircularProgressIndicator(strokeWidth: 2.4),
+                                            ? Padding(
+                                                key: const ValueKey('loading'),
+                                                padding: const EdgeInsets.all(11),
+                                                child: CircularProgressIndicator(strokeWidth: 2.4, color: style.accent),
                                               )
-                                            : IconButton(
+                                            : Material(
                                                 key: ValueKey(failed ? 'retry' : playing),
-                                                iconSize: 40,
-                                                padding: EdgeInsets.zero,
-                                                onPressed: () => audioBloc.transitionState(
-                                                  playing ? TransitionState.pause : TransitionState.play,
-                                                ),
-                                                icon: Icon(
-                                                  failed
-                                                      ? PhosphorIconsRegular.arrowClockwise
-                                                      : playing
-                                                          ? PhosphorIconsFill.pause
-                                                          : PhosphorIconsFill.play,
-                                                  semanticLabel: playing
-                                                      ? L.of(context)!.pause_button_label
-                                                      : L.of(context)!.play_button_label,
+                                                color: style.accent,
+                                                shape: const CircleBorder(),
+                                                child: InkWell(
+                                                  key: const Key('miniplayer-play'),
+                                                  customBorder: const CircleBorder(),
+                                                  onTap: () => audioBloc.transitionState(
+                                                    playing ? TransitionState.pause : TransitionState.play,
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      failed
+                                                          ? PhosphorIconsBold.arrowClockwise
+                                                          : playing
+                                                              ? PhosphorIconsFill.pause
+                                                              : PhosphorIconsFill.play,
+                                                      size: 20,
+                                                      color: style.onAccent,
+                                                      semanticLabel: playing ? l.pause_button_label : l.play_button_label,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            }),
-                      ),
-                    ],
+                                    if (!failed)
+                                      _MiniButton(
+                                        tooltip: l.fast_forward_button_label,
+                                        onPressed: () => audioBloc.transitionState(TransitionState.fastforward),
+                                        child: SkipIntervalIcon(
+                                          icon: PhosphorIconsRegular.arrowClockwise,
+                                          seconds: settings.fastForwardInterval,
+                                          size: 28,
+                                          color: style.text,
+                                        ),
+                                      ),
+                                    _MiniButton(
+                                      key: const Key('miniplayer-upnext'),
+                                      tooltip: l.up_next_queue_label,
+                                      onPressed: () => showUpNextSheet(context),
+                                      child: Icon(PhosphorIconsRegular.queue, size: 22, color: style.text),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                );
+                              }),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           );
         });
+  }
+}
+
+class _MiniButton extends StatelessWidget {
+  final String tooltip;
+  final VoidCallback onPressed;
+  final Widget child;
+
+  const _MiniButton({super.key, required this.tooltip, required this.onPressed, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        excludeSemantics: true,
+        child: InkResponse(
+          radius: 22,
+          onTap: onPressed,
+          child: SizedBox(width: 44, height: 48, child: Center(child: child)),
+        ),
+      ),
+    );
   }
 }
 
@@ -232,7 +285,7 @@ class _ProgressLine extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: FractionallySizedBox(
               widthFactor: fraction,
-              child: Container(height: 2.0, color: Theme.of(context).primaryColor),
+              child: Container(height: 3.0, color: CastawayStyle.of(context).accent),
             ),
           );
         });

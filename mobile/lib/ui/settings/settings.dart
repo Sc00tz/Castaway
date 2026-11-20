@@ -14,7 +14,6 @@ import 'package:castaway_mobile/ui/settings/search_provider.dart';
 import 'package:castaway_mobile/ui/settings/queue_position_setting.dart';
 import 'package:castaway_mobile/ui/settings/server_download_defaults.dart';
 import 'package:castaway_mobile/ui/settings/settings_section_label.dart';
-import 'package:castaway_mobile/ui/settings/bottom_bar_order.dart';
 import 'package:castaway_mobile/ui/widgets/action_text.dart';
 import 'package:castaway_mobile/ui/widgets/certificate_import_section.dart';
 import 'package:castaway_mobile/ui/settings/castaway_login.dart';
@@ -223,21 +222,6 @@ class _SettingsState extends State<Settings> {
                       height: 0,
                       width: 0,
                     ),
-              SettingsDividerLabel(label: L.of(context)!.settings_navigation),
-              const Divider(),
-              ListTile(
-                title: Text(L.of(context)!.reorganize_bottom_bar),
-                subtitle: Text(L.of(context)!.reorganize_bottom_bar_description),
-                leading: const Icon(PhosphorIconsRegular.list),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const BottomBarOrderWidget(),
-                    ),
-                  );
-                },
-              ),
               SettingsDividerLabel(label: L.of(context)!.settings_playback_divider_label),
               const Divider(),
               MergeSemantics(

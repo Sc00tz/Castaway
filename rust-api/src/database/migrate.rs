@@ -25,6 +25,7 @@ const MIGRATIONS: &[Migration] = &[
     Migration { version: 5, name: "drop_ai", sql: include_str!("../../migrations/0005_drop_ai.sql") },
     Migration { version: 6, name: "castaway_sync_labels", sql: include_str!("../../migrations/0006_castaway_sync_labels.sql") },
     Migration { version: 7, name: "castaway_device_name", sql: include_str!("../../migrations/0007_castaway_device_name.sql") },
+    Migration { version: 8, name: "castaway_theme", sql: include_str!("../../migrations/0008_castaway_theme.sql") },
 ];
 
 /// The last migration version of the old Python runner.

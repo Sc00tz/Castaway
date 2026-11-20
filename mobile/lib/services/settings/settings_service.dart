@@ -130,6 +130,4 @@ abstract class SettingsService {
   String? get castawayEmail;
   set castawayEmail(String? value);
 
-  List<String> get bottomBarOrder;
-  set bottomBarOrder(List<String> value);
 }
